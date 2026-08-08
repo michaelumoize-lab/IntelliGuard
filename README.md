@@ -435,10 +435,12 @@ FaceEmbedding
 
 Device
 
-RecognitionEvent
 AccessLog
 Alert
-SystemLog
+
+Planned Entities:
+RecognitionEvent (Planned)
+SystemLog (Planned)
 ```
 
 ## Person
@@ -498,7 +500,54 @@ Device statuses:
 
 ---
 
-## RecognitionEvent
+## AccessLog
+
+Stores access-control decisions and facial recognition event logs.
+
+Possible statuses:
+
+- Granted
+- Denied
+- Pending (Planned)
+- Error (Planned)
+
+Reasons include:
+
+- Face match
+- Face no match
+- Insufficient confidence
+- Time restriction
+- System error
+- Manual override
+- Invalid credentials (Planned)
+
+---
+
+## Alert
+
+Stores security and system alerts.
+
+Types:
+
+- Unauthorized access
+- Unknown face
+- Device offline
+- System error
+- Suspicious activity (Planned)
+- Informational event (Planned)
+
+Alerts have severity levels:
+
+- Low
+- Medium
+- High
+- Critical
+
+---
+
+## RecognitionEvent (Planned)
+
+*(Planned standalone entity; recognition attempt details are currently recorded in `AccessLog`)*
 
 Stores individual face-recognition attempts.
 
@@ -519,52 +568,9 @@ Information includes:
 
 ---
 
-## AccessLog
+## SystemLog (Planned)
 
-Stores access-control decisions.
-
-Possible statuses:
-
-- Granted
-- Denied
-- Pending
-- Error
-
-Reasons include:
-
-- Face match
-- Face no match
-- Insufficient confidence
-- Time restriction
-- Invalid credentials
-- System error
-- Manual override
-
----
-
-## Alert
-
-Stores security and system alerts.
-
-Examples:
-
-- Unauthorized access
-- Unknown face
-- Device offline
-- Suspicious activity
-- System error
-- Informational event
-
-Alerts have severity levels:
-
-- Low
-- Medium
-- High
-- Critical
-
----
-
-## SystemLog
+*(Planned entity for administrative and system activity auditing)*
 
 Stores administrative and system activity.
 
@@ -1398,4 +1404,7 @@ AI & Machine Learning Enthusiast
 
 # License
 
-This project is licensed under the MIT License.
+The original source code of this project is licensed under the MIT License.
+
+Pre-trained model artifacts, including the default InsightFace `buffalo_l` model zoo weights, are excluded from the MIT License and are subject to [InsightFace's licensing terms](https://github.com/deepinsight/insightface#license), which restrict their use to non-commercial research purposes only.
+

@@ -157,7 +157,7 @@ model Device {
   id              Int          @id @default(autoincrement())
   deviceName      String       @map("device_name") @db.VarChar(100)
   serialNumber    String       @unique @map("serial_number")
-  apiKey          String       @unique @map("api_key")
+  apiKeyHash      String       @unique @map("api_key_hash")
   location        String       @db.VarChar(150)
   ipAddress       String?      @map("ip_address")
   firmwareVersion String?      @map("firmware_version")
@@ -171,7 +171,7 @@ model Device {
   alerts     Alert[]
 
   @@index([serialNumber], map: "idx_device_serial")
-  @@index([apiKey], map: "idx_device_api_key")
+  @@index([apiKeyHash], map: "idx_device_api_key_hash")
   @@map("devices")
 }
 
@@ -207,7 +207,7 @@ enum DoorAction {
 
 model AccessLog {
   id                Int          @id @default(autoincrement())
-  deviceId          Int          @map("device_id")
+  deviceId          Int?         @map("device_id")
   personId          Int?         @map("person_id")
   embeddingId       Int?         @map("embedding_id")
   
@@ -223,7 +223,7 @@ model AccessLog {
   createdAt         DateTime     @default(now()) @map("created_at")
 
   // Relations
-  device    Device         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device    Device?        @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   person    Person?        @relation(fields: [personId], references: [id], onDelete: SetNull)
   embedding FaceEmbedding? @relation(fields: [embeddingId], references: [id], onDelete: SetNull)
 
@@ -250,7 +250,7 @@ enum Severity {
 
 model Alert {
   id         Int       @id @default(autoincrement())
-  deviceId   Int       @map("device_id")
+  deviceId   Int?      @map("device_id")
   personId   Int?      @map("person_id")
   alertType  AlertType @map("alert_type")
   title      String    @db.VarChar(150)
@@ -263,7 +263,7 @@ model Alert {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  device   Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   person   Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
   resolver User?   @relation("ResolvedAlerts", fields: [resolvedBy], references: [id], onDelete: SetNull)
 

@@ -3,6 +3,8 @@ from typing import Optional, List, Tuple
 import onnxruntime as ort
 from insightface.app import FaceAnalysis
 
+from app.core.config import settings
+
 logger = logging.getLogger("intelliguard.insightface")
 
 
@@ -72,5 +74,5 @@ class InsightFaceManager:
             return False
 
 
-# Shared model manager instance
-insightface_manager = InsightFaceManager()
+# Shared model manager instance initialized with model name from settings
+insightface_manager = InsightFaceManager(model_name=settings.INSIGHTFACE_MODEL)

@@ -5,8 +5,10 @@ from app.core.config import settings
 router = APIRouter()
 
 
+from fastapi import APIRouter, Request, Response, status
+
 @router.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
-async def get_health_status(request: Request) -> HealthResponse:
+async def get_health_status(request: Request, response: Response) -> HealthResponse:
     """Retrieve service health status, model loading state, and active ONNX execution provider.
     
     This endpoint reads the pre-initialized model state from application memory
@@ -26,6 +28,7 @@ async def get_health_status(request: Request) -> HealthResponse:
         )
     
     # Degraded status if model failed to load during startup
+    response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     error_msg = manager.error_message if manager else "Model manager not initialized"
     return HealthResponse(
         status="degraded",
