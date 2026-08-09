@@ -1,12 +1,14 @@
 "use client"
 
+import { authMutationKeys } from "@better-auth-ui/core"
 import {
+  type MagicLinkAuthClient,
   useAuth,
-  useSignInMagicLink,
-  useSignInSocial
+  useAuthPlugin,
+  useSignInMagicLink
 } from "@better-auth-ui/react"
+import { useIsMutating } from "@tanstack/react-query"
 import { type SyntheticEvent, useState } from "react"
-import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,13 +17,14 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
+  FieldLabel,
   FieldSeparator
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { magicLinkPlugin } from "@/lib/auth/magic-link-plugin"
 import { cn } from "@/lib/utils"
-import { Label } from "../ui/label"
-import { MagicLinkButton } from "./magic-link-button"
+import { MAGIC_LINK_SENT_STORAGE_KEY } from "./magic-link-sent"
 import { ProviderButtons, type SocialLayout } from "./provider-buttons"
 
 export type MagicLinkProps = {
@@ -44,40 +47,40 @@ export function MagicLink({
   socialPosition = "bottom"
 }: MagicLinkProps) {
   const {
+    authClient,
     basePaths,
     baseURL,
+    emailAndPassword,
     localization,
+    navigate,
+    plugins,
     redirectTo,
     socialProviders,
     viewPaths,
     Link
   } = useAuth()
+  const { localization: magicLinkLocalization, viewPaths: magicLinkViewPaths } =
+    useAuthPlugin(magicLinkPlugin)
 
   const [email, setEmail] = useState("")
 
-  const { mutate: signInMagicLink, isPending: magicLinkPending } =
-    useSignInMagicLink({
-      onError: (error) => toast.error(error.error?.message || error.message),
-      onSuccess: () => {
-        setEmail("")
-        toast.success(localization.auth.magicLinkSent)
+  const { mutate: signInMagicLink, isPending: signInMagicLinkPending } =
+    useSignInMagicLink(authClient as MagicLinkAuthClient, {
+      onSuccess: (_data, variables) => {
+        sessionStorage.setItem(MAGIC_LINK_SENT_STORAGE_KEY, variables.email)
+        navigate({
+          to: `${basePaths.auth}/${magicLinkViewPaths.auth.magicLinkSent}`
+        })
       }
     })
 
-  const [socialRedirecting, setSocialRedirecting] = useState(false)
-
-  const { mutate: signInSocial, isPending: socialPending } = useSignInSocial({
-    onError: (error) => toast.error(error.error?.message || error.message),
-    onSuccess: async () => {
-      setSocialRedirecting(true)
-
-      setTimeout(() => {
-        setSocialRedirecting(false)
-      }, 5000)
-    }
+  const signInMutating = useIsMutating({
+    mutationKey: authMutationKeys.signIn.all
   })
-
-  const isPending = magicLinkPending || socialPending || socialRedirecting
+  const signUpMutating = useIsMutating({
+    mutationKey: authMutationKeys.signUp.all
+  })
+  const isPending = signInMutating + signUpMutating > 0
 
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string
@@ -101,11 +104,7 @@ export function MagicLink({
           {socialPosition === "top" && (
             <>
               {socialProviders && socialProviders.length > 0 && (
-                <ProviderButtons
-                  socialLayout={socialLayout}
-                  signInSocial={signInSocial}
-                  isPending={isPending}
-                />
+                <ProviderButtons socialLayout={socialLayout} view="magicLink" />
               )}
 
               {showSeparator && (
@@ -119,7 +118,9 @@ export function MagicLink({
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field data-invalid={!!fieldErrors.email}>
-                <Label htmlFor="email">{localization.auth.email}</Label>
+                <FieldLabel htmlFor="email">
+                  {localization.auth.email}
+                </FieldLabel>
 
                 <Input
                   id="email"
@@ -154,12 +155,19 @@ export function MagicLink({
 
               <div className="flex flex-col gap-3">
                 <Button type="submit" disabled={isPending}>
-                  {isPending && <Spinner />}
+                  {signInMagicLinkPending && <Spinner />}
 
-                  {localization.auth.sendMagicLink}
+                  {magicLinkLocalization.sendMagicLink}
                 </Button>
 
-                <MagicLinkButton view="magicLink" isPending={isPending} />
+                {plugins.flatMap((plugin) =>
+                  (plugin.authButtons ?? []).map((AuthButton, index) => (
+                    <AuthButton
+                      key={`${plugin.id}-${index.toString()}`}
+                      view="magicLink"
+                    />
+                  ))
+                )}
               </div>
             </FieldGroup>
           </form>
@@ -173,27 +181,25 @@ export function MagicLink({
               )}
 
               {socialProviders && socialProviders.length > 0 && (
-                <ProviderButtons
-                  socialLayout={socialLayout}
-                  signInSocial={signInSocial}
-                  isPending={isPending}
-                />
+                <ProviderButtons socialLayout={socialLayout} view="magicLink" />
               )}
             </>
           )}
         </div>
 
-        <div className="flex flex-col gap-3 items-center w-full mt-4">
-          <FieldDescription className="text-center">
-            {localization.auth.needToCreateAnAccount}{" "}
-            <Link
-              href={`${basePaths.auth}/${viewPaths.auth.signUp}`}
-              className="underline underline-offset-4"
-            >
-              {localization.auth.signUp}
-            </Link>
-          </FieldDescription>
-        </div>
+        {emailAndPassword?.enabled && (
+          <div className="flex flex-col gap-3 items-center w-full mt-4">
+            <FieldDescription className="text-center">
+              {localization.auth.needToCreateAnAccount}{" "}
+              <Link
+                href={`${basePaths.auth}/${viewPaths.auth.signUp}`}
+                className="underline underline-offset-4"
+              >
+                {localization.auth.signUp}
+              </Link>
+            </FieldDescription>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

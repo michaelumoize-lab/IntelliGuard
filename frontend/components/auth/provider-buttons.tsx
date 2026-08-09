@@ -1,40 +1,30 @@
 "use client"
 
-import { providerIcons, useAuth } from "@better-auth-ui/react"
-import { getProviderName } from "@better-auth-ui/react/core"
-import type { SocialProvider } from "better-auth/social-providers"
+import type { AuthView } from "@better-auth-ui/core"
+import { useAuth } from "@better-auth-ui/react"
 import { useMemo } from "react"
 
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { ProviderButton } from "./provider-button"
 
 export type ProviderButtonsProps = {
-  isPending: boolean
   socialLayout?: SocialLayout
-  signInSocial: (params: {
-    provider: SocialProvider
-    callbackURL: string
-  }) => void
+  view?: AuthView
 }
 
 export type SocialLayout = "auto" | "horizontal" | "vertical" | "grid"
 
 /**
- * Render sign-in buttons for configured social providers.
+ * Render sign-in buttons for configured social providers. Each button owns its own sign-in mutation
+ * and reads the shared sign-in pending state from React Query.
  *
- * @param isPending - When true, disables all provider buttons.
- * @param socialLayout - Preferred layout for the provider buttons; when set to `"auto"` the layout is chosen based on the number of available providers.
- * @param signInSocial - Callback invoked with the provider and callbackURL when a button is clicked.
- * @returns A JSX element containing provider sign-in buttons.
+ * @param socialLayout - Preferred layout for the provider buttons; `"auto"` chooses based on the number of providers.
  */
 export function ProviderButtons({
-  isPending,
   socialLayout = "auto",
-  signInSocial
+  view = "signIn"
 }: ProviderButtonsProps) {
-  const { baseURL, localization, redirectTo, socialProviders } = useAuth()
-
-  const callbackURL = `${baseURL}${redirectTo}`
+  const { socialProviders } = useAuth()
 
   const resolvedSocialLayout = useMemo(() => {
     if (socialLayout === "auto") {
@@ -57,30 +47,21 @@ export function ProviderButtons({
         resolvedSocialLayout === "horizontal" && "flex flex-row flex-wrap"
       )}
     >
-      {socialProviders?.map((provider) => {
-        const ProviderIcon = providerIcons[provider]
-
-        return (
-          <Button
-            key={provider}
-            className={cn(resolvedSocialLayout === "horizontal" && "flex-1")}
-            variant="outline"
-            disabled={isPending}
-            onClick={() => signInSocial({ provider, callbackURL })}
-          >
-            <ProviderIcon />
-
-            {resolvedSocialLayout === "vertical"
-              ? localization.auth.continueWith.replace(
-                  "{{provider}}",
-                  getProviderName(provider)
-                )
+      {socialProviders?.map((provider) => (
+        <ProviderButton
+          key={provider}
+          provider={provider}
+          view={view}
+          display={
+            resolvedSocialLayout === "vertical"
+              ? "full"
               : resolvedSocialLayout === "grid"
-                ? getProviderName(provider)
-                : null}
-          </Button>
-        )
-      })}
+                ? "name"
+                : "icon"
+          }
+          className={cn(resolvedSocialLayout === "horizontal" && "flex-1")}
+        />
+      ))}
     </div>
   )
 }

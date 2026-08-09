@@ -1,12 +1,16 @@
-
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
+// ==========================================
+// AUTHENTICATION (Better-Auth Required)
+// ==========================================
 model User {
   id            String    @id
   name          String
@@ -21,6 +25,7 @@ model User {
   banExpires    DateTime?
   sessions      Session[]
   accounts      Account[]
+  alerts        Alert[]     @relation("ResolvedAlerts")
 
   @@unique([email])
   @@map("user")
@@ -73,4 +78,198 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+// ==========================================
+// CORE BUSINESS ENTITIES
+// ==========================================
+enum PersonCategory {
+  employee
+  student
+  visitor
+  contractor
+}
+
+enum PersonStatus {
+  active
+  inactive
+  suspended
+}
+
+model Person {
+  id             Int             @id @default(autoincrement())
+  personCode     String          @unique @map("person_code")
+  firstName      String          @map("first_name")
+  lastName       String          @map("last_name")
+  email          String?         @unique
+  phone          String?         @unique
+  category       PersonCategory
+  department     String?         @db.VarChar(100)
+  status         PersonStatus    @default(active)
+  profileImage   String?         @map("profile_image")
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  faceEmbeddings FaceEmbedding[]
+  accessLogs     AccessLog[]
+  alerts         Alert[]
+
+  @@index([personCode], map: "idx_person_code")
+  @@index([status], map: "idx_person_status")
+  @@map("persons")
+}
+
+model FaceEmbedding {
+  id                    Int      @id @default(autoincrement())
+  personId              Int      @map("person_id")
+  embedding             Unsupported("vector(512)")
+  embeddingModel        String   @default("Buffalo_L") @map("embedding_model") @db.VarChar(100)
+  embeddingModelVersion String?  @map("embedding_model_version") @db.VarChar(50)
+  imagePath             String   @map("image_path")
+  imageHash             String?  @unique @map("image_hash")
+  qualityScore          Float?   @map("quality_score")
+  isActive              Boolean  @default(true) @map("is_active")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  person     Person      @relation(fields: [personId], references: [id], onDelete: Cascade)
+  accessLogs AccessLog[]
+
+  @@index([isActive], map: "idx_face_embedding_active")
+  @@index([personId], map: "idx_face_embedding_person")
+  @@map("face_embeddings")
+}
+
+enum DeviceType {
+  camera
+  access_control
+  sensor
+  iot
+}
+
+enum DeviceStatus {
+  online
+  offline
+  maintenance
+  error
+}
+
+model Device {
+  id              Int          @id @default(autoincrement())
+  deviceName      String       @map("device_name") @db.VarChar(100)
+  serialNumber    String       @unique @map("serial_number")
+  apiKeyHash      String       @unique @map("api_key_hash")
+  location        String       @db.VarChar(150)
+  ipAddress       String?      @map("ip_address")
+  firmwareVersion String?      @map("firmware_version")
+  deviceType      DeviceType   @default(camera) @map("device_type")
+  status          DeviceStatus @default(offline)
+  lastSeen        DateTime?    @map("last_seen")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  accessLogs AccessLog[]
+  alerts     Alert[]
+
+  @@index([serialNumber], map: "idx_device_serial")
+  @@index([apiKeyHash], map: "idx_device_api_key_hash")
+  @@map("devices")
+}
+
+// ==========================================
+// ACCESS EVENTS & ALERTS (UNIFIED LOG)
+// ==========================================
+enum MatchStatus {
+  matched
+  unknown
+  ambiguous
+  rejected
+}
+
+enum AccessStatus {
+  granted
+  denied
+}
+
+enum AccessReason {
+  face_match
+  face_no_match
+  insufficient_confidence
+  time_restriction
+  manual_override
+  system_error
+}
+
+enum DoorAction {
+  unlock
+  lock
+  no_action
+}
+
+model AccessLog {
+  id                Int          @id @default(autoincrement())
+  deviceId          Int?         @map("device_id")
+  personId          Int?         @map("person_id")
+  embeddingId       Int?         @map("embedding_id")
+  
+  matchStatus       MatchStatus  @map("match_status")
+  accessStatus      AccessStatus @map("access_status")
+  reason            AccessReason
+  doorAction        DoorAction   @default(no_action) @map("door_action")
+  
+  confidenceScore   Float?       @map("confidence_score")
+  embeddingDistance Float?       @map("embedding_distance")
+  capturedImagePath String?      @map("captured_image_path")
+  processingTimeMs  Int?         @map("processing_time_ms")
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  device    Device?        @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  person    Person?        @relation(fields: [personId], references: [id], onDelete: SetNull)
+  embedding FaceEmbedding? @relation(fields: [embeddingId], references: [id], onDelete: SetNull)
+
+  @@index([deviceId], map: "idx_accesslog_device")
+  @@index([personId], map: "idx_accesslog_person")
+  @@index([createdAt], map: "idx_accesslog_created")
+  @@index([accessStatus], map: "idx_accesslog_status")
+  @@map("access_logs")
+}
+
+enum AlertType {
+  unauthorized_access
+  unknown_face
+  device_offline
+  system_error
+}
+
+enum Severity {
+  low
+  medium
+  high
+  critical
+}
+
+model Alert {
+  id         Int       @id @default(autoincrement())
+  deviceId   Int?      @map("device_id")
+  personId   Int?      @map("person_id")
+  alertType  AlertType @map("alert_type")
+  title      String    @db.VarChar(150)
+  message    String    @db.Text
+  severity   Severity  @default(medium)
+  imagePath  String?   @map("image_path")
+  resolved   Boolean   @default(false)
+  resolvedBy String?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  person   Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+  resolver User?   @relation("ResolvedAlerts", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@index([resolved], map: "idx_alert_resolved")
+  @@index([createdAt], map: "idx_alert_created")
+  @@map("alerts")
 }
