@@ -1,6 +1,0 @@
-export { EmailVerificationEmail } from "./email-verification"
-export { ResetPasswordEmail } from "./reset-password"
-export { PasswordChangedEmail } from "./password-changed"
-export { EmailChangedEmail } from "./email-changed"
-export { OtpEmail } from "./otp-email"
-export { NewDeviceEmail } from "./new-device"

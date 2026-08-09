@@ -12,21 +12,22 @@ datasource db {
 // AUTHENTICATION (Better-Auth Required)
 // ==========================================
 model User {
-  id            String      @id
+  id            String    @id
   name          String
-  email         String      @unique
-  emailVerified Boolean     @default(false)
+  email         String
+  emailVerified Boolean   @default(false)
   image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   role          String?
-  banned        Boolean?    @default(false)
+  banned        Boolean?  @default(false)
   banReason     String?
   banExpires    DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
   sessions      Session[]
   accounts      Account[]
   alerts        Alert[]     @relation("ResolvedAlerts")
 
+  @@unique([email])
   @@map("user")
 }
 
@@ -42,6 +43,7 @@ model Session {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   impersonatedBy String?
 
+  @@unique([token])
   @@index([userId])
   @@map("session")
 }
