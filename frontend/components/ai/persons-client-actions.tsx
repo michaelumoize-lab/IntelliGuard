@@ -154,8 +154,12 @@ export function PersonRowActions({ person }: { person: any }) {
   const [isReplacingFace, setIsReplacingFace] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const handleStatusToggle = async (newStatus: string) => {
+    if (isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+
     try {
       const res = await fetch(`/api/persons/${person.id}`, {
         method: "PATCH",
@@ -171,6 +175,8 @@ export function PersonRowActions({ person }: { person: any }) {
       }
     } catch (err) {
       toast.error("Failed to update status.");
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 

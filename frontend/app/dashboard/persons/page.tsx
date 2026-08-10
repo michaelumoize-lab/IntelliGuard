@@ -34,7 +34,8 @@ export default async function PersonsPage({
 }) {
   const resolvedSearchParams = await searchParams;
 
-  const page = Math.max(1, parseInt(resolvedSearchParams.page || "1", 10));
+  const rawPage = parseInt(resolvedSearchParams.page || "1", 10);
+  const requestedPage = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
   const limit = 20;
   const search = (resolvedSearchParams.search || "").trim();
   const status = (resolvedSearchParams.status || "").trim().toLowerCase();
@@ -70,7 +71,8 @@ export default async function PersonsPage({
   // Count total matching records directly on PostgreSQL via Prisma
   const total = await prisma.person.count({ where });
   const totalPages = Math.ceil(total / limit) || 1;
-  const skip = (page - 1) * limit;
+  const effectivePage = Math.min(requestedPage, totalPages);
+  const skip = (effectivePage - 1) * limit;
 
   // Retrieve persons with active face embedding metadata directly from PostgreSQL
   const persons = await prisma.person.findMany({
@@ -276,7 +278,7 @@ export default async function PersonsPage({
           {/* Unified Pagination Component */}
           <DataTablePagination
             total={total}
-            page={page}
+            page={effectivePage}
             limit={limit}
             totalPages={totalPages}
             itemLabel="persons"

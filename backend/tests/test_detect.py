@@ -105,3 +105,31 @@ def test_detect_faces_invalid_file(client: TestClient):
     assert response.status_code == 400
     data = response.json()
     assert "detail" in data
+
+
+def test_detect_faces_payload_size_limit(client: TestClient):
+    """Test POST /api/v1/detect with oversized payload exceeding 10MB limit."""
+    oversized_bytes = b"0" * (10 * 1024 * 1024 + 1)
+    response = client.post(
+        "/api/v1/detect",
+        files={"file": ("large.jpg", oversized_bytes, "image/jpeg")},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert "exceeds the maximum allowed limit" in data["detail"]
+
+
+def test_detect_faces_dimension_limit(client: TestClient):
+    """Test POST /api/v1/detect with image dimensions exceeding 4096px limit."""
+    # Create synthetic image with 4097x10 dimensions
+    large_dim_img = np.zeros((10, 4097, 3), dtype=np.uint8)
+    _, img_bytes = cv2.imencode(".jpg", large_dim_img)
+
+    response = client.post(
+        "/api/v1/detect",
+        files={"file": ("large_dim.jpg", img_bytes.tobytes(), "image/jpeg")},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert "exceed maximum allowed limit" in data["detail"]
+

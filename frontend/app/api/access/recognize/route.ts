@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateEmbedding, FastAPIError } from "@/lib/ai/fastapi";
 import { findTopFaceMatches } from "@/lib/ai/face-recognition";
+import { getServerSession } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,14 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
+    // Authenticate admin session
+    const session = await getServerSession();
+    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      return NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { status: 401 }
+      );
+    }
     // 1. Extract and validate uploaded recognition image
     let formData: FormData;
     try {

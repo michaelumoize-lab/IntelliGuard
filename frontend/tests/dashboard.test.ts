@@ -19,6 +19,7 @@ async function runDashboardTests() {
     console.log("✅ Test 1 PASSED: PostgreSQL database aggregation queries executed successfully.");
   } catch (err: any) {
     console.error("❌ Test 1 failed:", err);
+    process.exitCode = 1;
   }
 
   // 2. Test Recognition Breakdown Aggregations
@@ -32,6 +33,7 @@ async function runDashboardTests() {
     console.log("✅ Test 2 PASSED: Recognition breakdown counts calculated accurately.");
   } catch (err: any) {
     console.error("❌ Test 2 failed:", err);
+    process.exitCode = 1;
   }
 
   // 3. Test Security Alerts Unresolved Count
@@ -42,6 +44,7 @@ async function runDashboardTests() {
     console.log("✅ Test 3 PASSED: Unresolved alerts count retrieved.");
   } catch (err: any) {
     console.error("❌ Test 3 failed:", err);
+    process.exitCode = 1;
   }
 
   // 4. Test Zero Raw 512D Vector Leakage in Dashboard Activity
@@ -56,11 +59,13 @@ async function runDashboardTests() {
     const hasRawEmbedding = jsonString.includes('"embedding":') || jsonString.includes("[0.");
     if (hasRawEmbedding) {
       console.error("❌ Test 4 failed: Raw embedding detected in activity response!");
+      process.exitCode = 1;
     } else {
       console.log("✅ Test 4 PASSED: Zero raw vector floats in activity payload.");
     }
   } catch (err: any) {
     console.error("❌ Test 4 failed:", err);
+    process.exitCode = 1;
   }
 
   // 5. Test Real System Health Checks (FastAPI, PostgreSQL, pgvector, ImageKit)
@@ -77,14 +82,23 @@ async function runDashboardTests() {
       console.log("✅ Test 5 PASSED: PostgreSQL and native pgvector extension verified alive.");
     } else {
       console.error("❌ Test 5 failed: pgvector extension not found.");
+      process.exitCode = 1;
     }
   } catch (err: any) {
     console.error("❌ Test 5 failed:", err);
+    process.exitCode = 1;
   }
 
   console.log("\n==================================================");
-  console.log("  Milestone 9 Dashboard Tests Completed!");
+  if (process.exitCode === 1) {
+    console.error("  Milestone 9 Dashboard Tests Failed!");
+  } else {
+    console.log("  Milestone 9 Dashboard Tests Completed Successfully!");
+  }
   console.log("==================================================");
 }
 
-runDashboardTests().catch(console.error);
+runDashboardTests().catch((err) => {
+  console.error("Fatal test error:", err);
+  process.exitCode = 1;
+});

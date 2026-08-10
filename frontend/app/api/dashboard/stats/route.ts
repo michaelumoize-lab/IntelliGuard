@@ -5,62 +5,52 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    // Explicit reporting timezone (UTC local midnight boundary)
+    const now = new Date();
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
 
-    // Parallel database aggregations for performance
+    // Parallel grouped aggregations and metric averages
     const [
-      totalPersons,
-      activePersons,
-      inactivePersons,
-      suspendedPersons,
+      personStatusGroups,
       totalEmbeddings,
       activeEmbeddings,
-      totalAccess,
-      grantedAccess,
-      deniedAccess,
-      todayTotalAccess,
-      todayGrantedAccess,
-      todayDeniedAccess,
-      matchedRecognition,
-      unknownRecognition,
-      ambiguousRecognition,
-      totalAlerts,
-      unresolvedAlerts,
-      criticalAlerts,
-      highAlerts,
-      mediumAlerts,
-      lowAlerts,
+      accessStatusGroups,
+      todayAccessStatusGroups,
+      matchStatusGroups,
+      alertSeverityGroups,
       qualityAggregate,
       similarityAggregate,
       latencyAggregate,
     ] = await Promise.all([
-      prisma.person.count(),
-      prisma.person.count({ where: { status: "active" } }),
-      prisma.person.count({ where: { status: "inactive" } }),
-      prisma.person.count({ where: { status: "suspended" } }),
+      prisma.person.groupBy({
+        by: ["status"],
+        _count: true,
+      }),
 
       prisma.faceEmbedding.count(),
       prisma.faceEmbedding.count({ where: { isActive: true } }),
 
-      prisma.accessLog.count(),
-      prisma.accessLog.count({ where: { accessStatus: "granted" } }),
-      prisma.accessLog.count({ where: { accessStatus: "denied" } }),
+      prisma.accessLog.groupBy({
+        by: ["accessStatus"],
+        _count: true,
+      }),
 
-      prisma.accessLog.count({ where: { createdAt: { gte: startOfToday } } }),
-      prisma.accessLog.count({ where: { createdAt: { gte: startOfToday }, accessStatus: "granted" } }),
-      prisma.accessLog.count({ where: { createdAt: { gte: startOfToday }, accessStatus: "denied" } }),
+      prisma.accessLog.groupBy({
+        by: ["accessStatus"],
+        where: { createdAt: { gte: startOfToday } },
+        _count: true,
+      }),
 
-      prisma.accessLog.count({ where: { matchStatus: "matched" } }),
-      prisma.accessLog.count({ where: { matchStatus: "unknown" } }),
-      prisma.accessLog.count({ where: { matchStatus: "ambiguous" } }),
+      prisma.accessLog.groupBy({
+        by: ["matchStatus"],
+        _count: true,
+      }),
 
-      prisma.alert.count(),
-      prisma.alert.count({ where: { resolved: false } }),
-      prisma.alert.count({ where: { resolved: false, severity: "critical" } }),
-      prisma.alert.count({ where: { resolved: false, severity: "high" } }),
-      prisma.alert.count({ where: { resolved: false, severity: "medium" } }),
-      prisma.alert.count({ where: { resolved: false, severity: "low" } }),
+      prisma.alert.groupBy({
+        by: ["severity"],
+        where: { resolved: false },
+        _count: true,
+      }),
 
       prisma.faceEmbedding.aggregate({
         _avg: { qualityScore: true },
@@ -73,6 +63,40 @@ export async function GET(req: NextRequest) {
         _avg: { processingTimeMs: true },
       }),
     ]);
+
+    // Derive person breakdown values
+    const personMap = new Map(personStatusGroups.map((g) => [g.status, g._count]));
+    const activePersons = personMap.get("active") || 0;
+    const inactivePersons = personMap.get("inactive") || 0;
+    const suspendedPersons = personMap.get("suspended") || 0;
+    const totalPersons = activePersons + inactivePersons + suspendedPersons;
+
+    // Derive access breakdown values
+    const accessMap = new Map(accessStatusGroups.map((g) => [g.accessStatus, g._count]));
+    const grantedAccess = accessMap.get("granted") || 0;
+    const deniedAccess = accessMap.get("denied") || 0;
+    const totalAccess = grantedAccess + deniedAccess;
+
+    // Derive today's access breakdown values
+    const todayAccessMap = new Map(todayAccessStatusGroups.map((g) => [g.accessStatus, g._count]));
+    const todayGrantedAccess = todayAccessMap.get("granted") || 0;
+    const todayDeniedAccess = todayAccessMap.get("denied") || 0;
+    const todayTotalAccess = todayGrantedAccess + todayDeniedAccess;
+
+    // Derive recognition breakdown values
+    const matchMap = new Map(matchStatusGroups.map((g) => [g.matchStatus, g._count]));
+    const matchedRecognition = matchMap.get("matched") || 0;
+    const unknownRecognition = matchMap.get("unknown") || 0;
+    const ambiguousRecognition = matchMap.get("ambiguous") || 0;
+
+    // Derive alert severity breakdown values
+    const alertMap = new Map(alertSeverityGroups.map((g) => [g.severity, g._count]));
+    const criticalAlerts = alertMap.get("critical") || 0;
+    const highAlerts = alertMap.get("high") || 0;
+    const mediumAlerts = alertMap.get("medium") || 0;
+    const lowAlerts = alertMap.get("low") || 0;
+    const unresolvedAlerts = criticalAlerts + highAlerts + mediumAlerts + lowAlerts;
+    const totalAlertsCount = await prisma.alert.count();
 
     const avgQualityPct = qualityAggregate._avg.qualityScore ? qualityAggregate._avg.qualityScore * 100 : 0;
     const avgSimilarityPct = similarityAggregate._avg.confidenceScore ? similarityAggregate._avg.confidenceScore * 100 : 0;
@@ -107,7 +131,7 @@ export async function GET(req: NextRequest) {
         avgLatencySec: Number(avgLatencySec.toFixed(2)),
       },
       alerts: {
-        total: totalAlerts,
+        total: totalAlertsCount,
         unresolved: unresolvedAlerts,
         critical: criticalAlerts,
         high: highAlerts,

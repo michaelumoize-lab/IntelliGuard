@@ -184,13 +184,13 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
           <SidebarMenu>
             {mainNavItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = item.href ? (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))) : false;
 
               if (item.isSubmenu && item.subItems) {
                 const isSubmenuActive = item.subItems.some(
-                  (subItem) => pathname === subItem.href
+                  (subItem) => subItem.href && (pathname === subItem.href || (subItem.href !== "/dashboard" && pathname.startsWith(subItem.href + "/")))
                 );
-                const isOpen = openSubmenus[item.title] ?? false;
+                const isOpen = openSubmenus[item.title] ?? isSubmenuActive;
 
                 return (
                   <Collapsible
@@ -311,7 +311,7 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
               <SidebarMenuButton
                 size="default"
                 variant="outline"
-                className="h-8 w-8 shrink-0 group-data-[collapsible=icon]:hidden hover:text-destructive cursor-pointer"
+                className="h-8 w-8 shrink-0 hover:text-destructive cursor-pointer"
                 onClick={handleLogout}
                 disabled={isLoading}
                 tooltip="Logout"

@@ -1,13 +1,18 @@
 import time
 import logging
+import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, File, UploadFile, Request, Response, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.detection import FaceDetectionResponse, DetectedFace, Base64DetectRequest
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
 
 router = APIRouter()
 logger = logging.getLogger("intelliguard.detect")
+
+# Model-safe concurrency limiter to prevent unbounded CPU/GPU model executions
+inference_semaphore = asyncio.Semaphore(4)
 
 
 def _run_detection(img, face_app) -> List[DetectedFace]:
@@ -74,8 +79,9 @@ async def detect_faces(
     image_bytes = await file.read()
     img = read_image_bytes_to_cv2(image_bytes)
 
-    # Perform inference
-    faces = _run_detection(img, face_app)
+    # Perform inference offloaded to worker pool with concurrency limiting
+    async with inference_semaphore:
+        faces = await run_in_threadpool(_run_detection, img, face_app)
     execution_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
     logger.info(f"Detection complete: {len(faces)} face(s) found in {execution_time_ms} ms.")
@@ -114,8 +120,9 @@ async def detect_faces_base64(
     # Decode base64 to OpenCV array
     img = decode_base64_to_cv2(payload.image_base64)
 
-    # Perform inference
-    faces = _run_detection(img, face_app)
+    # Perform inference offloaded to worker pool with concurrency limiting
+    async with inference_semaphore:
+        faces = await run_in_threadpool(_run_detection, img, face_app)
     execution_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
     logger.info(f"Base64 detection complete: {len(faces)} face(s) found in {execution_time_ms} ms.")
@@ -126,3 +133,4 @@ async def detect_faces_base64(
         faces=faces,
         execution_time_ms=execution_time_ms,
     )
+

@@ -1,8 +1,10 @@
 import time
 import logging
+import asyncio
 import numpy as np
 from typing import List
 from fastapi import APIRouter, File, UploadFile, Request, Response, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.embedding import FaceEmbeddingResponse, Base64EmbeddingRequest
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
@@ -10,6 +12,9 @@ from app.core.quality import calculate_face_quality_score
 
 router = APIRouter()
 logger = logging.getLogger("intelliguard.embedding")
+
+# Model-safe concurrency limiter to prevent unbounded CPU/GPU model executions
+inference_semaphore = asyncio.Semaphore(4)
 
 
 def _extract_512d_embedding(img: np.ndarray, face_app) -> tuple[List[float], float, float]:
@@ -113,8 +118,9 @@ async def generate_embedding(
     image_bytes = await file.read()
     img = read_image_bytes_to_cv2(image_bytes)
 
-    # Execute detection and embedding pipeline
-    embedding_vector, quality_score, confidence = _extract_512d_embedding(img, face_app)
+    # Execute detection and embedding pipeline offloaded to worker pool with concurrency limit
+    async with inference_semaphore:
+        embedding_vector, quality_score, confidence = await run_in_threadpool(_extract_512d_embedding, img, face_app)
     execution_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
     logger.info(f"512D embedding generated successfully in {execution_time_ms} ms.")
@@ -159,8 +165,9 @@ async def generate_embedding_base64(
     # Decode base64 string to OpenCV array
     img = decode_base64_to_cv2(payload.image_base64)
 
-    # Execute detection and embedding pipeline
-    embedding_vector, quality_score, confidence = _extract_512d_embedding(img, face_app)
+    # Execute detection and embedding pipeline offloaded to worker pool with concurrency limit
+    async with inference_semaphore:
+        embedding_vector, quality_score, confidence = await run_in_threadpool(_extract_512d_embedding, img, face_app)
     execution_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
     logger.info(f"Base64 512D embedding generated successfully in {execution_time_ms} ms.")
@@ -177,3 +184,4 @@ async def generate_embedding_base64(
         model_version=None,
         execution_time_ms=execution_time_ms,
     )
+

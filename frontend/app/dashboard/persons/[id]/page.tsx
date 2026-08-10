@@ -149,7 +149,7 @@ export default async function PersonDetailsPage({
                 <div className="flex justify-between items-center py-1">
                   <span className="text-muted-foreground">Registered Date</span>
                   <span className="font-mono text-[11px]">
-                    {new Date(activeEmbedding.createdAt).toLocaleDateString()}
+                    {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(activeEmbedding.createdAt))}
                   </span>
                 </div>
               </div>
@@ -285,7 +285,7 @@ export default async function PersonDetailsPage({
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {new Date(emb.createdAt).toLocaleString()}
+                          {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(emb.createdAt))}
                         </TableCell>
                       </TableRow>
                     ))

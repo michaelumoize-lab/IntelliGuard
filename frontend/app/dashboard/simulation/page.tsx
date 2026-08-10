@@ -31,11 +31,17 @@ export default function WebcamSimulationPage() {
 
   // Refs for race-condition & stale response guards
   const isMonitoringRef = useRef<boolean>(false);
+  const isCameraOnRef = useRef<boolean>(false);
   const inFlightRef = useRef<boolean>(false);
+  const requestSequenceRef = useRef<number>(0);
 
   useEffect(() => {
     isMonitoringRef.current = isMonitoring;
   }, [isMonitoring]);
+
+  useEffect(() => {
+    isCameraOnRef.current = isCameraOn;
+  }, [isCameraOn]);
 
   // Turn Camera On / Off
   const handleToggleCamera = useCallback(() => {
@@ -51,14 +57,15 @@ export default function WebcamSimulationPage() {
 
   // Execute a single face scan
   const executeScan = useCallback(async () => {
-    if (!isCameraOn || !cameraRef.current || inFlightRef.current) return;
+    if (!isCameraOnRef.current || !cameraRef.current || inFlightRef.current) return;
 
+    const requestSeq = ++requestSequenceRef.current;
     inFlightRef.current = true;
     setIsScanning(true);
 
     try {
       const imageBlob = await cameraRef.current.captureFrame();
-      if (!imageBlob) {
+      if (!imageBlob || !isCameraOnRef.current || requestSeq !== requestSequenceRef.current) {
         inFlightRef.current = false;
         setIsScanning(false);
         return;
@@ -66,8 +73,8 @@ export default function WebcamSimulationPage() {
 
       const response = await scanFace(imageBlob);
 
-      // Stale Response Guard: if monitoring or camera was stopped while in flight, discard result
-      if (!isCameraOn || (isMonitoringRef.current === false && !inFlightRef.current)) {
+      // Stale Response Guard: if camera was stopped or a newer scan began in flight, discard result
+      if (!isCameraOnRef.current || requestSeq !== requestSequenceRef.current) {
         return;
       }
 

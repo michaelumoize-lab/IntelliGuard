@@ -124,7 +124,7 @@ export async function findTopFaceMatches(
       face: {
         similarity: bestSimilarity,
         distance: bestDistance,
-        qualityScore: bestCandidate.qualityScore ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
+        qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
         model: bestCandidate.embeddingModel || "buffalo_l",
       },
     };
@@ -147,7 +147,7 @@ export async function findTopFaceMatches(
         embeddingId: Number(bestCandidate.embeddingId),
         similarity: bestSimilarity,
         distance: bestDistance,
-        qualityScore: bestCandidate.qualityScore ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
+        qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
         model: bestCandidate.embeddingModel || "buffalo_l",
       },
     };
@@ -166,7 +166,7 @@ export async function findTopFaceMatches(
       face: {
         similarity: bestSimilarity,
         distance: bestDistance,
-        qualityScore: bestCandidate.qualityScore ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
+        qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
         model: bestCandidate.embeddingModel || "buffalo_l",
       },
       candidates: [
@@ -196,12 +196,13 @@ export async function findTopFaceMatches(
       lastName: bestCandidate.lastName,
       category: bestCandidate.category,
       department: bestCandidate.department,
+      status: bestCandidate.status,
     },
     face: {
       embeddingId: Number(bestCandidate.embeddingId),
       similarity: bestSimilarity,
       distance: bestDistance,
-      qualityScore: bestCandidate.qualityScore ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
+      qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
       model: bestCandidate.embeddingModel || "buffalo_l",
     },
   };

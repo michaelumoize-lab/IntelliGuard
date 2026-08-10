@@ -95,7 +95,7 @@ export async function checkForDuplicateFace(
     return { isDuplicate: false };
   } catch (error) {
     console.error("Error executing pgvector duplicate check in PostgreSQL:", error);
-    return { isDuplicate: false };
+    throw error;
   }
 }
 

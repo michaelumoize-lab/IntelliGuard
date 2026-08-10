@@ -71,7 +71,7 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
   const badge = getBadgeStyle();
   const rawSimilarity = result.face ? result.face.similarity : 0;
   const similarityPct = rawSimilarity < 0 ? "< 0%" : `${(rawSimilarity * 100).toFixed(1)}%`;
-  const qualityPct = result.face?.quality_score ? (result.face.quality_score * 100).toFixed(1) : null;
+  const qualityPct = result.face?.quality_score != null ? (result.face.quality_score * 100).toFixed(1) : null;
 
   return (
     <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-6 shadow-sm flex flex-col justify-between">
@@ -82,7 +82,7 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
           <span>{badge.label}</span>
         </div>
         <span className="text-[11px] font-mono text-muted-foreground uppercase">
-          {result.reason?.replace("_", " ")}
+          {result.reason?.replaceAll("_", " ")}
         </span>
       </div>
 

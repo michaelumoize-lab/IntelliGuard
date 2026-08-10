@@ -22,10 +22,19 @@ export function DataTableSearch({
   const initialSearch = searchParams.get(paramName) || "";
   const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
   const [isPending, startTransition] = useTransition();
+  const lastPushedRef = React.useRef<string | null>(null);
 
   // Sync internal input state when URL searchParams change externally
   useEffect(() => {
-    setSearchTerm(searchParams.get(paramName) || "");
+    const urlVal = searchParams.get(paramName) || "";
+    if (lastPushedRef.current !== null) {
+      if (urlVal === lastPushedRef.current) {
+        lastPushedRef.current = null;
+        return;
+      }
+      lastPushedRef.current = null;
+    }
+    setSearchTerm(urlVal);
   }, [searchParams, paramName]);
 
   // Debounced URL Search Parameter update (300ms)
@@ -35,14 +44,16 @@ export function DataTableSearch({
 
     const timer = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString());
-      if (searchTerm.trim()) {
-        params.set(paramName, searchTerm.trim());
+      const trimmed = searchTerm.trim();
+      if (trimmed) {
+        params.set(paramName, trimmed);
       } else {
         params.delete(paramName);
       }
       // Reset page to 1 whenever search query changes
       params.set("page", "1");
 
+      lastPushedRef.current = trimmed;
       startTransition(() => {
         router.push(`${pathname}?${params.toString()}`);
       });
@@ -56,6 +67,7 @@ export function DataTableSearch({
     const params = new URLSearchParams(searchParams.toString());
     params.delete(paramName);
     params.set("page", "1");
+    lastPushedRef.current = "";
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`);
     });
@@ -69,6 +81,7 @@ export function DataTableSearch({
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder}
         className="w-full h-9 pl-9 pr-8 bg-background border border-input rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
       />
       <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">

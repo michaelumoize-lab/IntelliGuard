@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { HealthCheckResponse } from "@/app/api/dashboard/health/route";
+import type { HealthCheckResponse } from "@/types/health";
 
 export function NavbarSystemHealthBadge() {
   const [status, setStatus] = useState<"online" | "offline" | "loading">("loading");

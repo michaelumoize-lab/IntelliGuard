@@ -81,36 +81,38 @@ export async function POST(
 
     // 6. Step D: Run Database Transaction
     try {
-      // Deactivate all previous embeddings for this person
-      await prisma.faceEmbedding.updateMany({
-        where: { personId, isActive: true },
-        data: { isActive: false },
-      });
+      const updatedPerson = await prisma.$transaction(async (tx) => {
+        // Deactivate all previous embeddings for this person
+        await tx.faceEmbedding.updateMany({
+          where: { personId, isActive: true },
+          data: { isActive: false },
+        });
 
-      // Insert new active 512D FaceEmbedding
-      const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
-      await prisma.$executeRawUnsafe(
-        `
-        INSERT INTO face_embeddings (
-          person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
-        ) VALUES (
-          $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+        // Insert new active 512D FaceEmbedding
+        const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
+        await tx.$executeRawUnsafe(
+          `
+          INSERT INTO face_embeddings (
+            person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+          ) VALUES (
+            $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+          );
+          `,
+          personId,
+          vectorLiteral,
+          aiResult.model || "Buffalo_L",
+          ikResult.url,
+          aiResult.qualityScore
         );
-        `,
-        personId,
-        vectorLiteral,
-        aiResult.model || "Buffalo_L",
-        ikResult.url,
-        aiResult.qualityScore
-      );
 
-      // Update Person record with new face image URL and file ID
-      const updatedPerson = await prisma.person.update({
-        where: { id: personId },
-        data: {
-          faceImageUrl: ikResult.url,
-          faceImageFileId: ikResult.fileId,
-        },
+        // Update Person record with new face image URL and file ID
+        return await tx.person.update({
+          where: { id: personId },
+          data: {
+            faceImageUrl: ikResult.url,
+            faceImageFileId: ikResult.fileId,
+          },
+        });
       });
 
       // Step E: DB Transaction Succeeded -> Attempt deletion of OLD ImageKit asset
@@ -142,7 +144,11 @@ export async function POST(
 
       // Rollback: Delete newly uploaded ImageKit asset so previous image/embedding remains active
       if (newUploadedFileId) {
-        await deleteFaceImage(newUploadedFileId);
+        try {
+          await deleteFaceImage(newUploadedFileId);
+        } catch (cleanupErr) {
+          console.error("Rollback image cleanup failed:", cleanupErr);
+        }
       }
 
       return NextResponse.json(

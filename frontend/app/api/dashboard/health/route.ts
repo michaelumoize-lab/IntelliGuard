@@ -1,24 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { HealthCheckResponse } from "@/types/health";
 
 export const dynamic = "force-dynamic";
-
-export interface HealthCheckResponse {
-  success: boolean;
-  services: {
-    nextjs: { status: "online"; latencyMs: number };
-    fastapi: { status: "online" | "offline" | "error"; latencyMs?: number; message?: string };
-    postgresql: { status: "connected" | "disconnected"; latencyMs?: number };
-    pgvector: { status: "available" | "unavailable"; message?: string };
-    imagekit: { status: "configured" | "misconfigured"; message?: string };
-  };
-}
+export type { HealthCheckResponse };
 
 export async function GET(req: NextRequest) {
-  const startTime = Date.now();
-
-  // 1. Next.js Status
+  // 1. Next.js Local Work Timing
+  const nextjsStart = Date.now();
   const nextjsStatus = { status: "online" as const, latencyMs: 0 };
+  nextjsStatus.latencyMs = Date.now() - nextjsStart;
 
   // 2. Real FastAPI Health Check
   const fastApiUrl = process.env.FASTAPI_URL || "http://localhost:8000";
@@ -39,13 +30,14 @@ export async function GET(req: NextRequest) {
       if (data.status === "ok" || data.status === "healthy" || data.model_loaded === true) {
         fastApiStatus = { status: "online", latencyMs: faLatency };
       } else {
-        fastApiStatus = { status: "error", latencyMs: faLatency, message: data.error || "Health status degraded" };
+        fastApiStatus = { status: "error", latencyMs: faLatency, message: "AI service status degraded" };
       }
     } else {
-      fastApiStatus = { status: "offline", message: `HTTP ${faRes.status}` };
+      fastApiStatus = { status: "offline", message: "AI microservice HTTP error response" };
     }
   } catch (err: any) {
-    fastApiStatus = { status: "offline", message: err.message || "Unreachable" };
+    console.error("FastAPI health check probe failed:", err);
+    fastApiStatus = { status: "offline", message: "AI microservice unreachable" };
   }
 
   // 3. Real PostgreSQL & pgvector Health Check
@@ -66,8 +58,9 @@ export async function GET(req: NextRequest) {
       pgvectorStatus = { status: "unavailable", message: "Extension 'vector' not found in database" };
     }
   } catch (err: any) {
+    console.error("Database health check probe failed:", err);
     postgresStatus = { status: "disconnected" };
-    pgvectorStatus = { status: "unavailable", message: err.message };
+    pgvectorStatus = { status: "unavailable", message: "Database query failed" };
   }
 
   // 4. ImageKit Configuration Check
@@ -81,8 +74,6 @@ export async function GET(req: NextRequest) {
     message: isImageKitConfigured ? "Keys and endpoint configured" : "Missing environment variables",
   };
 
-  nextjsStatus.latencyMs = Date.now() - startTime;
-
   return NextResponse.json({
     success: true,
     services: {
@@ -94,3 +85,4 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+

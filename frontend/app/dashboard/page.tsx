@@ -6,6 +6,7 @@ import { RecognitionBreakdown } from "@/components/dashboard/recognition-breakdo
 import { RecentAccessTable, AccessEventItem } from "@/components/dashboard/recent-access-table";
 import { SecurityAlertsPanel, SecurityAlertItem } from "@/components/dashboard/security-alerts-panel";
 import { SystemHealthPanel } from "@/components/dashboard/system-health-panel";
+import { DashboardLastUpdated } from "@/components/dashboard/dashboard-last-updated";
 import { Users, ShieldCheck, History, AlertTriangle, UserCheck, ShieldAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -14,11 +15,7 @@ export default async function AdminDashboardPage() {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const lastUpdatedTime = new Date().toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const lastUpdatedIso = new Date().toISOString();
 
   // Execute database queries in parallel for peak performance
   const [
@@ -144,7 +141,7 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 self-start md:self-auto font-mono text-xs text-muted-foreground">
-          <span>Last updated: {lastUpdatedTime}</span>
+          <span>Last updated: <DashboardLastUpdated isoTimestamp={lastUpdatedIso} /></span>
         </div>
       </div>
 

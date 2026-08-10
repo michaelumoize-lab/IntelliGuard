@@ -25,8 +25,11 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     const [error, setError] = useState<string | null>(null);
     const [isPermissionDenied, setIsPermissionDenied] = useState<boolean>(false);
 
+    const currentRunIdRef = React.useRef<number>(0);
+
     // Stop active camera stream tracks safely
     const stopStreamTracks = () => {
+      currentRunIdRef.current++;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
@@ -38,6 +41,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
     // Initialize camera stream on demand
     const startCamera = async (deviceId?: string) => {
+      const runId = ++currentRunIdRef.current;
       setIsLoading(true);
       setError(null);
       setIsPermissionDenied(false);
@@ -51,11 +55,21 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
         };
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (runId !== currentRunIdRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
         streamRef.current = stream;
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
+        }
+
+        if (runId !== currentRunIdRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
         }
 
         setIsLoading(false);
@@ -67,6 +81,12 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
         const allDevices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = allDevices.filter((d) => d.kind === "videoinput");
         setDevices(videoDevices);
+
+        const activeTrack = stream.getVideoTracks()[0];
+        const activeDeviceId = activeTrack?.getSettings()?.deviceId;
+        if (activeDeviceId && (!selectedDeviceId || !deviceId)) {
+          setSelectedDeviceId(activeDeviceId);
+        }
       } catch (err: any) {
         console.error("Camera access error:", err);
         setIsLoading(false);

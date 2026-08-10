@@ -1,8 +1,10 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding, FastAPIError } from "@/lib/ai/fastapi";
 import { checkForDuplicateFace } from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
+import { getServerSession } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,14 @@ export async function POST(req: NextRequest) {
   let uploadedFileId: string | null = null;
 
   try {
+    const session = await getServerSession();
+    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      return NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { status: 401 }
+      );
+    }
+
     const formData = await req.formData();
 
     // 1. Extract and validate text fields
@@ -85,43 +95,46 @@ export async function POST(req: NextRequest) {
     const ikResult = await uploadFaceImage(imageBuffer, imageFile.name || "face.jpg");
     uploadedFileId = ikResult.fileId; // Save for cleanup in case database creation fails
 
-    // 6. Step D: Create Person and FaceEmbedding records in PostgreSQL
-    const personCode = `PER-${Date.now().toString().slice(-6)}`;
+    // 6. Step D: Create Person and FaceEmbedding records atomically in PostgreSQL
+    const personCode = `PER-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-    // Wrap database creation in a try-catch for transactional ImageKit cleanup
+    // Wrap database creation in a transaction and try-catch for ImageKit cleanup
     try {
-      const newPerson = await prisma.person.create({
-        data: {
-          personCode,
-          firstName,
-          lastName,
-          email,
-          phone,
-          category: categoryInput as any,
-          department,
-          status: "active",
-          faceImageUrl: ikResult.url,
-          faceImageFileId: ikResult.fileId,
-          notes,
-        },
-      });
+      const newPerson = await prisma.$transaction(async (tx) => {
+        const createdPerson = await tx.person.create({
+          data: {
+            personCode,
+            firstName,
+            lastName,
+            email,
+            phone,
+            category: categoryInput as any,
+            department,
+            status: "active",
+            faceImageUrl: ikResult.url,
+            faceImageFileId: ikResult.fileId,
+            notes,
+          },
+        });
 
-      // Insert 512D vector embedding using raw pgvector SQL cast
-      const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
-      await prisma.$executeRawUnsafe(
-        `
-        INSERT INTO face_embeddings (
-          person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
-        ) VALUES (
-          $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+        const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
+        await tx.$executeRawUnsafe(
+          `
+          INSERT INTO face_embeddings (
+            person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+          ) VALUES (
+            $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+          );
+          `,
+          createdPerson.id,
+          vectorLiteral,
+          aiResult.model || "Buffalo_L",
+          ikResult.url,
+          aiResult.qualityScore
         );
-        `,
-        newPerson.id,
-        vectorLiteral,
-        aiResult.model || "Buffalo_L",
-        ikResult.url,
-        aiResult.qualityScore
-      );
+
+        return createdPerson;
+      });
 
       // Return success response WITHOUT exposing raw 512 float values
       return NextResponse.json(
@@ -213,6 +226,14 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession();
+    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      return NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));

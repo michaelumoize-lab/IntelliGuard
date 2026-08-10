@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -39,6 +40,7 @@ export function RegisterPersonForm() {
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterPersonFormValues>({
+    resolver: zodResolver(registerPersonSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -50,6 +52,14 @@ export function RegisterPersonForm() {
     },
   });
 
+  React.useEffect(() => {
+    return () => {
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -60,6 +70,9 @@ export function RegisterPersonForm() {
       }
       setPhotoError(null);
       setImageFile(file);
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
       setImagePreview(URL.createObjectURL(file));
     }
   };

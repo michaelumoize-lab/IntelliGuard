@@ -67,11 +67,12 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
             </thead>
             <tbody className="divide-y divide-border/40">
               {events.map((evt) => {
-                const dateStr = new Date(evt.createdAt).toLocaleTimeString([], {
+                const dateStr = new Intl.DateTimeFormat("en-US", {
                   hour: "2-digit",
                   minute: "2-digit",
                   second: "2-digit",
-                });
+                  timeZone: "UTC",
+                }).format(new Date(evt.createdAt));
                 const isGranted = evt.accessStatus === "granted";
                 const isDataInconsistency = isGranted && !evt.person;
 
@@ -124,13 +125,13 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                       )}
                     </td>
                     <td className="py-3.5 font-mono text-muted-foreground uppercase text-[11px]">
-                      {evt.reason.replace("_", " ")}
+                      {evt.reason.replaceAll("_", " ")}
                     </td>
                     <td className="py-3.5 font-mono text-right font-semibold text-foreground">
                       {similarityDisplay}
                     </td>
                     <td className="py-3.5 font-mono text-right text-muted-foreground">
-                      {evt.processingTimeMs ? `${(evt.processingTimeMs / 1000).toFixed(2)}s` : "N/A"}
+                      {evt.processingTimeMs != null ? `${(evt.processingTimeMs / 1000).toFixed(2)}s` : "N/A"}
                     </td>
                   </tr>
                 );

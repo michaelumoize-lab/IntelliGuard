@@ -44,11 +44,18 @@ export async function uploadFaceImage(
     fileName: fileName || `face_${Date.now()}.jpg`,
     folder: "/intelliguard/persons/",
     useUniqueFileName: true,
-    isPrivateFile: false, // Accessible via standard CDN delivery URLs for admin dashboard
+    isPrivateFile: true, // Biometric images stored as private files
+  });
+
+  // Generate signed, short-lived delivery URL for secure admin dashboard rendering
+  const signedUrl = client.url({
+    path: response.filePath,
+    signed: true,
+    expireSeconds: 3600 * 24, // 24 hours expiry
   });
 
   return {
-    url: response.url,
+    url: signedUrl,
     fileId: response.fileId,
     filePath: response.filePath,
   };

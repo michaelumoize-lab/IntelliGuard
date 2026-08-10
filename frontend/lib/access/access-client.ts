@@ -54,7 +54,12 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
     body: formData,
   });
 
-  const data = await response.json();
+  let data: any = {};
+  try {
+    data = await response.json();
+  } catch (_) {
+    // Non-JSON error body fallback
+  }
 
   if (!response.ok && !data.access_status) {
     return {

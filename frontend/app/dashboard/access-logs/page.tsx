@@ -27,7 +27,8 @@ interface AccessLogsPageProps {
 
 export default async function AccessLogsPage({ searchParams }: AccessLogsPageProps) {
   const params = await searchParams;
-  const page = Math.max(1, parseInt(params.page || "1", 10));
+  const rawPage = parseInt(params.page || "1", 10);
+  const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
   const limit = 20;
   const search = (params.search || "").trim();
   const statusFilter = (params.status || "").trim().toLowerCase();
@@ -215,7 +216,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                         )}
                       </TableCell>
                       <TableCell className="py-3.5 font-mono text-muted-foreground uppercase text-[11px]">
-                        {log.reason.replace("_", " ")}
+                        {log.reason.replaceAll("_", " ")}
                       </TableCell>
                       <TableCell className="py-3.5 font-mono text-right font-semibold text-foreground">
                         {similarityDisplay}

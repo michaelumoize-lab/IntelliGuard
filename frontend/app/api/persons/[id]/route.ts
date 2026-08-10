@@ -112,9 +112,44 @@ export async function PATCH(
     const body = await req.json();
     const updateData: any = {};
 
-    if (body.firstName !== undefined) updateData.firstName = String(body.firstName).trim();
-    if (body.lastName !== undefined) updateData.lastName = String(body.lastName).trim();
-    if (body.email !== undefined) updateData.email = body.email ? String(body.email).trim() : null;
+    if (body.firstName !== undefined) {
+      const firstName = String(body.firstName).trim();
+      if (!firstName || firstName.length > 100) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "First name cannot be empty or exceed 100 characters." },
+          { status: 400 }
+        );
+      }
+      updateData.firstName = firstName;
+    }
+
+    if (body.lastName !== undefined) {
+      const lastName = String(body.lastName).trim();
+      if (!lastName || lastName.length > 100) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Last name cannot be empty or exceed 100 characters." },
+          { status: 400 }
+        );
+      }
+      updateData.lastName = lastName;
+    }
+
+    if (body.email !== undefined) {
+      if (body.email === null || String(body.email).trim() === "") {
+        updateData.email = null;
+      } else {
+        const email = String(body.email).trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return NextResponse.json(
+            { success: false, error: "VALIDATION_ERROR", message: "Invalid email format." },
+            { status: 400 }
+          );
+        }
+        updateData.email = email;
+      }
+    }
+
     if (body.phone !== undefined) updateData.phone = body.phone ? String(body.phone).trim() : null;
     if (body.department !== undefined) updateData.department = body.department ? String(body.department).trim() : null;
     if (body.notes !== undefined) updateData.notes = body.notes ? String(body.notes).trim() : null;
@@ -139,6 +174,14 @@ export async function PATCH(
         );
       }
       updateData.status = stat;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "No fields to update.",
+        person: existingPerson,
+      });
     }
 
     const updatedPerson = await prisma.person.update({
@@ -208,16 +251,7 @@ export async function DELETE(
       );
     }
 
-    // 1. Delete ImageKit cloud asset if fileId exists (wrapped in try/catch so imagekit errors don't block deletion)
-    if (person.faceImageFileId) {
-      try {
-        await deleteFaceImage(person.faceImageFileId);
-      } catch (imgErr) {
-        console.warn("Non-fatal ImageKit cleanup error during person deletion:", imgErr);
-      }
-    }
-
-    // 2. Perform transactional deletion in PostgreSQL (nullify access logs/alerts, delete embeddings, delete person)
+    // 1. Perform transactional deletion in PostgreSQL (nullify access logs/alerts, delete embeddings, delete person)
     await prisma.$transaction([
       prisma.accessLog.updateMany({
         where: { personId },
@@ -235,6 +269,15 @@ export async function DELETE(
       }),
     ]);
 
+    // 2. Delete ImageKit cloud asset only after the database commit succeeds
+    if (person.faceImageFileId) {
+      try {
+        await deleteFaceImage(person.faceImageFileId);
+      } catch (imgErr) {
+        console.warn("Non-fatal ImageKit cleanup error during person deletion:", imgErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Person and associated biometric data deleted successfully.",
@@ -242,7 +285,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error("Failed to delete person:", error);
     return NextResponse.json(
-      { success: false, error: "DATABASE_ERROR", message: error.message || "Failed to delete person record." },
+      { success: false, error: "DATABASE_ERROR", message: "Failed to delete person record." },
       { status: 500 }
     );
   }

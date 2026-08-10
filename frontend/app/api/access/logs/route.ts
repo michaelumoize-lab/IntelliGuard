@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
 
+const VALID_REASONS = [
+  "face_match",
+  "face_no_match",
+  "insufficient_confidence",
+  "time_restriction",
+  "manual_override",
+  "system_error",
+];
+
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession();
+    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      return NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
@@ -25,7 +43,7 @@ export async function GET(req: NextRequest) {
       where.matchStatus = matchStatus;
     }
 
-    if (reason) {
+    if (reason && VALID_REASONS.includes(reason)) {
       where.reason = reason;
     }
 

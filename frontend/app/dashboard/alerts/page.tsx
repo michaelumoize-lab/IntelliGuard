@@ -20,11 +20,12 @@ interface AlertsPageProps {
 
 export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const params = await searchParams;
-  const page = Math.max(1, parseInt(params.page || "1", 10));
+  const rawPage = parseInt(params.page || "1", 10);
+  const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
   const limit = 20;
   const search = (params.search || "").trim();
   const severityFilter = (params.severity || "").trim().toLowerCase();
-  const resolvedFilter = params.resolved;
+  const resolvedFilter = params.resolved === undefined ? "false" : params.resolved;
 
   const where: any = {};
 
@@ -112,7 +113,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
             <Link
               href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=false`}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
-                resolvedFilter === "false" || !resolvedFilter ? "bg-amber-500/10 text-amber-500 border-amber-500/30 font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
+                resolvedFilter === "false" ? "bg-amber-500/10 text-amber-500 border-amber-500/30 font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
             >
               Unresolved

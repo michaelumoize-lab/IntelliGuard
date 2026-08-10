@@ -47,6 +47,9 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
         return;
       }
       setImageFile(file);
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
       setImagePreview(URL.createObjectURL(file));
     }
   };
@@ -67,43 +70,48 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
     setIsLoading(true);
 
     try {
-      if (isEditing) {
-        // Edit Person Metadata
-        const res = await fetch(`/api/persons/${initialData.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            category,
-            department,
-            phone,
-            email,
-            notes,
-          }),
-        });
+        const trimmedDept = department.trim();
+        const trimmedPhone = phone.trim();
+        const trimmedEmail = email.trim();
+        const trimmedNotes = notes.trim();
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.message || "Failed to update person.");
-        }
+        if (isEditing) {
+          // Edit Person Metadata
+          const res = await fetch(`/api/persons/${initialData.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              category,
+              department: trimmedDept || null,
+              phone: trimmedPhone || null,
+              email: trimmedEmail || null,
+              notes: trimmedNotes || null,
+            }),
+          });
 
-        toast.success("Person metadata updated successfully!");
-        onSuccess();
-        onClose();
-      } else {
-        // Register New Person
-        const formData = new FormData();
-        formData.append("firstName", firstName);
-        formData.append("lastName", lastName);
-        formData.append("category", category);
-        formData.append("department", department);
-        formData.append("phone", phone);
-        formData.append("email", email);
-        formData.append("notes", notes);
-        if (imageFile) {
-          formData.append("image", imageFile);
-        }
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Failed to update person.");
+          }
+
+          toast.success("Person metadata updated successfully!");
+          onSuccess();
+          onClose();
+        } else {
+          // Register New Person
+          const formData = new FormData();
+          formData.append("firstName", firstName.trim());
+          formData.append("lastName", lastName.trim());
+          formData.append("category", category);
+          if (trimmedDept) formData.append("department", trimmedDept);
+          if (trimmedPhone) formData.append("phone", trimmedPhone);
+          if (trimmedEmail) formData.append("email", trimmedEmail);
+          if (trimmedNotes) formData.append("notes", trimmedNotes);
+          if (imageFile) {
+            formData.append("image", imageFile);
+          }
 
         const res = await fetch("/api/persons", {
           method: "POST",

@@ -30,6 +30,7 @@ async function runWebcamSimulationTests() {
     console.log("✅ Test 1 PASSED: Browser webcam payload contains 'image' and correctly omits 'deviceId'.");
   } else {
     console.error("❌ Test 1 failed: deviceId exposed in browser simulation payload.");
+    process.exitCode = 1;
   }
 
   // 2. Test End-to-End Simulation Pipeline (Webcam Frame -> M6 -> M7 -> Response)
@@ -51,9 +52,13 @@ async function runWebcamSimulationTests() {
 
     if (decision.accessStatus && decision.doorAction) {
       console.log("✅ Test 2 PASSED: Simulation pipeline successfully evaluated recognition & access decision!");
+    } else {
+      console.error("❌ Test 2 failed: Missing decision values.");
+      process.exitCode = 1;
     }
   } catch (err: any) {
     console.error("❌ Test 2 failed:", err);
+    process.exitCode = 1;
   }
 
   // 3. Test Scan History Capping (Max 10 Items)
@@ -68,6 +73,7 @@ async function runWebcamSimulationTests() {
     console.log("✅ Test 3 PASSED: Scan history list correctly capped at 10 items.");
   } else {
     console.error("❌ Test 3 failed: Scan history list length:", historyList.length);
+    process.exitCode = 1;
   }
 
   // 4. Test In-Flight Request Throttling Logic
@@ -92,11 +98,19 @@ async function runWebcamSimulationTests() {
     console.log(`✅ Test 4 PASSED: In-flight guard skipped ${skippedCalls} concurrent requests to prevent API flooding.`);
   } else {
     console.error("❌ Test 4 failed: Concurrent requests were not throttled.");
+    process.exitCode = 1;
   }
 
   console.log("\n==================================================");
-  console.log("  Milestone 8 Simulation Tests Completed!");
+  if (process.exitCode === 1) {
+    console.error("  Milestone 8 Simulation Tests Failed!");
+  } else {
+    console.log("  Milestone 8 Simulation Tests Completed Successfully!");
+  }
   console.log("==================================================");
 }
 
-runWebcamSimulationTests().catch(console.error);
+runWebcamSimulationTests().catch((err) => {
+  console.error("Fatal test error:", err);
+  process.exitCode = 1;
+});

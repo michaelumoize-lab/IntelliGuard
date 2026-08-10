@@ -21,11 +21,6 @@ export async function authenticateDevice(
   deviceIdInput?: number | string | null,
   apiKeyInput?: string | null
 ): Promise<DeviceAuthResult> {
-  // Caller 1: Admin / Browser simulation request (deviceId omitted)
-  if (!deviceIdInput && !apiKeyInput) {
-    return { isValid: true, device: null };
-  }
-
   const deviceId = typeof deviceIdInput === "string" ? parseInt(deviceIdInput, 10) : deviceIdInput;
   if (!deviceId || isNaN(deviceId) || !apiKeyInput) {
     return { isValid: false, reason: "invalid_credentials" };
@@ -40,9 +35,15 @@ export async function authenticateDevice(
       return { isValid: false, reason: "device_not_found" };
     }
 
-    // Securely compare SHA-256 hashed API key
+    // Securely compare SHA-256 hashed API key using constant-time comparison
     const hashedApiKey = crypto.createHash("sha256").update(apiKeyInput).digest("hex");
-    if (hashedApiKey !== device.apiKeyHash && apiKeyInput !== device.apiKeyHash) {
+    const hashedBuffer = Buffer.from(hashedApiKey);
+    const expectedBuffer = Buffer.from(device.apiKeyHash);
+    const isHashMatch =
+      hashedBuffer.length === expectedBuffer.length &&
+      crypto.timingSafeEqual(hashedBuffer, expectedBuffer);
+
+    if (!isHashMatch) {
       return { isValid: false, reason: "invalid_credentials" };
     }
 

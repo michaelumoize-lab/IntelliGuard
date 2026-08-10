@@ -28,6 +28,8 @@ async function runMilestone6Tests() {
     process.exit(1);
   }
 
+  let createdTestPersonId: number | null = null;
+
   // 1. Test Known Face Recognition (Register single_face.jpg person first, then recognize)
   console.log("[Test 1] Testing Known Face Recognition...");
   try {
@@ -50,6 +52,7 @@ async function runMilestone6Tests() {
           faceImageUrl: "https://ik.imagekit.io/intelliguard_demo/single_face.jpg"
         }
       });
+      createdTestPersonId = testPerson.id;
 
       const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
       await prisma.$executeRawUnsafe(
@@ -76,11 +79,17 @@ async function runMilestone6Tests() {
       console.log(` - Similarity: ${recognition.face.similarity} | Distance: ${recognition.face.distance}`);
       console.log("✅ Test 1 PASSED: Registered face recognized as MATCHED with high similarity!");
     } else {
-      console.log(` - Result: ${recognition.matchStatus}`);
-      console.log("✅ Test 1 PASSED: Recognition engine evaluated vector correctly.");
+      console.error(`❌ Test 1 FAILED: Expected matchStatus='matched' but got '${recognition.matchStatus}'`);
+      process.exitCode = 1;
     }
   } catch (err: any) {
     console.error("❌ Test 1 failed:", err);
+    process.exitCode = 1;
+  } finally {
+    if (createdTestPersonId) {
+      await prisma.faceEmbedding.deleteMany({ where: { personId: createdTestPersonId } }).catch(() => {});
+      await prisma.person.delete({ where: { id: createdTestPersonId } }).catch(() => {});
+    }
   }
 
   // 2. Test Multiple Faces Rejection
@@ -89,25 +98,40 @@ async function runMilestone6Tests() {
     const multiBuf = fs.readFileSync(multiFacePath);
     await generateEmbedding(multiBuf, "multi_face.jpg");
     console.error("❌ Test 2 failed: Expected MULTIPLE_FACES error!");
+    process.exitCode = 1;
   } catch (err: any) {
     if (err instanceof FastAPIError && err.code === "MULTIPLE_FACES") {
       console.log("✅ Test 2 PASSED: Multiple faces correctly rejected with MULTIPLE_FACES.");
     } else {
       console.error("❌ Test 2 failed with unexpected error:", err);
+      process.exitCode = 1;
     }
   }
 
   // 3. Test Zero Faces Rejection
   console.log("\n[Test 3] Testing Zero Faces Rejection...");
   try {
-    const emptyBuf = Buffer.alloc(100);
-    await generateEmbedding(emptyBuf, "empty.jpg");
-    console.error("❌ Test 3 failed: Expected INVALID_IMAGE / NO_FACE_DETECTED error!");
+    const noFaceJpeg = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48,
+      0x00, 0x48, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08,
+      0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0a, 0x0c, 0x14, 0x0d, 0x0c, 0x0b, 0x0b, 0x0c, 0x19, 0x12,
+      0x13, 0x0f, 0x14, 0x1d, 0x1a, 0x1f, 0x1e, 0x1d, 0x1a, 0x1c, 0x1c, 0x20, 0x24, 0x2e, 0x27, 0x20,
+      0x22, 0x2c, 0x23, 0x1c, 0x1c, 0x28, 0x37, 0x29, 0x2c, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1f, 0x27,
+      0x39, 0x3d, 0x38, 0x32, 0x3c, 0x2e, 0x33, 0x34, 0x32, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01,
+      0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xff, 0xc4, 0x00, 0x1f, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01,
+      0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04,
+      0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f,
+      0x00, 0xbe, 0x00, 0xff, 0xd9
+    ]);
+    await generateEmbedding(noFaceJpeg, "noface.jpg");
+    console.error("❌ Test 3 failed: Expected NO_FACE_DETECTED error!");
+    process.exitCode = 1;
   } catch (err: any) {
-    if (err instanceof FastAPIError) {
+    if (err instanceof FastAPIError && err.code === "NO_FACE_DETECTED") {
       console.log(`✅ Test 3 PASSED: Non-face input rejected with error code '${err.code}'.`);
     } else {
       console.error("❌ Test 3 failed with unexpected error:", err);
+      process.exitCode = 1;
     }
   }
 
@@ -121,16 +145,25 @@ async function runMilestone6Tests() {
     const hasRawEmbedding = "embedding" in recognition || ("face" in recognition && "embedding" in (recognition.face as any));
     if (hasRawEmbedding) {
       console.error("❌ Test 4 failed: Raw embedding property exposed in response!");
+      process.exitCode = 1;
     } else {
       console.log("✅ Test 4 PASSED: Zero raw 512D embedding arrays in response payload.");
     }
   } catch (err: any) {
     console.error("❌ Test 4 failed:", err);
+    process.exitCode = 1;
   }
 
   console.log("\n==================================================");
-  console.log("  Milestone 6 Recognition Tests Completed");
+  if (process.exitCode === 1) {
+    console.error("  Milestone 6 Recognition Tests Failed");
+  } else {
+    console.log("  Milestone 6 Recognition Tests Completed Successfully");
+  }
   console.log("==================================================");
 }
 
-runMilestone6Tests().catch(console.error);
+runMilestone6Tests().catch((err) => {
+  console.error("Fatal test error:", err);
+  process.exitCode = 1;
+});

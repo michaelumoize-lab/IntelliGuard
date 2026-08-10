@@ -4,6 +4,7 @@ import { generateEmbedding, FastAPIError } from "@/lib/ai/fastapi";
 import { findTopFaceMatches } from "@/lib/ai/face-recognition";
 import { evaluateAccess } from "@/lib/access/access-control";
 import { authenticateDevice } from "@/lib/access/device-auth";
+import { getServerSession } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
 
@@ -58,21 +59,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Step 2: Authenticate Device (if device credentials supplied)
-    const deviceAuth = await authenticateDevice(deviceIdInput, apiKeyInput);
-    if (!deviceAuth.isValid) {
-      const processingTimeMs = Date.now() - startTime;
-      return NextResponse.json(
-        {
-          success: false,
-          access_status: "denied",
-          reason: "system_error",
-          door_action: "lock",
-          message: `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`,
-          processing_time_ms: processingTimeMs,
-        },
-        { status: 401 }
-      );
+    // 2. Step 2: Authenticate caller (Admin session for simulation / Device credentials for hardware)
+    let deviceAuth: { isValid: boolean; device?: any; reason?: string } = { isValid: false };
+
+    if (!deviceIdInput && !apiKeyInput) {
+      const session = await getServerSession();
+      if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+        const processingTimeMs = Date.now() - startTime;
+        return NextResponse.json(
+          {
+            success: false,
+            access_status: "denied",
+            reason: "system_error",
+            door_action: "lock",
+            message: "Authentication required. Admin authorization or valid device credentials required.",
+            processing_time_ms: processingTimeMs,
+          },
+          { status: 401 }
+        );
+      }
+      deviceAuth = { isValid: true, device: null };
+    } else {
+      deviceAuth = await authenticateDevice(deviceIdInput, apiKeyInput);
+      if (!deviceAuth.isValid) {
+        const processingTimeMs = Date.now() - startTime;
+        return NextResponse.json(
+          {
+            success: false,
+            access_status: "denied",
+            reason: "system_error",
+            door_action: "lock",
+            message: `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`,
+            processing_time_ms: processingTimeMs,
+          },
+          { status: 401 }
+        );
+      }
     }
 
     const arrayBuffer = await imageFile.arrayBuffer();
@@ -187,14 +209,15 @@ export async function POST(req: NextRequest) {
             severity: "medium",
           },
         });
-      } else if (recognition.person && recognition.person.status !== "active") {
+      } else if (recognition.person && (recognition.person.status || "active") !== "active") {
+        const personStatus = recognition.person.status || "inactive";
         await prisma.alert.create({
           data: {
             deviceId: deviceAuth.device?.id || null,
             personId: recognition.person.id,
             alertType: "unauthorized_access",
             title: "Unauthorized Access Attempt",
-            message: `${recognition.person.firstName} ${recognition.person.lastName} (${recognition.person.personCode}) attempted access while status is ${recognition.person.status}.`,
+            message: `${recognition.person.firstName} ${recognition.person.lastName} (${recognition.person.personCode}) attempted access while status is ${personStatus}.`,
             severity: "high",
           },
         });

@@ -6,8 +6,10 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+    const rawPage = parseInt(searchParams.get("page") || "1", 10);
+    const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+    const rawLimit = parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Math.min(100, Math.max(1, isNaN(rawLimit) ? 20 : rawLimit));
     const type = (searchParams.get("type") || "").trim();
     const severity = (searchParams.get("severity") || "").trim().toLowerCase();
     const resolvedParam = searchParams.get("resolved");
@@ -22,8 +24,10 @@ export async function GET(req: NextRequest) {
       where.severity = severity;
     }
 
-    if (resolvedParam !== null && resolvedParam !== undefined && resolvedParam !== "") {
-      where.resolved = resolvedParam === "true";
+    if (resolvedParam === "true") {
+      where.resolved = true;
+    } else if (resolvedParam === "false") {
+      where.resolved = false;
     }
 
     const total = await prisma.alert.count({ where });

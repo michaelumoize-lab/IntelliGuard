@@ -1,24 +1,29 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { HealthCheckResponse } from "@/app/api/dashboard/health/route";
-import { Activity, Server, Database, Cpu, Cloud, RefreshCw } from "lucide-react";
+import type { HealthCheckResponse } from "@/types/health";
+import { Activity, Server, Database, Cpu, Cloud, RefreshCw, AlertTriangle } from "lucide-react";
 
 export function SystemHealthPanel() {
   const [health, setHealth] = useState<HealthCheckResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<boolean>(false);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
 
   const fetchHealth = async () => {
     setIsLoading(true);
+    setFetchError(false);
     try {
       const res = await fetch("/api/dashboard/health", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setHealth(data);
+      } else {
+        setFetchError(true);
       }
     } catch (err) {
       console.error("Failed to fetch system health:", err);
+      setFetchError(true);
     } finally {
       setIsLoading(false);
       setLastChecked(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
@@ -51,13 +56,13 @@ export function SystemHealthPanel() {
   };
 
   // Calculate healthy service count out of 5
-  const healthyCount = health
+  const healthyCount = health?.services
     ? [
-        health.services.nextjs.status === "online",
-        health.services.fastapi.status === "online",
-        health.services.postgresql.status === "connected",
-        health.services.pgvector.status === "available",
-        health.services.imagekit.status === "configured",
+        health.services.nextjs?.status === "online",
+        health.services.fastapi?.status === "online",
+        health.services.postgresql?.status === "connected",
+        health.services.pgvector?.status === "available",
+        health.services.imagekit?.status === "configured",
       ].filter(Boolean).length
     : 0;
 
@@ -108,7 +113,12 @@ export function SystemHealthPanel() {
         </div>
       </div>
 
-      {!health ? (
+      {fetchError ? (
+        <div className="py-8 text-center text-xs text-destructive flex items-center justify-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Failed to retrieve system service health status.</span>
+        </div>
+      ) : !health ? (
         <div className="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin text-primary" />
           <span>Polling service health statuses...</span>

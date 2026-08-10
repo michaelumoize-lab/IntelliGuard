@@ -27,6 +27,7 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: Granted access & unlock for valid matched person.");
   } else {
     console.error("❌ FAILED: Unexpected decision for valid match:", res1);
+    process.exitCode = 1;
   }
 
   // Test 2: Unknown Face
@@ -41,6 +42,7 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: Denied access & lock for unknown face.");
   } else {
     console.error("❌ FAILED: Unexpected decision for unknown face:", res2);
+    process.exitCode = 1;
   }
 
   // Test 3: Ambiguous Recognition
@@ -55,6 +57,7 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: Denied access & lock for ambiguous recognition.");
   } else {
     console.error("❌ FAILED: Unexpected decision for ambiguous match:", res3);
+    process.exitCode = 1;
   }
 
   // Test 4: Inactive Person
@@ -69,6 +72,7 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: Denied access for inactive person.");
   } else {
     console.error("❌ FAILED: Inactive person gained access:", res4);
+    process.exitCode = 1;
   }
 
   // Test 5: Suspended Person
@@ -83,6 +87,7 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: Denied access for suspended person.");
   } else {
     console.error("❌ FAILED: Suspended person gained access:", res5);
+    process.exitCode = 1;
   }
 
   // Test 6: System Failure
@@ -97,6 +102,7 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: System failure failed closed with lock.");
   } else {
     console.error("❌ FAILED: System failure did not lock:", res6);
+    process.exitCode = 1;
   }
 
   // Test 7: Fail Closed on Invalid Input
@@ -106,10 +112,15 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: Null input safely failed closed.");
   } else {
     console.error("❌ FAILED: Null input did not fail closed:", res7);
+    process.exitCode = 1;
   }
 
   console.log("\n==================================================");
-  console.log("  All Decision Engine Unit Tests Passed!");
+  if (process.exitCode === 1) {
+    console.error("  Some Decision Engine Unit Tests Failed!");
+  } else {
+    console.log("  All Decision Engine Unit Tests Passed!");
+  }
   console.log("==================================================");
 }
 

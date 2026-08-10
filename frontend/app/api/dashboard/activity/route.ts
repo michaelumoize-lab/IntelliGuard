@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10", 10)));
+    const rawLimit = parseInt(searchParams.get("limit") || "10", 10);
+    const limit = Math.min(50, Math.max(1, isNaN(rawLimit) ? 10 : rawLimit));
     const status = (searchParams.get("status") || "").trim().toLowerCase();
 
     const where: any = {};
