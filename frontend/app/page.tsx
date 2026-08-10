@@ -9,7 +9,7 @@ export default function Home() {
           <Shield className="w-8 h-8" />
         </div>
 
-        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+        <h1 className="text-2xl xs:text-3xl sm:text-5xl font-bold tracking-tight text-foreground">
           IntelliGuard Biometric Access Control
         </h1>
 

@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UploadIcon, InfoIcon, Loader2, UserPlus, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { UploadIcon, InfoIcon, Loader2, UserPlus, ArrowLeft, CheckCircle2, Camera } from "lucide-react";
 import Link from "next/link";
+import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
 // Zod Schema Validation
 const registerPersonSchema = z.object({
@@ -32,6 +33,7 @@ export function RegisterPersonForm() {
   const router = useRouter();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isWebcamOpen, setIsWebcamOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
@@ -75,6 +77,16 @@ export function RegisterPersonForm() {
       }
       setImagePreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleWebcamCapture = (file: File) => {
+    setPhotoError(null);
+    setImageFile(file);
+    if (imagePreview && imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(URL.createObjectURL(file));
+    toast.success("Photo captured from webcam!");
   };
 
   const onSubmit = async (values: RegisterPersonFormValues) => {
@@ -121,75 +133,87 @@ export function RegisterPersonForm() {
   };
 
   return (
-    <Card className="border border-border shadow-sm max-w-3xl mx-auto">
-      <CardHeader className="border-b border-border pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 border border-primary/20 text-primary rounded-xl">
-              <UserPlus className="w-5 h-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Biometric Identity Enrollment</CardTitle>
-              <CardDescription className="text-xs">
-                Register an individual and extract 512D ArcFace embeddings for instant face recognition.
-              </CardDescription>
-            </div>
-          </div>
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-            <Link href="/dashboard/persons">
-              <ArrowLeft className="w-3.5 h-3.5" /> Back to Directory
-            </Link>
-          </Button>
-        </div>
-      </CardHeader>
-
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <CardContent className="space-y-6 pt-6">
-          {/* AI Face Requirement Alert */}
-          <Alert className="border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300">
-            <InfoIcon className="h-4 w-4 text-blue-500" />
-            <AlertTitle className="text-xs font-semibold">Face Photo Quality Guidelines</AlertTitle>
-            <AlertDescription className="text-xs opacity-90">
-              Ensure exactly <strong>one front-facing face</strong> is clearly visible and well-lit. The InsightFace AI engine automatically crops, aligns, and generates normalized 512D vector embeddings.
-            </AlertDescription>
-          </Alert>
-
-          {/* Photo Upload Section */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold text-foreground">
-              Face Photo Upload <span className="text-destructive">*</span>
-            </Label>
-            <div className="flex flex-col sm:flex-row items-center gap-4 p-4 border border-dashed border-border rounded-xl bg-muted/20">
-              {imagePreview ? (
-                <div className="relative h-28 w-28 rounded-xl overflow-hidden border border-border shrink-0 bg-muted">
-                  <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
-                  <div className="absolute bottom-1 right-1 bg-emerald-500 text-white rounded-full p-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              ) : (
-                <div className="h-28 w-28 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground bg-muted/40 shrink-0">
-                  <UploadIcon className="h-6 w-6 mb-1 opacity-60" />
-                  <span className="text-[10px] font-medium">Select Photo</span>
-                </div>
-              )}
-
-              <div className="flex-1 space-y-2 text-center sm:text-left">
-                <Input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleFileChange}
-                  className="cursor-pointer text-xs bg-background"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Upload a clear portrait JPG, PNG, or WEBP image up to 10MB.
-                </p>
-                {photoError && (
-                  <p className="text-xs font-medium text-destructive">{photoError}</p>
-                )}
+    <>
+      <Card className="border border-border shadow-sm max-w-3xl mx-auto">
+        <CardHeader className="border-b border-border pb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-primary/10 border border-primary/20 text-primary rounded-xl shrink-0">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Biometric Identity Enrollment</CardTitle>
+                <CardDescription className="text-xs">
+                  Register an individual and extract 512D ArcFace embeddings for instant face recognition.
+                </CardDescription>
               </div>
             </div>
+            <Button asChild variant="outline" size="sm" className="h-8 text-xs gap-1.5 w-full sm:w-auto shrink-0">
+              <Link href="/dashboard/persons">
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Directory
+              </Link>
+            </Button>
           </div>
+        </CardHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <CardContent className="space-y-6 pt-6">
+            {/* AI Face Requirement Alert */}
+            <Alert className="border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300">
+              <InfoIcon className="h-4 w-4 text-blue-500 shrink-0" />
+              <AlertTitle className="text-xs font-semibold">Face Photo Quality Guidelines</AlertTitle>
+              <AlertDescription className="text-xs opacity-90">
+                Ensure exactly <strong>one front-facing face</strong> is clearly visible and well-lit. The InsightFace AI engine automatically crops, aligns, and generates normalized 512D vector embeddings.
+              </AlertDescription>
+            </Alert>
+
+            {/* Photo Upload & Webcam Section */}
+            <div className="space-y-2">
+              <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2">
+                <Label className="text-xs font-semibold text-foreground">
+                  Face Photo Registration <span className="text-destructive">*</span>
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsWebcamOpen(true)}
+                  className="h-7 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10 transition-colors w-full xs:w-auto"
+                >
+                  <Camera className="w-3.5 h-3.5" /> Snap with Webcam
+                </Button>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 border border-dashed border-border rounded-xl bg-muted/20">
+                {imagePreview ? (
+                  <div className="relative h-28 w-28 rounded-xl overflow-hidden border border-border shrink-0 bg-muted">
+                    <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                    <div className="absolute bottom-1 right-1 bg-emerald-500 text-white rounded-full p-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-28 w-28 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground bg-muted/40 shrink-0">
+                    <UploadIcon className="h-6 w-6 mb-1 opacity-60" />
+                    <span className="text-[10px] font-medium">Select Photo</span>
+                  </div>
+                )}
+
+                <div className="flex-1 w-full space-y-2 text-center sm:text-left">
+                  <Input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleFileChange}
+                    className="cursor-pointer text-xs bg-background"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Upload a clear portrait JPG, PNG, or WEBP image, or click <strong>Snap with Webcam</strong> to take a live photo.
+                  </p>
+                  {photoError && (
+                    <p className="text-xs font-medium text-destructive">{photoError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
 
           {/* Name Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -301,18 +325,18 @@ export function RegisterPersonForm() {
           </div>
         </CardContent>
 
-        <CardFooter className="flex items-center justify-between border-t border-border pt-4 bg-muted/20">
+        <CardFooter className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-border pt-4 bg-muted/20">
           <Button
             type="button"
             variant="outline"
             onClick={() => router.push("/dashboard/persons")}
             disabled={isLoading}
-            className="h-9 text-xs"
+            className="h-9 text-xs w-full sm:w-auto"
           >
             Cancel
           </Button>
 
-          <Button type="submit" disabled={isLoading} className="h-9 text-xs font-semibold gap-1.5">
+          <Button type="submit" disabled={isLoading} className="h-9 text-xs font-semibold gap-1.5 w-full sm:w-auto">
             {isLoading ? (
               <>
                 <Loader className="w-3.5 h-3.5 animate-spin" />
@@ -328,6 +352,13 @@ export function RegisterPersonForm() {
         </CardFooter>
       </form>
     </Card>
+
+    <WebcamCaptureModal
+      isOpen={isWebcamOpen}
+      onClose={() => setIsWebcamOpen(false)}
+      onCapture={handleWebcamCapture}
+    />
+    </>
   );
 }
 

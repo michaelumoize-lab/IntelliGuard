@@ -15,12 +15,12 @@ export function PersonDetailsClientHeaderActions({ person }: { person: any }) {
 
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
+      <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
+        <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)} className="w-full xs:w-auto">
           <PencilIcon className="mr-1.5 h-3.5 w-3.5" /> Edit Metadata
         </Button>
 
-        <Button size="sm" onClick={() => setIsReplaceFaceOpen(true)}>
+        <Button size="sm" onClick={() => setIsReplaceFaceOpen(true)} className="w-full xs:w-auto">
           <CameraIcon className="mr-1.5 h-3.5 w-3.5" /> Replace Face Photo
         </Button>
       </div>

@@ -56,18 +56,18 @@ export default async function PersonDetailsPage({
   const embeddingStatus = activeEmbedding ? "active" : person.faceEmbeddings.length > 0 ? "inactive" : "none";
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6 bg-background text-foreground">
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
         <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+          <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0">
             <Link href="/dashboard/persons">
               <ArrowLeftIcon className="h-4 w-4" />
             </Link>
           </Button>
 
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-wrap gap-2">
               <h1 className="text-2xl font-bold tracking-tight">
                 {person.firstName} {person.lastName}
               </h1>
@@ -172,7 +172,7 @@ export default async function PersonDetailsPage({
             </CardHeader>
 
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs">
                 <div>
                   <span className="text-muted-foreground block mb-0.5">First Name</span>
                   <span className="font-medium text-sm">{person.firstName}</span>
@@ -185,7 +185,7 @@ export default async function PersonDetailsPage({
 
                 <div>
                   <span className="text-muted-foreground block mb-0.5">Person Code</span>
-                  <span className="font-mono text-sm font-semibold">{person.personCode}</span>
+                  <span className="font-mono text-sm font-semibold break-all">{person.personCode}</span>
                 </div>
 
                 <div>
@@ -215,12 +215,12 @@ export default async function PersonDetailsPage({
 
                 <div>
                   <span className="text-muted-foreground block mb-0.5">Email</span>
-                  <span className="font-medium">{person.email || "—"}</span>
+                  <span className="font-medium break-all">{person.email || "—"}</span>
                 </div>
 
                 <div>
                   <span className="text-muted-foreground block mb-0.5">Phone</span>
-                  <span className="font-medium">{person.phone || "—"}</span>
+                  <span className="font-medium break-all">{person.phone || "—"}</span>
                 </div>
 
                 <div>

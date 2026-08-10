@@ -260,11 +260,11 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
         {/* Camera Selector Badge */}
         {isCameraOn && devices.length > 1 && !error && !isLoading && (
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-10 max-w-[150px] sm:max-w-xs">
             <select
               value={selectedDeviceId}
               onChange={(e) => handleDeviceSelect(e.target.value)}
-              className="bg-background/80 backdrop-blur-md border border-input text-foreground text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full bg-background/80 backdrop-blur-md border border-input text-foreground text-[11px] sm:text-xs rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-ring truncate"
             >
               {devices.map((device, idx) => (
                 <option key={device.deviceId} value={device.deviceId}>
@@ -277,9 +277,9 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
         {/* Live Indicator */}
         {isCameraOn && !isLoading && !error && (
-          <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1 bg-background/80 backdrop-blur-md border border-border rounded-full">
+          <div className="absolute top-2.5 sm:top-4 left-2.5 sm:left-4 z-10 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-0.5 sm:py-1 bg-background/80 backdrop-blur-md border border-border rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">LIVE FEED</span>
+            <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">LIVE</span>
           </div>
         )}
       </div>

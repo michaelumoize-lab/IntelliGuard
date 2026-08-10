@@ -81,7 +81,7 @@ export function PersonsClientFilters({
 
   return (
     <Card>
-      <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-center">
+      <CardContent className="p-4 flex flex-col md:flex-row gap-3 sm:gap-4 items-stretch md:items-center">
         {/* Debounced Search-as-you-type Input */}
         <DataTableSearch
           placeholder="Search by code, name, email, phone, department..."
@@ -89,10 +89,12 @@ export function PersonsClientFilters({
         />
 
         {/* Status & Category Filters */}
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 border border-input rounded-md px-2.5 py-1.5 text-xs bg-background">
-            <FilterIcon className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground font-medium">Status:</span>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-1.5 border border-input rounded-md px-2.5 py-1.5 text-xs bg-background">
+            <div className="flex items-center gap-1.5">
+              <FilterIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground font-medium">Status:</span>
+            </div>
             <select
               value={initialStatus}
               onChange={(e) => updateFilters({ status: e.target.value })}
@@ -105,9 +107,11 @@ export function PersonsClientFilters({
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5 border border-input rounded-md px-2.5 py-1.5 text-xs bg-background">
-            <FilterIcon className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground font-medium">Category:</span>
+          <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-1.5 border border-input rounded-md px-2.5 py-1.5 text-xs bg-background">
+            <div className="flex items-center gap-1.5">
+              <FilterIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground font-medium">Category:</span>
+            </div>
             <select
               value={initialCategory}
               onChange={(e) => updateFilters({ category: e.target.value })}

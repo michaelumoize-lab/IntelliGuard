@@ -15,7 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UploadIcon, InfoIcon, Loader2Icon } from "lucide-react";
+import { UploadIcon, InfoIcon, Loader2Icon, Camera } from "lucide-react";
+import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
 interface PersonModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(initialData?.faceImageUrl || null);
+  const [isWebcamOpen, setIsWebcamOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +54,15 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
       }
       setImagePreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleWebcamCapture = (file: File) => {
+    setImageFile(file);
+    if (imagePreview && imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(URL.createObjectURL(file));
+    toast.success("Photo captured from webcam!");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -158,7 +169,7 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
             </Alert>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="firstName">First Name *</Label>
               <Input
@@ -182,7 +193,7 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="category">Category *</Label>
               <select
@@ -209,7 +220,7 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -234,28 +245,39 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
 
           {!isEditing && (
             <div className="space-y-2">
-              <Label>Face Photo *</Label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Face Photo *</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsWebcamOpen(true)}
+                  className="h-7 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  <Camera className="w-3.5 h-3.5" /> Snap with Webcam
+                </Button>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 p-3 border border-dashed border-border rounded-xl bg-muted/20">
                 {imagePreview ? (
-                  <div className="relative h-24 w-24 rounded-lg overflow-hidden border border-border">
+                  <div className="relative h-24 w-24 rounded-lg overflow-hidden border border-border shrink-0">
                     <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
                   </div>
                 ) : (
-                  <div className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
+                  <div className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center text-muted-foreground bg-muted/20 shrink-0">
                     <UploadIcon className="h-6 w-6 mb-1 opacity-60" />
                     <span className="text-[10px]">Upload Photo</span>
                   </div>
                 )}
 
-                <div className="flex-1">
+                <div className="flex-1 w-full space-y-1.5 text-center sm:text-left">
                   <Input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={handleFileChange}
-                    className="cursor-pointer text-xs"
+                    className="cursor-pointer text-xs bg-background"
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Supports JPG, PNG, WEBP up to 10MB.
+                  <p className="text-[11px] text-muted-foreground">
+                    Upload file or click <strong>Snap with Webcam</strong> to take a live photo.
                   </p>
                 </div>
               </div>
@@ -273,11 +295,11 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
             />
           </div>
 
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+          <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
               {isLoading ? (
                 <>
                   <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
@@ -292,6 +314,12 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <WebcamCaptureModal
+        isOpen={isWebcamOpen}
+        onClose={() => setIsWebcamOpen(false)}
+        onCapture={handleWebcamCapture}
+      />
     </Dialog>
   );
 }

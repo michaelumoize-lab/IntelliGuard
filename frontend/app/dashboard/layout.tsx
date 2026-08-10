@@ -42,9 +42,9 @@ export default async function DashboardLayout({
 
           <SidebarInset className="flex flex-col flex-1 bg-background min-w-0">
             {/* Top Navbar Header aligned seamlessly at h-14 with Sidebar Header */}
-            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-4 md:px-6 backdrop-blur-md">
+            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-3 sm:px-4 md:px-6 backdrop-blur-md">
               {/* Left Section: Sidebar Toggle + Breadcrumb */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <SidebarTrigger className="text-muted-foreground hover:text-foreground cursor-pointer" />
                 <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-muted-foreground">
                   <span className="text-muted-foreground/70">IntelliGuard</span>
@@ -57,11 +57,11 @@ export default async function DashboardLayout({
               <NavbarSystemHealthBadge />
 
               {/* Right Section: Quick Live Scan Button + Alerts Bell */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {/* Live Webcam Scan Quick Button */}
                 <Link
                   href="/dashboard/simulation"
-                  className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                  className="px-2.5 sm:px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span className="hidden xs:inline">Live Scan</span>
