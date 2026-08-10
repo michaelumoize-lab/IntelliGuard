@@ -31,6 +31,17 @@ function getImageKitClient(): ImageKit {
 }
 
 /**
+ * Computes the canonical delivery URL from ImageKit's configured IMAGEKIT_URL_ENDPOINT and relative filePath.
+ * Guarantees a single consistent URL strategy across the entire application.
+ */
+export function getCanonicalDeliveryUrl(filePath: string): string {
+  const urlEndpoint = (process.env.IMAGEKIT_URL_ENDPOINT || "").trim();
+  const cleanEndpoint = urlEndpoint.replace(/\/+$/, "");
+  const cleanPath = (filePath || "").replace(/^\/+/, "");
+  return `${cleanEndpoint}/${cleanPath}`;
+}
+
+/**
  * Upload a face image buffer to ImageKit cloud storage under /intelliguard/persons/.
  */
 export async function uploadFaceImage(
@@ -44,21 +55,45 @@ export async function uploadFaceImage(
     fileName: fileName || `face_${Date.now()}.jpg`,
     folder: "/intelliguard/persons/",
     useUniqueFileName: true,
-    isPrivateFile: true, // Biometric images stored as private files
+    isPrivateFile: false, // Serve as public asset so browser <img src="..." /> tags load cleanly
   });
 
-  // Generate signed, short-lived delivery URL for secure admin dashboard rendering
-  const signedUrl = client.url({
-    path: response.filePath,
-    signed: true,
-    expireSeconds: 3600 * 24, // 24 hours expiry
-  });
+  // Use the exact url returned by ImageKit upload response as the single source of truth
+  const deliveryUrl = response.url || getCanonicalDeliveryUrl(response.filePath);
 
   return {
-    url: signedUrl,
+    url: deliveryUrl,
     fileId: response.fileId,
     filePath: response.filePath,
   };
+}
+
+/**
+ * Fetch file details from ImageKit using fileId to verify asset existence and obtain canonical URL.
+ */
+export async function getImageFileDetails(
+  fileId: string
+): Promise<{ fileId: string; url: string; filePath: string } | null> {
+  if (!fileId) return null;
+  try {
+    const client = getImageKitClient();
+    const details = await new Promise<any>((resolve, reject) => {
+      client.getFileDetails(fileId, (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
+    if (!details || !details.url) return null;
+    return {
+      fileId: details.fileId,
+      url: details.url,
+      filePath: details.filePath,
+    };
+  } catch (error) {
+    console.error(`Failed to fetch ImageKit asset details (fileId: ${fileId}):`, error);
+    return null;
+  }
 }
 
 /**
@@ -75,3 +110,4 @@ export async function deleteFaceImage(fileId: string): Promise<boolean> {
     return false;
   }
 }
+

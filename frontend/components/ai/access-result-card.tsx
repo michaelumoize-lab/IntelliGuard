@@ -90,7 +90,15 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
       {result.person ? (
         <div className="flex items-center gap-4 mb-6">
           <div className="w-14 h-14 rounded-full bg-muted border border-border overflow-hidden flex items-center justify-center text-muted-foreground flex-shrink-0">
-            <User className="w-7 h-7" />
+            {result.person.face_image_url ? (
+              <img
+                src={result.person.face_image_url}
+                alt={`${result.person.first_name} ${result.person.last_name}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="w-7 h-7" />
+            )}
           </div>
           <div>
             <h3 className="text-base font-bold text-foreground leading-snug">

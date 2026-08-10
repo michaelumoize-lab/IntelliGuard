@@ -127,23 +127,12 @@ export function PersonsClientFilters({
 }
 
 export function RegisterPersonButton() {
-  const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
-
   return (
-    <>
-      <Button onClick={() => setIsOpen(true)}>
+    <Button asChild>
+      <Link href="/dashboard/persons/register">
         <PlusIcon className="mr-2 h-4 w-4" /> Register Person
-      </Button>
-
-      {isOpen && (
-        <PersonModal
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-          onSuccess={() => router.refresh()}
-        />
-      )}
-    </>
+      </Link>
+    </Button>
   );
 }
 

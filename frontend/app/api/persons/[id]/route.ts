@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deleteFaceImage } from "@/lib/ai/imagekit";
+import { getServerSession } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession();
+    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      return NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { status: 401 }
+      );
+    }
+
     const resolvedParams = await params;
     const personId = parseInt(resolvedParams.id, 10);
     if (isNaN(personId)) {
@@ -89,6 +98,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession();
+    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      return NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { status: 401 }
+      );
+    }
+
     const resolvedParams = await params;
     const personId = parseInt(resolvedParams.id, 10);
     if (isNaN(personId)) {
@@ -230,6 +247,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession();
+    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      return NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { status: 401 }
+      );
+    }
+
     const resolvedParams = await params;
     const personId = parseInt(resolvedParams.id, 10);
     if (isNaN(personId)) {

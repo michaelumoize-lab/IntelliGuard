@@ -262,7 +262,7 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
             </div>
           )}
 
-          <div className="space-y-1">
+          <div className="space-y-1 mb-4">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
               id="notes"
