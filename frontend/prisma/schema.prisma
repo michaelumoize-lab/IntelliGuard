@@ -106,7 +106,8 @@ model Person {
   category       PersonCategory
   department     String?         @db.VarChar(100)
   status         PersonStatus    @default(active)
-  profileImage   String?         @map("profile_image")
+  faceImageUrl    String?         @map("face_image_url")
+  faceImageFileId String?         @map("face_image_file_id")
   notes          String?
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
