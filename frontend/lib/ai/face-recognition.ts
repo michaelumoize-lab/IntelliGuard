@@ -26,6 +26,7 @@ export interface RecognitionClassificationResult {
     category: string;
     department: string | null;
     status?: string;
+    faceImageUrl?: string | null;
   } | null;
   face: {
     embeddingId?: number;
@@ -73,6 +74,7 @@ export async function findTopFaceMatches(
     category: string;
     department: string | null;
     status: string;
+    faceImageUrl: string | null;
     distance: number;
     similarity: number;
   }> = await prisma.$queryRawUnsafe(
@@ -89,6 +91,7 @@ export async function findTopFaceMatches(
       p.category AS "category",
       p.department AS "department",
       p.status AS "status",
+      p.face_image_url AS "faceImageUrl",
       (fe.embedding <=> $1::vector) AS distance,
       (1 - (fe.embedding <=> $1::vector)) AS similarity
     FROM face_embeddings fe
@@ -142,6 +145,7 @@ export async function findTopFaceMatches(
         category: bestCandidate.category,
         department: bestCandidate.department,
         status: bestCandidate.status,
+        faceImageUrl: bestCandidate.faceImageUrl,
       },
       face: {
         embeddingId: Number(bestCandidate.embeddingId),
@@ -197,6 +201,7 @@ export async function findTopFaceMatches(
       category: bestCandidate.category,
       department: bestCandidate.department,
       status: bestCandidate.status,
+      faceImageUrl: bestCandidate.faceImageUrl,
     },
     face: {
       embeddingId: Number(bestCandidate.embeddingId),

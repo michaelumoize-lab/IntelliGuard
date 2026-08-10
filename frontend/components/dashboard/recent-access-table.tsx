@@ -19,6 +19,7 @@ export interface AccessEventItem {
     firstName: string;
     lastName: string;
     category: string;
+    faceImageUrl?: string | null;
   } | null;
   device?: {
     id: number;
@@ -95,9 +96,15 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                       {evt.person ? (
                         <Link
                           href={`/dashboard/persons/${evt.person.id}`}
-                          className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+                          className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-2"
                         >
-                          <User className="w-3.5 h-3.5 text-muted-foreground" />
+                          <div className="w-5 h-5 rounded-full bg-muted border border-border overflow-hidden flex items-center justify-center shrink-0">
+                            {evt.person.faceImageUrl ? (
+                              <img src={evt.person.faceImageUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                          </div>
                           <span>{evt.person.firstName} {evt.person.lastName}</span>
                         </Link>
                       ) : isDataInconsistency ? (

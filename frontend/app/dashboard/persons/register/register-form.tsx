@@ -287,7 +287,7 @@ export function RegisterPersonForm() {
           </div>
 
           {/* Security Notes */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 mb-6">
             <Label htmlFor="notes" className="text-xs font-medium">
               Administrative & Access Notes
             </Label>

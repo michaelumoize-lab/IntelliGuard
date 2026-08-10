@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
           last_name: recognition.person.lastName,
           category: recognition.person.category,
           department: recognition.person.department,
+          face_image_url: recognition.person.faceImageUrl,
         },
         face: {
           embedding_id: recognition.face.embeddingId,

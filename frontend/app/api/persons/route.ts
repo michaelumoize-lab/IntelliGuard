@@ -245,14 +245,19 @@ export async function GET(req: NextRequest) {
     const where: any = {};
 
     if (search) {
-      where.OR = [
-        { personCode: { contains: search, mode: "insensitive" } },
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-        { phone: { contains: search, mode: "insensitive" } },
-        { department: { contains: search, mode: "insensitive" } },
-      ];
+      const terms = search.split(/\s+/).filter(Boolean);
+      if (terms.length > 0) {
+        where.AND = terms.map((term) => ({
+          OR: [
+            { personCode: { contains: term, mode: "insensitive" } },
+            { firstName: { contains: term, mode: "insensitive" } },
+            { lastName: { contains: term, mode: "insensitive" } },
+            { email: { contains: term, mode: "insensitive" } },
+            { phone: { contains: term, mode: "insensitive" } },
+            { department: { contains: term, mode: "insensitive" } },
+          ],
+        }));
+      }
     }
 
     if (status && ["active", "inactive", "suspended"].includes(status)) {
