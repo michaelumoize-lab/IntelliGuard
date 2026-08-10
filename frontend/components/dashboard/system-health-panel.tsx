@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import type { HealthCheckResponse } from "@/types/health";
 import { Activity, Server, Database, Cpu, Cloud, RefreshCw, AlertTriangle } from "lucide-react";
 
@@ -10,11 +10,12 @@ export function SystemHealthPanel() {
   const [fetchError, setFetchError] = useState<boolean>(false);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
 
-  const fetchHealth = async () => {
+  const fetchHealth = useCallback(async (force = false) => {
     setIsLoading(true);
     setFetchError(false);
     try {
-      const res = await fetch("/api/dashboard/health", { cache: "no-store" });
+      const url = force ? "/api/dashboard/health?force=true" : "/api/dashboard/health";
+      const res = await fetch(url, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setHealth(data);
@@ -28,14 +29,12 @@ export function SystemHealthPanel() {
       setIsLoading(false);
       setLastChecked(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchHealth();
-    // Periodic status polling every 15s
-    const interval = setInterval(fetchHealth, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [fetchHealth]);
+
 
   const getStatusBadge = (status: string) => {
     const isOk = status === "online" || status === "connected" || status === "available" || status === "configured";
@@ -103,7 +102,7 @@ export function SystemHealthPanel() {
             </span>
           )}
           <button
-            onClick={fetchHealth}
+            onClick={() => fetchHealth(true)}
             disabled={isLoading}
             className="px-3 py-1.5 bg-secondary hover:bg-muted text-secondary-foreground text-xs font-medium rounded-lg transition-all border border-border flex items-center gap-1.5"
           >
