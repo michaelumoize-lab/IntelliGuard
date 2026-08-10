@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
 from typing import Optional
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class HealthResponse(BaseModel):
@@ -12,14 +12,15 @@ class HealthResponse(BaseModel):
     execution_provider: str = Field(..., description="Active ONNX Runtime execution provider")
     error: Optional[str] = Field(None, description="Initialization error details if status is degraded")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "status": "healthy",
                 "service": "intelliguard-ai",
                 "model": "buffalo_l",
                 "model_loaded": True,
                 "execution_provider": "CPUExecutionProvider",
-                "error": None
+                "error": None,
             }
         }
+    )

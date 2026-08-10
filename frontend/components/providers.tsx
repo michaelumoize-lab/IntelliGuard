@@ -12,6 +12,8 @@ import { getQueryClient } from "@/lib/query-client"
 import { AuthProvider } from "./auth/auth-provider"
 import { Toaster } from "./ui/sonner"
 
+import { TooltipProvider } from "./ui/tooltip"
+
 export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter()
   const queryClient = getQueryClient()
@@ -28,7 +30,9 @@ export function Providers({ children }: { children: ReactNode }) {
         plugins={[deleteUserPlugin(), lastLoginMethodPlugin(), multiSessionPlugin()]}
         Link={Link}
       >
-        {children}
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
 
         <Toaster />
       </AuthProvider>
