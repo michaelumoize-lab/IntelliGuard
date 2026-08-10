@@ -140,9 +140,6 @@ export default async function AdminDashboardPage() {
             Real-time biometric access control telemetry, recognition analytics, and system health.
           </p>
         </div>
-        <div className="flex items-center gap-3 self-start md:self-auto font-mono text-xs text-muted-foreground">
-          <span>Last updated: <DashboardLastUpdated isoTimestamp={lastUpdatedIso} /></span>
-        </div>
       </div>
 
       {/* 2. Full-Width Horizontal System Service Health Panel */}

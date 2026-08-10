@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from "react";
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react";
 import { RefreshCw, AlertCircle, VideoOff, CameraOff, Video } from "lucide-react";
 
 export interface LiveCameraPreviewRef {
@@ -25,11 +25,10 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     const [error, setError] = useState<string | null>(null);
     const [isPermissionDenied, setIsPermissionDenied] = useState<boolean>(false);
 
-    const currentRunIdRef = React.useRef<number>(0);
+    const currentRunIdRef = useRef<number>(0);
 
-    // Stop active camera stream tracks safely
-    const stopStreamTracks = () => {
-      currentRunIdRef.current++;
+    // Stop active camera stream tracks without invalidating run counter
+    const stopTracksOnly = useCallback(() => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
@@ -37,91 +36,128 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
-    };
+    }, []);
+
+    // Stop active stream AND invalidate any in-flight startup calls
+    const stopStreamTracks = useCallback(() => {
+      currentRunIdRef.current++;
+      stopTracksOnly();
+    }, [stopTracksOnly]);
 
     // Initialize camera stream on demand
-    const startCamera = async (deviceId?: string) => {
-      const runId = ++currentRunIdRef.current;
-      setIsLoading(true);
-      setError(null);
-      setIsPermissionDenied(false);
-      stopStreamTracks();
+    const startCamera = useCallback(
+      async (deviceId?: string) => {
+        // Stop existing stream tracks first
+        stopTracksOnly();
 
-      try {
-        const constraints: MediaStreamConstraints = {
-          video: deviceId
-            ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-            : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        };
+        // Increment run counter for this specific startup attempt
+        const runId = ++currentRunIdRef.current;
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (runId !== currentRunIdRef.current) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+        setIsLoading(true);
+        setError(null);
+        setIsPermissionDenied(false);
+
+        try {
+          if (!navigator?.mediaDevices?.getUserMedia) {
+            throw new Error("Webcam API is not available. Please ensure HTTPS or localhost is used.");
+          }
+
+          const constraints: MediaStreamConstraints = {
+            video: deviceId
+              ? { deviceId: { ideal: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+              : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+          };
+
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+          // Check if run was cancelled while waiting for getUserMedia
+          if (runId !== currentRunIdRef.current) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+
+          streamRef.current = stream;
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            try {
+              await videoRef.current.play();
+            } catch (playErr) {
+              console.warn("Video play exception (may require user gesture):", playErr);
+            }
+          }
+
+          if (runId !== currentRunIdRef.current) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+
+          setIsLoading(false);
+          if (onCameraStatusChange) {
+            onCameraStatusChange(true);
+          }
+
+          // Fetch available video input devices
+          try {
+            const allDevices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = allDevices.filter((d) => d.kind === "videoinput");
+            setDevices(videoDevices);
+
+            const activeTrack = stream.getVideoTracks()[0];
+            const activeDeviceId = activeTrack?.getSettings()?.deviceId;
+            if (activeDeviceId && !selectedDeviceId) {
+              setSelectedDeviceId(activeDeviceId);
+            }
+          } catch (enumErr) {
+            console.warn("Failed to enumerate devices:", enumErr);
+          }
+        } catch (err: any) {
+          console.error("Camera access error:", err);
+          if (runId === currentRunIdRef.current) {
+            setIsLoading(false);
+            if (onCameraStatusChange) {
+              onCameraStatusChange(false);
+            }
+
+            if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+              setIsPermissionDenied(true);
+              setError("Camera permission denied. Please allow camera access in browser settings.");
+            } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+              setError("No camera device found on your system.");
+            } else {
+              setError(err.message || "Failed to initialize camera preview.");
+            }
+          }
         }
+      },
+      [stopTracksOnly, selectedDeviceId, onCameraStatusChange]
+    );
 
-        streamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        if (runId !== currentRunIdRef.current) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        setIsLoading(false);
-        setTimeout(() => {
-          if (onCameraStatusChange) onCameraStatusChange(true);
-        }, 0);
-
-        // Fetch available video input devices
-        const allDevices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = allDevices.filter((d) => d.kind === "videoinput");
-        setDevices(videoDevices);
-
-        const activeTrack = stream.getVideoTracks()[0];
-        const activeDeviceId = activeTrack?.getSettings()?.deviceId;
-        if (activeDeviceId && (!selectedDeviceId || !deviceId)) {
-          setSelectedDeviceId(activeDeviceId);
-        }
-      } catch (err: any) {
-        console.error("Camera access error:", err);
-        setIsLoading(false);
-        setTimeout(() => {
-          if (onCameraStatusChange) onCameraStatusChange(false);
-        }, 0);
-
-        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          setIsPermissionDenied(true);
-          setError("Camera permission denied. Please allow camera access in your browser settings.");
-        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-          setError("No camera device found on your system.");
-        } else {
-          setError(err.message || "Failed to initialize camera preview.");
-        }
+    // Handle device change from select dropdown
+    const handleDeviceSelect = (newDeviceId: string) => {
+      setSelectedDeviceId(newDeviceId);
+      if (isCameraOn) {
+        startCamera(newDeviceId);
       }
     };
 
-    // Lifecycle effect: only start camera when isCameraOn is true
+    // Lifecycle effect: start/stop camera based on isCameraOn state
     useEffect(() => {
       if (isCameraOn) {
-        startCamera(selectedDeviceId);
+        startCamera(selectedDeviceId || undefined);
       } else {
         stopStreamTracks();
         setIsLoading(false);
         setError(null);
-        setTimeout(() => {
-          if (onCameraStatusChange) onCameraStatusChange(false);
-        }, 0);
+        if (onCameraStatusChange) {
+          onCameraStatusChange(false);
+        }
       }
 
       return () => {
         stopStreamTracks();
       };
-    }, [isCameraOn, selectedDeviceId]);
+    }, [isCameraOn]);
 
     // Expose captureFrame method to parent via ref
     useImperativeHandle(ref, () => ({
@@ -214,7 +250,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
             <button
-              onClick={() => startCamera(selectedDeviceId)}
+              onClick={() => startCamera(selectedDeviceId || undefined)}
               className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs rounded-lg transition-colors flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" /> Try Again
@@ -227,7 +263,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           <div className="absolute top-4 right-4 z-10">
             <select
               value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
+              onChange={(e) => handleDeviceSelect(e.target.value)}
               className="bg-background/80 backdrop-blur-md border border-input text-foreground text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
             >
               {devices.map((device, idx) => (
@@ -252,3 +288,4 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 );
 
 LiveCameraPreview.displayName = "LiveCameraPreview";
+

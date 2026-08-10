@@ -5,7 +5,23 @@ import type { HealthCheckResponse } from "@/types/health";
 export const dynamic = "force-dynamic";
 export type { HealthCheckResponse };
 
+// Server-side in-memory cache for health check probes (5-minute TTL)
+let cachedHealth: { data: HealthCheckResponse; timestamp: number } | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function GET(req: NextRequest) {
+  const forceRefresh = req.nextUrl.searchParams.get("force") === "true";
+  const now = Date.now();
+
+  // Return cached health report if within 5-minute TTL and not forced
+  if (!forceRefresh && cachedHealth && now - cachedHealth.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json({
+      ...cachedHealth.data,
+      cached: true,
+      cachedAt: new Date(cachedHealth.timestamp).toISOString(),
+    });
+  }
+
   // 1. Next.js Local Work Timing
   const nextjsStart = Date.now();
   const nextjsStatus = { status: "online" as const, latencyMs: 0 };
@@ -74,7 +90,7 @@ export async function GET(req: NextRequest) {
     message: isImageKitConfigured ? "Keys and endpoint configured" : "Missing environment variables",
   };
 
-  return NextResponse.json({
+  const responseData: HealthCheckResponse = {
     success: true,
     services: {
       nextjs: nextjsStatus,
@@ -83,6 +99,15 @@ export async function GET(req: NextRequest) {
       pgvector: pgvectorStatus,
       imagekit: imagekitStatus,
     },
-  });
+  };
+
+  // Cache response in memory
+  cachedHealth = {
+    data: responseData,
+    timestamp: now,
+  };
+
+  return NextResponse.json(responseData);
 }
+
 
