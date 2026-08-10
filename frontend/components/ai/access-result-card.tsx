@@ -74,9 +74,9 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
   const qualityPct = result.face?.quality_score != null ? (result.face.quality_score * 100).toFixed(1) : null;
 
   return (
-    <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-6 shadow-sm flex flex-col justify-between">
+    <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-4 sm:p-6 shadow-sm flex flex-col justify-between">
       {/* Top Header: Decision Badge */}
-      <div className="flex items-center justify-between pb-5 border-b border-border mb-5">
+      <div className="flex items-center justify-between flex-wrap gap-2 pb-5 border-b border-border mb-5">
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold tracking-wide ${badge.bg}`}>
           {badge.icon}
           <span>{badge.label}</span>
@@ -100,18 +100,18 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
               <User className="w-7 h-7" />
             )}
           </div>
-          <div>
-            <h3 className="text-base font-bold text-foreground leading-snug">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-foreground leading-snug truncate">
               {result.person.first_name} {result.person.last_name}
             </h3>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center flex-wrap gap-2 mt-1">
               <span className="text-xs font-mono text-muted-foreground">{result.person.person_code}</span>
               <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                 {result.person.category}
               </span>
             </div>
             {result.person.department && (
-              <p className="text-xs text-muted-foreground mt-0.5">{result.person.department}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{result.person.department}</p>
             )}
           </div>
         </div>
@@ -132,8 +132,8 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
           <div className="space-y-1.5">
             {result.candidates.map((cand, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs text-foreground">
-                <span>{cand.firstName} {cand.lastName} ({cand.personCode})</span>
-                <span className="font-mono text-amber-500">{(cand.similarity * 100).toFixed(1)}%</span>
+                <span className="truncate mr-2">{cand.firstName} {cand.lastName} ({cand.personCode})</span>
+                <span className="font-mono text-amber-500 shrink-0">{(cand.similarity * 100).toFixed(1)}%</span>
               </div>
             ))}
           </div>
@@ -141,7 +141,7 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
       )}
 
       {/* Metrics Breakdown Grid */}
-      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
+      <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 pt-4 border-t border-border">
         <div className="p-3 bg-muted/40 rounded-xl border border-border">
           <p className="text-[10px] text-muted-foreground font-medium uppercase mb-1">Similarity Match</p>
           <p className="text-base font-bold font-mono text-foreground">{similarityPct}</p>
@@ -150,7 +150,7 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
         <div className="p-3 bg-muted/40 rounded-xl border border-border">
           <p className="text-[10px] text-muted-foreground font-medium uppercase mb-1">Processing Time</p>
           <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-primary" />
+            <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
             <p className="text-base font-bold font-mono text-foreground">{result.processing_time_ms} ms</p>
           </div>
         </div>
@@ -165,7 +165,7 @@ export function AccessResultCard({ result, isLoading }: AccessResultCardProps) {
         <div className="p-3 bg-muted/40 rounded-xl border border-border">
           <p className="text-[10px] text-muted-foreground font-medium uppercase mb-1">Vector Model</p>
           <div className="flex items-center gap-1">
-            <Cpu className="w-3.5 h-3.5 text-muted-foreground" />
+            <Cpu className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             <p className="text-xs font-medium text-foreground">{result.face?.model || "Buffalo_L"}</p>
           </div>
         </div>

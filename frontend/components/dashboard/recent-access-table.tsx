@@ -34,7 +34,7 @@ interface RecentAccessTableProps {
 
 export function RecentAccessTable({ events }: RecentAccessTableProps) {
   return (
-    <div className="bg-card text-card-foreground border border-border rounded-xl p-6 shadow-sm space-y-4">
+    <div className="bg-card text-card-foreground border border-border rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
       <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-2">
           <History className="w-4 h-4 text-muted-foreground" />

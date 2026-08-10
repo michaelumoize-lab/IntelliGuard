@@ -66,15 +66,15 @@ export function SystemHealthPanel() {
     : 0;
 
   return (
-    <div className="bg-card text-card-foreground border border-border rounded-2xl p-6 shadow-sm space-y-5">
+    <div className="bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
       {/* Panel Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary">
+          <div className="p-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary shrink-0">
             <Activity className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-wrap gap-2">
               <h3 className="text-base font-semibold text-foreground tracking-tight">System Service Health</h3>
               {health && (
                 <span
@@ -123,7 +123,7 @@ export function SystemHealthPanel() {
           <span>Polling service health statuses...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
           {/* Next.js API */}
           <div className="p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2.5">
             <div className="flex items-center gap-2">

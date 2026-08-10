@@ -71,7 +71,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden bg-card text-card-foreground border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group",
+        "relative overflow-hidden bg-card text-card-foreground border border-border/80 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group",
         vStyles.border,
         className
       )}

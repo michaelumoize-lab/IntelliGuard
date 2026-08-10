@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UploadIcon, InfoIcon, Loader2Icon, ArrowRightIcon } from "lucide-react";
+import { UploadIcon, InfoIcon, Loader2Icon, ArrowRightIcon, Camera } from "lucide-react";
+import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
 interface ReplaceFaceModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ interface ReplaceFaceModalProps {
 export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: ReplaceFaceModalProps) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isWebcamOpen, setIsWebcamOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,6 +46,15 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleWebcamCapture = (file: File) => {
+    setImageFile(file);
+    if (imagePreview && imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(URL.createObjectURL(file));
+    toast.success("Photo captured from webcam!");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,7 +94,7 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Replace Face Photo</DialogTitle>
           <DialogDescription>
@@ -100,7 +111,7 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
             </AlertDescription>
           </Alert>
 
-          <div className="flex items-center justify-center gap-4 py-2">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 py-2">
             {/* Old Image */}
             <div className="flex flex-col items-center">
               <Label className="text-xs mb-1 text-muted-foreground">Current Photo</Label>
@@ -113,7 +124,7 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
               </div>
             </div>
 
-            <ArrowRightIcon className="h-5 w-5 text-muted-foreground mt-4" />
+            <ArrowRightIcon className="h-5 w-5 text-muted-foreground mt-2 sm:mt-4 rotate-90 sm:rotate-0" />
 
             {/* New Image Preview */}
             <div className="flex flex-col items-center">
@@ -129,22 +140,32 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="newFaceFile">Select New Image *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="newFaceFile" className="text-xs font-semibold">Select New Image *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsWebcamOpen(true)}
+                className="h-7 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+              >
+                <Camera className="w-3.5 h-3.5" /> Snap with Webcam
+              </Button>
+            </div>
             <Input
               id="newFaceFile"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleFileChange}
-              className="cursor-pointer text-xs"
-              required
+              className="cursor-pointer text-xs bg-background"
             />
           </div>
 
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+          <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !imageFile}>
+            <Button type="submit" disabled={isLoading || !imageFile} className="w-full sm:w-auto">
               {isLoading ? (
                 <>
                   <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
@@ -157,6 +178,12 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <WebcamCaptureModal
+        isOpen={isWebcamOpen}
+        onClose={() => setIsWebcamOpen(false)}
+        onCapture={handleWebcamCapture}
+      />
     </Dialog>
   );
 }

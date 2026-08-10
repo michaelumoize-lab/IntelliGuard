@@ -27,13 +27,13 @@ export function LiveScanControls({
   lastScanTime,
 }: LiveScanControlsProps) {
   return (
-    <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-5 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
+    <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-4 sm:p-5 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
       {/* Control Buttons */}
-      <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
         {/* Camera Toggle Button */}
         <button
           onClick={onToggleCamera}
-          className={`flex-1 sm:flex-none px-4 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border cursor-pointer ${
             isCameraOn
               ? "bg-secondary hover:bg-muted border-border text-foreground"
               : "bg-primary hover:bg-primary/90 text-primary-foreground border-primary"
@@ -41,12 +41,12 @@ export function LiveScanControls({
         >
           {isCameraOn ? (
             <>
-              <VideoOff className="w-4 h-4 text-destructive" />
+              <VideoOff className="w-4 h-4 text-destructive shrink-0" />
               <span>Turn Off Camera</span>
             </>
           ) : (
             <>
-              <Video className="w-4 h-4" />
+              <Video className="w-4 h-4 shrink-0" />
               <span>Turn On Camera</span>
             </>
           )}
@@ -56,12 +56,12 @@ export function LiveScanControls({
         <button
           onClick={onScan}
           disabled={!isCameraOn || !isCameraReady || isScanning || isMonitoring}
-          className="flex-1 sm:flex-none px-4 py-2.5 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border border-primary/20"
+          className="px-4 py-2.5 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border border-primary/20 cursor-pointer disabled:cursor-not-allowed"
         >
           {isScanning && !isMonitoring ? (
-            <Loader2 className="w-4 h-4 animate-spin text-primary-foreground" />
+            <Loader2 className="w-4 h-4 animate-spin text-primary-foreground shrink-0" />
           ) : (
-            <Camera className="w-4 h-4" />
+            <Camera className="w-4 h-4 shrink-0" />
           )}
           <span>Scan Face</span>
         </button>
@@ -70,7 +70,7 @@ export function LiveScanControls({
         <button
           onClick={onToggleMonitoring}
           disabled={!isCameraOn || !isCameraReady}
-          className={`flex-1 sm:flex-none px-4 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border ${
+          className={`px-4 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border cursor-pointer disabled:cursor-not-allowed ${
             isMonitoring
               ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20"
               : "bg-emerald-600 hover:bg-emerald-500 border-emerald-500 text-white"
@@ -78,12 +78,12 @@ export function LiveScanControls({
         >
           {isMonitoring ? (
             <>
-              <Square className="w-4 h-4 fill-current" />
+              <Square className="w-4 h-4 fill-current shrink-0" />
               <span>Stop Monitoring</span>
             </>
           ) : (
             <>
-              <Play className="w-4 h-4 fill-current" />
+              <Play className="w-4 h-4 fill-current shrink-0" />
               <span>Start Monitoring</span>
             </>
           )}
@@ -91,16 +91,16 @@ export function LiveScanControls({
       </div>
 
       {/* Telemetry Stats Bar */}
-      <div className="flex items-center justify-between lg:justify-end gap-6 w-full lg:w-auto text-xs text-muted-foreground pt-3 lg:pt-0 border-t lg:border-t-0 border-border">
+      <div className="flex flex-wrap items-center justify-between lg:justify-end gap-3 sm:gap-6 w-full lg:w-auto text-xs text-muted-foreground pt-3 lg:pt-0 border-t lg:border-t-0 border-border">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-muted-foreground" />
+          <Activity className="w-4 h-4 text-muted-foreground shrink-0" />
           <span>Scans Executed:</span>
           <span className="font-mono font-bold text-foreground">{scanCount}</span>
         </div>
 
         {lastScanTime && (
           <div className="flex items-center gap-1.5 font-mono text-muted-foreground">
-            <span className="text-[10px] uppercase text-muted-foreground/70">Last Scan:</span>
+            <span className="text-[10px] uppercase text-muted-foreground/70">Last:</span>
             <span>{lastScanTime}</span>
           </div>
         )}

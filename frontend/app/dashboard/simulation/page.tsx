@@ -135,12 +135,12 @@ export default function WebcamSimulationPage() {
   };
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 bg-background text-foreground">
+    <div className="p-4 sm:p-6 md:p-10 max-w-7xl mx-auto space-y-6 sm:space-y-8 bg-background text-foreground">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 bg-primary/10 border border-primary/20 text-primary rounded-lg">
+            <span className="p-2 bg-primary/10 border border-primary/20 text-primary rounded-lg shrink-0">
               <Camera className="w-5 h-5" />
             </span>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Live Webcam Access Simulation</h1>
@@ -183,7 +183,7 @@ export default function WebcamSimulationPage() {
       />
 
       {/* Recent Scan History List */}
-      <div className="bg-card text-card-foreground border border-border rounded-xl p-6 shadow-sm space-y-4">
+      <div className="bg-card text-card-foreground border border-border rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2 pb-4 border-b border-border">
           <History className="w-4 h-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-foreground">Recent Simulation Scan History</h3>
