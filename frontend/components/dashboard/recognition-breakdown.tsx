@@ -44,53 +44,53 @@ export function RecognitionBreakdown({
       </div>
 
       {/* Distribution Cards */}
-      <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 pt-1">
-        <div className="p-3 bg-muted/40 rounded-lg border border-border flex flex-col items-center text-center">
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            <CheckCircle className="w-3 h-3" /> Matched
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-3 pt-1">
+        <div className="p-2 sm:p-3 bg-muted/40 rounded-lg border border-border flex flex-col items-center text-center">
+          <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <CheckCircle className="w-3 h-3 shrink-0" /> Matched
           </span>
-          <span className="text-lg font-bold font-mono text-foreground mt-1">{matched}</span>
+          <span className="text-base sm:text-lg font-bold font-mono text-foreground mt-0.5 sm:mt-1">{matched}</span>
           <span className="text-[10px] text-muted-foreground font-mono">{matchedPct.toFixed(1)}%</span>
         </div>
 
-        <div className="p-3 bg-muted/40 rounded-lg border border-border flex flex-col items-center text-center">
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-            <HelpCircle className="w-3 h-3" /> Unknown
+        <div className="p-2 sm:p-3 bg-muted/40 rounded-lg border border-border flex flex-col items-center text-center">
+          <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-muted-foreground">
+            <HelpCircle className="w-3 h-3 shrink-0" /> Unknown
           </span>
-          <span className="text-lg font-bold font-mono text-foreground mt-1">{unknown}</span>
+          <span className="text-base sm:text-lg font-bold font-mono text-foreground mt-0.5 sm:mt-1">{unknown}</span>
           <span className="text-[10px] text-muted-foreground font-mono">{unknownPct.toFixed(1)}%</span>
         </div>
 
-        <div className="p-3 bg-muted/40 rounded-lg border border-border flex flex-col items-center text-center">
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="w-3 h-3" /> Ambiguous
+        <div className="p-2 sm:p-3 bg-muted/40 rounded-lg border border-border flex flex-col items-center text-center">
+          <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-3 h-3 shrink-0" /> Ambiguous
           </span>
-          <span className="text-lg font-bold font-mono text-foreground mt-1">{ambiguous}</span>
+          <span className="text-base sm:text-lg font-bold font-mono text-foreground mt-0.5 sm:mt-1">{ambiguous}</span>
           <span className="text-[10px] text-muted-foreground font-mono">{ambiguousPct.toFixed(1)}%</span>
         </div>
       </div>
 
       {/* Telemetry Averages */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border/80">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-2 border-t border-border/80">
         <div className="flex items-center justify-between p-2 bg-muted/20 rounded-lg text-xs">
-          <span className="text-muted-foreground flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-primary" /> Avg Quality
+          <span className="text-muted-foreground flex items-center gap-1 text-[10px] sm:text-xs">
+            <Sparkles className="w-3 h-3 text-primary shrink-0" /> <span className="hidden sm:inline">Avg</span> Quality
           </span>
-          <span className="font-mono font-bold text-foreground">{avgQuality.toFixed(1)}%</span>
+          <span className="font-mono font-bold text-foreground text-[11px] sm:text-xs">{avgQuality.toFixed(1)}%</span>
         </div>
 
         <div className="flex items-center justify-between p-2 bg-muted/20 rounded-lg text-xs">
-          <span className="text-muted-foreground flex items-center gap-1">
-            <Zap className="w-3 h-3 text-emerald-500" /> Avg Similarity
+          <span className="text-muted-foreground flex items-center gap-1 text-[10px] sm:text-xs">
+            <Zap className="w-3 h-3 text-emerald-500 shrink-0" /> <span className="hidden sm:inline">Avg</span> Sim
           </span>
-          <span className="font-mono font-bold text-foreground">{avgSimilarity.toFixed(1)}%</span>
+          <span className="font-mono font-bold text-foreground text-[11px] sm:text-xs">{avgSimilarity.toFixed(1)}%</span>
         </div>
 
         <div className="flex items-center justify-between p-2 bg-muted/20 rounded-lg text-xs">
-          <span className="text-muted-foreground flex items-center gap-1">
-            <Clock className="w-3 h-3 text-blue-500" /> Avg Latency
+          <span className="text-muted-foreground flex items-center gap-1 text-[10px] sm:text-xs">
+            <Clock className="w-3 h-3 text-blue-500 shrink-0" /> <span className="hidden sm:inline">Avg</span> Latency
           </span>
-          <span className="font-mono font-bold text-foreground">{avgLatencySec.toFixed(2)}s</span>
+          <span className="font-mono font-bold text-foreground text-[11px] sm:text-xs">{avgLatencySec.toFixed(2)}s</span>
         </div>
       </div>
     </div>
