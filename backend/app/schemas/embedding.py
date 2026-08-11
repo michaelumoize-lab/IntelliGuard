@@ -30,7 +30,7 @@ class FaceEmbeddingResponse(BaseModel):
         description="Face detection confidence score between 0.0 and 1.0",
         examples=[0.98],
     )
-    model: str = Field("buffalo_l", description="Name of the InsightFace model pack used")
+    model: str = Field("buffalo_s", description="Name of the InsightFace model pack used")
     model_version: Optional[str] = Field(None, description="Model version if available")
     execution_time_ms: float = Field(..., description="Inference execution time in milliseconds")
 
@@ -44,7 +44,7 @@ class FaceEmbeddingResponse(BaseModel):
                 "normalized": True,
                 "quality_score": 0.94,
                 "detection_confidence": 0.98,
-                "model": "buffalo_l",
+                "model": "buffalo_s",
                 "model_version": None,
                 "execution_time_ms": 142.37,
             }

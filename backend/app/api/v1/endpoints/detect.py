@@ -11,8 +11,8 @@ from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
 router = APIRouter()
 logger = logging.getLogger("intelliguard.detect")
 
-# Model-safe concurrency limiter to prevent unbounded CPU/GPU model executions
-inference_semaphore = asyncio.Semaphore(4)
+# Model-safe concurrency limiter to prevent memory spikes on single-core 512MB instances
+inference_semaphore = asyncio.Semaphore(1)
 
 
 def _run_detection(img, face_app) -> List[DetectedFace]:

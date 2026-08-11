@@ -17,7 +17,7 @@ class HealthResponse(BaseModel):
             "example": {
                 "status": "healthy",
                 "service": "intelliguard-ai",
-                "model": "buffalo_l",
+                "model": "buffalo_s",
                 "model_loaded": True,
                 "execution_provider": "CPUExecutionProvider",
                 "error": None,

@@ -11,14 +11,14 @@ logger = logging.getLogger("intelliguard.insightface")
 class InsightFaceManager:
     """Singleton manager responsible for loading and holding the InsightFace model."""
 
-    def __init__(self, model_name: str = "buffalo_l") -> None:
+    def __init__(self, model_name: str = "buffalo_s") -> None:
         self.model_name: str = model_name
         self.app: Optional[FaceAnalysis] = None
         self.is_loaded: bool = False
         self.active_provider: str = "Unavailable"
         self.error_message: Optional[str] = None
 
-    def initialize(self, det_size: Tuple[int, int] = (640, 640)) -> bool:
+    def initialize(self, det_size: Tuple[int, int] = (320, 320)) -> bool:
         """Initialize the InsightFace FaceAnalysis model.
         
         This method is intended to be called once during FastAPI startup.
@@ -39,7 +39,8 @@ class InsightFaceManager:
 
             logger.info(f"Initializing InsightFace FaceAnalysis (model='{self.model_name}') with providers={providers}...")
             
-            face_app = FaceAnalysis(name=self.model_name, providers=providers)
+            # Load only detection and recognition modules to save memory (avoids loading 3D landmarks & genderage models)
+            face_app = FaceAnalysis(name=self.model_name, allowed_modules=['detection', 'recognition'], providers=providers)
             face_app.prepare(ctx_id=0, det_size=det_size)
 
             self.app = face_app

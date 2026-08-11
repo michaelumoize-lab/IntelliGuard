@@ -13,8 +13,8 @@ from app.core.quality import calculate_face_quality_score
 router = APIRouter()
 logger = logging.getLogger("intelliguard.embedding")
 
-# Model-safe concurrency limiter to prevent unbounded CPU/GPU model executions
-inference_semaphore = asyncio.Semaphore(4)
+# Model-safe concurrency limiter to prevent memory spikes on single-core 512MB instances
+inference_semaphore = asyncio.Semaphore(1)
 
 
 def _extract_512d_embedding(img: np.ndarray, face_app) -> tuple[List[float], float, float]:
