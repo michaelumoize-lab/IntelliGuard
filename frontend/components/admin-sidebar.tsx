@@ -20,6 +20,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Cpu,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 
@@ -92,6 +93,11 @@ const mainNavItems: NavItem[] = [
         icon: UserPlus,
       },
     ],
+  },
+  {
+    title: "Device Management",
+    href: "/dashboard/devices",
+    icon: Cpu,
   },
   {
     title: "Access Logs",
