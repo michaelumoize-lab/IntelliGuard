@@ -1,3 +1,6 @@
+import os
+import urllib.request
+import zipfile
 import logging
 from typing import Optional, List, Tuple
 import onnxruntime as ort
@@ -6,6 +9,53 @@ from insightface.app import FaceAnalysis
 from app.core.config import settings
 
 logger = logging.getLogger("intelliguard.insightface")
+
+
+def ensure_minimal_models(model_name: str = "buffalo_s") -> str:
+    """Ensure only required ONNX models (detection and recognition) exist in the model directory.
+
+    Downloads the model archive if not present, extracts ONLY detection (det_*.onnx) and recognition
+    (w600k_*.onnx) models, and discards heavy unused models (such as the 143MB 3D landmark model)
+    to keep RAM footprint below 120MB on constrained cloud instances (e.g. Render 512MB tier).
+    """
+    models_dir = os.path.expanduser(f"~/.insightface/models/{model_name}")
+    os.makedirs(models_dir, exist_ok=True)
+
+    existing_files = os.listdir(models_dir) if os.path.exists(models_dir) else []
+    has_det = any(f.startswith("det_") and f.endswith(".onnx") for f in existing_files)
+    has_rec = any((f.startswith("w600k_") or "arcface" in f) and f.endswith(".onnx") for f in existing_files)
+
+    if not (has_det and has_rec):
+        logger.info(f"Downloading model archive for '{model_name}'...")
+        zip_path = os.path.join(models_dir, f"{model_name}.zip")
+        url = f"https://github.com/deepinsight/insightface/releases/download/model-zoo/{model_name}.zip"
+
+        urllib.request.urlretrieve(url, zip_path)
+
+        logger.info(f"Extracting minimal models (detection and recognition) for '{model_name}'...")
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            for member in zf.namelist():
+                filename = os.path.basename(member)
+                if (filename.startswith("det_") or filename.startswith("w600k_")) and filename.endswith(".onnx"):
+                    zf.extract(member, models_dir)
+
+        if os.path.exists(zip_path):
+            try:
+                os.remove(zip_path)
+            except OSError:
+                pass
+
+    # Prune any unused models that might exist from previous downloads to prevent FaceAnalysis from loading them
+    for unused in ["1k3d68.onnx", "2d106det.onnx", "genderage.onnx"]:
+        unused_path = os.path.join(models_dir, unused)
+        if os.path.exists(unused_path):
+            try:
+                os.remove(unused_path)
+                logger.info(f"Pruned unused model weight '{unused}' to save memory.")
+            except OSError:
+                pass
+
+    return models_dir
 
 
 class InsightFaceManager:
@@ -28,6 +78,9 @@ class InsightFaceManager:
             return True
 
         try:
+            # 1. Ensure only required models exist to avoid loading unused 143MB landmark weights
+            ensure_minimal_models(self.model_name)
+
             available_providers = ort.get_available_providers()
             logger.info(f"Available ONNX Runtime execution providers: {available_providers}")
 
@@ -35,13 +88,30 @@ class InsightFaceManager:
             providers: List[str] = []
             if "CUDAExecutionProvider" in available_providers:
                 providers.append("CUDAExecutionProvider")
+                ctx_id = 0
+            else:
+                ctx_id = -1
             providers.append("CPUExecutionProvider")
 
-            logger.info(f"Initializing InsightFace FaceAnalysis (model='{self.model_name}') with providers={providers}...")
-            
-            # Load only detection and recognition modules to save memory (avoids loading 3D landmarks & genderage models)
-            face_app = FaceAnalysis(name=self.model_name, allowed_modules=['detection', 'recognition'], providers=providers)
-            face_app.prepare(ctx_id=0, det_size=det_size)
+            logger.info(
+                f"Initializing InsightFace FaceAnalysis (model='{self.model_name}') with providers={providers}, ctx_id={ctx_id}..."
+            )
+
+            # Restrict ONNX Runtime threads and disable memory arena hoarding for low-memory container environments
+            sess_options = ort.SessionOptions()
+            sess_options.intra_op_num_threads = 1
+            sess_options.inter_op_num_threads = 1
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.enable_cpu_mem_arena = False
+
+            # Load only detection and recognition modules with optimized session options
+            face_app = FaceAnalysis(
+                name=self.model_name,
+                allowed_modules=["detection", "recognition"],
+                providers=providers,
+                sess_options=sess_options,
+            )
+            face_app.prepare(ctx_id=ctx_id, det_size=det_size)
 
             self.app = face_app
             self.is_loaded = True
