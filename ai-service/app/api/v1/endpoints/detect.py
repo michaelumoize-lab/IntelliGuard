@@ -7,12 +7,10 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.detection import FaceDetectionResponse, DetectedFace, Base64DetectRequest
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
+from app.core.insightface import inference_semaphore
 
 router = APIRouter()
 logger = logging.getLogger("intelliguard.detect")
-
-# Model-safe concurrency limiter to prevent memory spikes on single-core 512MB instances
-inference_semaphore = asyncio.Semaphore(1)
 
 
 def _run_detection(img, face_app) -> List[DetectedFace]:

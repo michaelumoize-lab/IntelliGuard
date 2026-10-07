@@ -32,8 +32,10 @@ export async function GET(
   }
 
   const url = new URL(req.url);
-  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-  const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get("limit") || "10", 10)));
+  const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
+  const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+  const rawLimit = parseInt(url.searchParams.get("limit") || "10", 10);
+  const limit = Math.max(1, Math.min(100, isNaN(rawLimit) ? 10 : rawLimit));
   const severity = url.searchParams.get("severity");
   const alertType = url.searchParams.get("alertType");
   const resolvedParam = url.searchParams.get("resolved");

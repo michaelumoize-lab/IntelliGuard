@@ -339,7 +339,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]`;
                   Embedding Vector Precision & Normalization
                 </h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Both <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-foreground">buffalo_l</code> and <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-foreground">buffalo_s</code> output identical 512-dimensional vector schemas. Switching model weights does not invalidate existing facial embeddings stored in your PostgreSQL database.
+                  Both <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-foreground">buffalo_l</code> and <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-foreground">buffalo_s</code> output 512-dimensional vector schemas, but their embedding spaces are distinct. Switching models requires verified cross-model compatibility or re-enrollment before recommending it.
                 </p>
               </div>
             </CardContent>

@@ -12,13 +12,15 @@ frontend/.turbo/
 frontend/.env.local
 
 # --------------------------
-# Backend (Python)
+# AI Service (Python FastAPI)
 # --------------------------
-backend/.venv/
-backend/__pycache__/
-backend/.pytest_cache/
-backend/.mypy_cache/
-backend/.ruff_cache/
+ai-service/.venv/
+ai-service/__pycache__/
+ai-service/.pytest_cache/
+ai-service/.mypy_cache/
+ai-service/.ruff_cache/
+.venv/
+
 
 *.py[cod]
 *.pyo

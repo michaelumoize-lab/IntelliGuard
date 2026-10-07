@@ -32,8 +32,10 @@ export async function GET(
   }
 
   const url = new URL(req.url);
-  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-  const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get("limit") || "10", 10)));
+  const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
+  const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+  const rawLimit = parseInt(url.searchParams.get("limit") || "10", 10);
+  const limit = Math.max(1, Math.min(100, isNaN(rawLimit) ? 10 : rawLimit));
   const statusParam = (url.searchParams.get("status") || "").trim();
   const search = (url.searchParams.get("search") || "").trim();
   const dateFrom = url.searchParams.get("dateFrom");
@@ -65,9 +67,28 @@ export async function GET(
     }
 
     if (dateFrom || dateTo) {
-      whereClause.createdAt = {};
-      if (dateFrom) whereClause.createdAt.gte = new Date(dateFrom);
-      if (dateTo) whereClause.createdAt.lte = new Date(dateTo);
+      const createdAtFilter: { gte?: Date; lte?: Date } = {};
+      if (dateFrom) {
+        const parsedDateFrom = new Date(dateFrom);
+        if (isNaN(parsedDateFrom.getTime())) {
+          return NextResponse.json(
+            { success: false, error: "VALIDATION_ERROR", message: "Invalid dateFrom parameter." },
+            { status: 400 }
+          );
+        }
+        createdAtFilter.gte = parsedDateFrom;
+      }
+      if (dateTo) {
+        const parsedDateTo = new Date(dateTo);
+        if (isNaN(parsedDateTo.getTime())) {
+          return NextResponse.json(
+            { success: false, error: "VALIDATION_ERROR", message: "Invalid dateTo parameter." },
+            { status: 400 }
+          );
+        }
+        createdAtFilter.lte = parsedDateTo;
+      }
+      whereClause.createdAt = createdAtFilter;
     }
 
     const total = await prisma.accessLog.count({ where: whereClause });

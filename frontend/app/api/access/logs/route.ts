@@ -24,8 +24,10 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+    const rawPage = parseInt(searchParams.get("page") || "1", 10);
+    const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+    const rawLimit = parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Math.min(100, Math.max(1, isNaN(rawLimit) ? 20 : rawLimit));
     const search = (searchParams.get("search") || "").trim();
     const status = (searchParams.get("status") || "").trim().toLowerCase();
     const matchStatus = (searchParams.get("matchStatus") || "").trim().toLowerCase();

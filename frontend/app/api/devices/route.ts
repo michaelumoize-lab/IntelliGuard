@@ -25,8 +25,10 @@ export async function GET(req: NextRequest) {
   if (authCheck.error) return authCheck.error;
 
   const url = new URL(req.url);
-  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-  const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get("limit") || "10", 10)));
+  const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
+  const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+  const rawLimit = parseInt(url.searchParams.get("limit") || "10", 10);
+  const limit = Math.max(1, Math.min(100, isNaN(rawLimit) ? 10 : rawLimit));
   const search = (url.searchParams.get("search") || "").trim();
   const statusParam = url.searchParams.get("status") || "";
   const typeParam = url.searchParams.get("deviceType") || "";
@@ -162,18 +164,29 @@ export async function POST(req: NextRequest) {
     const rawApiKey = `ig_dev_${crypto.randomBytes(24).toString("hex")}`;
     const apiKeyHash = crypto.createHash("sha256").update(rawApiKey).digest("hex");
 
-    const newDevice = await prisma.device.create({
-      data: {
-        deviceName,
-        serialNumber,
-        location,
-        ipAddress,
-        firmwareVersion,
-        deviceType: deviceType as DeviceType,
-        status: status as DeviceStatus,
-        apiKeyHash,
-      },
-    });
+    let newDevice;
+    try {
+      newDevice = await prisma.device.create({
+        data: {
+          deviceName,
+          serialNumber,
+          location,
+          ipAddress,
+          firmwareVersion,
+          deviceType: deviceType as DeviceType,
+          status: status as DeviceStatus,
+          apiKeyHash,
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: `Serial number '${serialNumber}' is already registered.` },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     const { apiKeyHash: _, ...safeDevice } = newDevice;
 

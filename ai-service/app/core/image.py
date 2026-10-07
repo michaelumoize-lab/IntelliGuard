@@ -9,6 +9,7 @@ logger = logging.getLogger("intelliguard.image")
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB maximum encoded payload size
 MAX_IMAGE_DIMENSION = 4096  # 4096px maximum width or height to prevent decompression bombs
+MAX_BASE64_BYTES = ((MAX_IMAGE_BYTES + 2) // 3) * 4  # Encoded equivalent of MAX_IMAGE_BYTES
 
 
 def read_image_bytes_to_cv2(image_bytes: bytes) -> np.ndarray:
@@ -73,7 +74,13 @@ def decode_base64_to_cv2(base64_str: str) -> np.ndarray:
         if "," in base64_str:
             base64_str = base64_str.split(",", 1)[1]
 
-        image_bytes = base64.b64decode(base64_str)
+        if len(base64_str) > MAX_BASE64_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Uploaded image payload size ({len(base64_str)} bytes) exceeds the maximum allowed limit of {MAX_BASE64_BYTES} bytes.",
+            )
+
+        image_bytes = base64.b64decode(base64_str, validate=True)
         return read_image_bytes_to_cv2(image_bytes)
     except HTTPException:
         raise

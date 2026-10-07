@@ -133,3 +133,37 @@ def test_detect_faces_dimension_limit(client: TestClient):
     data = response.json()
     assert "exceed maximum allowed limit" in data["detail"]
 
+
+def test_detect_faces_base64_payload_size_limit(client: TestClient):
+    """Test POST /api/v1/detect/base64 with oversized base64 string exceeding limit."""
+    from app.core.image import MAX_BASE64_BYTES
+    oversized_base64 = "A" * (MAX_BASE64_BYTES + 4)
+    response = client.post(
+        "/api/v1/detect/base64",
+        json={"image_base64": oversized_base64},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert "exceeds the maximum allowed limit" in data["detail"]
+
+
+def test_detect_faces_base64_invalid_chars(client: TestClient):
+    """Test POST /api/v1/detect/base64 with malformed characters in base64 string."""
+    response = client.post(
+        "/api/v1/detect/base64",
+        json={"image_base64": "invalid!!!===base64@@@"},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert "Invalid base64 string" in data["detail"]
+
+
+def test_shared_inference_semaphore():
+    """Verify detect and embedding endpoints share the same semaphore from insightface."""
+    from app.core.insightface import inference_semaphore as core_sem
+    from app.api.v1.endpoints.detect import inference_semaphore as detect_sem
+    from app.api.v1.endpoints.embedding import inference_semaphore as embed_sem
+
+    assert detect_sem is core_sem
+    assert embed_sem is core_sem
+
