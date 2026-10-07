@@ -12,8 +12,8 @@ def memory_mb():
 
 print(f"Before InsightFace: {memory_mb():.2f} MB")
 
-app = FaceAnalysis(name="buffalo_l")
-app.prepare(ctx_id=-1, det_size=(640, 640))
+app = FaceAnalysis(name="buffalo_l", allowed_modules=['detection', 'recognition'])
+app.prepare(ctx_id=-1, det_size=(320, 320))
 
 print(f"After model loading: {memory_mb():.2f} MB")
 

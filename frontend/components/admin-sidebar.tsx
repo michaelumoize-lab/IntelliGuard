@@ -118,7 +118,7 @@ const mainNavItems: NavItem[] = [
 
 const supportNavItems: NavItem[] = [
   { title: "Settings", href: "/settings", icon: Settings },
-  { title: "Help", href: "/help", icon: CircleHelp },
+  { title: "Help", href: "/dashboard/help", icon: CircleHelp },
 ];
 
 export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {

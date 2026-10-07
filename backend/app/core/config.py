@@ -11,7 +11,7 @@ class Settings:
 
     APP_NAME: str = os.getenv("APP_NAME", "IntelliGuard AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s")
+    INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")
     
     # Raw CORS string
     _allowed_origins_raw: str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
