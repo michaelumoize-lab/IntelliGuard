@@ -5,8 +5,8 @@ import { generateEmbedding, FastAPIError } from "./fastapi";
 async function runTests() {
   console.log("=== Milestone 4 Verification Tests ===");
 
-  const singleFacePath = path.join(__dirname, "../../../backend/tests/single_face.jpg");
-  const testImgPath = path.join(__dirname, "../../../backend/test.jpg");
+  const singleFacePath = path.join(__dirname, "../../../ai-service/tests/single_face.jpg");
+  const testImgPath = path.join(__dirname, "../../../ai-service/test.jpg");
 
   if (!fs.existsSync(singleFacePath)) {
     console.error("Test image not found:", singleFacePath);

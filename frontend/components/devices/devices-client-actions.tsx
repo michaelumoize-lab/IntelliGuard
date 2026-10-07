@@ -274,8 +274,8 @@ export function DevicesTableInteractive({
         body: JSON.stringify({
           deviceName: data.deviceName,
           location: data.location,
-          ipAddress: data.ipAddress,
-          firmwareVersion: data.firmwareVersion,
+          ipAddress: data.ipAddress?.trim() || null,
+          firmwareVersion: data.firmwareVersion?.trim() || null,
           deviceType: data.deviceType,
           status: data.status,
         }),
@@ -376,8 +376,8 @@ export function DeviceDetailHeaderActions({
       body: JSON.stringify({
         deviceName: formData.deviceName,
         location: formData.location,
-        ipAddress: formData.ipAddress,
-        firmwareVersion: formData.firmwareVersion,
+        ipAddress: formData.ipAddress?.trim() || null,
+        firmwareVersion: formData.firmwareVersion?.trim() || null,
         deviceType: formData.deviceType,
         status: formData.status,
       }),

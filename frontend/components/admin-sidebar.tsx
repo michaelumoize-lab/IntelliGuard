@@ -117,7 +117,7 @@ const mainNavItems: NavItem[] = [
 ];
 
 const supportNavItems: NavItem[] = [
-  { title: "Settings", href: "/settings", icon: Settings },
+  { title: "Settings", href: "/settings/account", icon: Settings },
   { title: "Help", href: "/dashboard/help", icon: CircleHelp },
 ];
 

@@ -9,12 +9,10 @@ from fastapi.concurrency import run_in_threadpool
 from app.schemas.embedding import FaceEmbeddingResponse, Base64EmbeddingRequest
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
 from app.core.quality import calculate_face_quality_score
+from app.core.insightface import inference_semaphore
 
 router = APIRouter()
 logger = logging.getLogger("intelliguard.embedding")
-
-# Model-safe concurrency limiter to prevent memory spikes on single-core 512MB instances
-inference_semaphore = asyncio.Semaphore(1)
 
 
 def _extract_512d_embedding(img: np.ndarray, face_app) -> tuple[List[float], float, float]:

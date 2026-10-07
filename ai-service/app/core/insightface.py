@@ -2,6 +2,7 @@ import os
 import urllib.request
 import zipfile
 import logging
+import asyncio
 from typing import Optional, List, Tuple
 import onnxruntime as ort
 from insightface.app import FaceAnalysis
@@ -147,3 +148,6 @@ class InsightFaceManager:
 
 # Shared model manager instance initialized with model name from settings
 insightface_manager = InsightFaceManager(model_name=settings.INSIGHTFACE_MODEL)
+
+# Model-safe concurrency limiter to serialize InsightFace inference across endpoints
+inference_semaphore = asyncio.Semaphore(1)
