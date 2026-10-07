@@ -123,89 +123,89 @@ export function SystemHealthPanel() {
           <span>Polling service health statuses...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
           {/* Next.js API */}
-          <div className="p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2.5">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-background rounded-lg border border-border text-foreground">
+          <div className="p-3.5 sm:p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-background rounded-lg border border-border text-foreground shrink-0">
                 <Server className="w-4 h-4" />
               </div>
-              <span className="text-xs font-semibold text-foreground">Next.js API</span>
+              <span className="text-xs font-semibold text-foreground truncate">Next.js API</span>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               {getStatusBadge(health.services.nextjs.status)}
-              <span className="text-[11px] font-mono text-muted-foreground pt-0.5">
+              <span className="text-[11px] font-mono text-muted-foreground pt-0.5 truncate">
                 Latency: {health.services.nextjs.latencyMs}ms
               </span>
             </div>
           </div>
 
           {/* FastAPI AI Engine */}
-          <div className="p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2.5">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/20 text-primary">
+          <div className="p-3.5 sm:p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/20 text-primary shrink-0">
                 <Cpu className="w-4 h-4" />
               </div>
-              <span className="text-xs font-semibold text-foreground">FastAPI AI</span>
+              <span className="text-xs font-semibold text-foreground truncate">FastAPI AI</span>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               {getStatusBadge(health.services.fastapi.status)}
-              <span className="text-[11px] font-mono text-muted-foreground pt-0.5">
+              <span className="text-[11px] font-mono text-muted-foreground pt-0.5 truncate">
                 {health.services.fastapi.latencyMs
                   ? `Latency: ${health.services.fastapi.latencyMs}ms`
-                  : health.services.fastapi.message || "Connection refused"}
+                  : health.services.fastapi.message || "Offline"}
               </span>
             </div>
           </div>
 
           {/* PostgreSQL DB */}
-          <div className="p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2.5">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-background rounded-lg border border-border text-foreground">
+          <div className="p-3.5 sm:p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-background rounded-lg border border-border text-foreground shrink-0">
                 <Database className="w-4 h-4" />
               </div>
-              <span className="text-xs font-semibold text-foreground">PostgreSQL</span>
+              <span className="text-xs font-semibold text-foreground truncate">PostgreSQL</span>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               {getStatusBadge(health.services.postgresql.status)}
-              <span className="text-[11px] font-mono text-muted-foreground pt-0.5">
+              <span className="text-[11px] font-mono text-muted-foreground pt-0.5 truncate">
                 {health.services.postgresql.latencyMs ? `Latency: ${health.services.postgresql.latencyMs}ms` : "Offline"}
               </span>
             </div>
           </div>
 
           {/* pgvector Extension */}
-          <div className="p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2.5">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-500">
+          <div className="p-3.5 sm:p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-500 shrink-0">
                 <Database className="w-4 h-4" />
               </div>
-              <span className="text-xs font-semibold text-foreground">pgvector</span>
+              <span className="text-xs font-semibold text-foreground truncate">pgvector</span>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               {getStatusBadge(health.services.pgvector.status)}
-              <span className="text-[11px] font-mono text-muted-foreground pt-0.5">
+              <span className="text-[11px] font-mono text-muted-foreground pt-0.5 truncate">
                 Native Vector Engine
               </span>
             </div>
           </div>
 
           {/* ImageKit Cloud Storage */}
-          <div className="p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2.5">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20 text-cyan-500">
+          <div className="p-3.5 sm:p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20 text-cyan-500 shrink-0">
                 <Cloud className="w-4 h-4" />
               </div>
-              <span className="text-xs font-semibold text-foreground">ImageKit</span>
+              <span className="text-xs font-semibold text-foreground truncate">ImageKit</span>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               {getStatusBadge(health.services.imagekit.status)}
-              <span className="text-[11px] font-mono text-muted-foreground pt-0.5">
+              <span className="text-[11px] font-mono text-muted-foreground pt-0.5 truncate">
                 Cloud Asset Storage
               </span>
             </div>

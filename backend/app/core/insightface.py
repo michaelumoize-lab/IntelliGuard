@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
+
 import onnxruntime as ort
 from insightface.app import FaceAnalysis
 
@@ -18,9 +19,9 @@ class InsightFaceManager:
         self.active_provider: str = "Unavailable"
         self.error_message: Optional[str] = None
 
-    def initialize(self, det_size: Tuple[int, int] = (640, 640)) -> bool:
+    def initialize(self, det_size: Tuple[int, int] = (320, 320)) -> bool:
         """Initialize the InsightFace FaceAnalysis model.
-        
+
         This method is intended to be called once during FastAPI startup.
         """
         if self.is_loaded and self.app is not None:
@@ -29,7 +30,9 @@ class InsightFaceManager:
 
         try:
             available_providers = ort.get_available_providers()
-            logger.info(f"Available ONNX Runtime execution providers: {available_providers}")
+            logger.info(
+                f"Available ONNX Runtime execution providers: {available_providers}"
+            )
 
             # Prioritize CUDA if installed and available, fallback to CPU
             providers: List[str] = []
@@ -37,9 +40,16 @@ class InsightFaceManager:
                 providers.append("CUDAExecutionProvider")
             providers.append("CPUExecutionProvider")
 
-            logger.info(f"Initializing InsightFace FaceAnalysis (model='{self.model_name}') with providers={providers}...")
-            
-            face_app = FaceAnalysis(name=self.model_name, providers=providers)
+            logger.info(
+                f"Initializing InsightFace FaceAnalysis (model='{self.model_name}') with providers={providers}..."
+            )
+
+            # Load only detection and recognition modules to save memory (avoids loading 3D landmarks & genderage models)
+            face_app = FaceAnalysis(
+                name=self.model_name,
+                allowed_modules=["detection", "recognition"],
+                providers=providers,
+            )
             face_app.prepare(ctx_id=0, det_size=det_size)
 
             self.app = face_app
@@ -70,7 +80,10 @@ class InsightFaceManager:
             self.app = None
             self.active_provider = "Unavailable"
             self.error_message = str(err)
-            logger.error(f"Failed to initialize InsightFace model '{self.model_name}': {err}", exc_info=True)
+            logger.error(
+                f"Failed to initialize InsightFace model '{self.model_name}': {err}",
+                exc_info=True,
+            )
             return False
 
 

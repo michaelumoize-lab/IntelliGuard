@@ -20,6 +20,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Cpu,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 
@@ -94,6 +95,11 @@ const mainNavItems: NavItem[] = [
     ],
   },
   {
+    title: "Device Management",
+    href: "/dashboard/devices",
+    icon: Cpu,
+  },
+  {
     title: "Access Logs",
     href: "/dashboard/access-logs",
     icon: ClipboardList,
@@ -112,7 +118,7 @@ const mainNavItems: NavItem[] = [
 
 const supportNavItems: NavItem[] = [
   { title: "Settings", href: "/settings", icon: Settings },
-  { title: "Help", href: "/help", icon: CircleHelp },
+  { title: "Help", href: "/dashboard/help", icon: CircleHelp },
 ];
 
 export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
