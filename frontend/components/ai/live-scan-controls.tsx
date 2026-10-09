@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Camera, Play, Square, Loader2, Activity, Video, VideoOff } from "lucide-react";
+import { Camera, Play, Square, Loader2, Activity, Video, VideoOff, Volume2, VolumeX } from "lucide-react";
 
 interface LiveScanControlsProps {
   isCameraOn: boolean;
@@ -13,6 +13,8 @@ interface LiveScanControlsProps {
   isScanning: boolean;
   scanCount: number;
   lastScanTime: string | null;
+  soundEnabled?: boolean;
+  onToggleSound?: () => void;
 }
 
 export function LiveScanControls({
@@ -25,11 +27,13 @@ export function LiveScanControls({
   isScanning,
   scanCount,
   lastScanTime,
+  soundEnabled = true,
+  onToggleSound,
 }: LiveScanControlsProps) {
   return (
-    <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-4 sm:p-5 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
+    <div className="w-full bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
       {/* Control Buttons */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
+      <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
         {/* Camera Toggle Button */}
         <button
           onClick={onToggleCamera}
@@ -88,6 +92,27 @@ export function LiveScanControls({
             </>
           )}
         </button>
+
+        {/* Audio Chime Feedback Toggle */}
+        {onToggleSound && (
+          <button
+            type="button"
+            onClick={onToggleSound}
+            className={`px-3 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+              soundEnabled
+                ? "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+                : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+            }`}
+            title={soundEnabled ? "Audio Chime: Active" : "Audio Chime: Muted"}
+          >
+            {soundEnabled ? (
+              <Volume2 className="w-4 h-4 text-primary shrink-0" />
+            ) : (
+              <VolumeX className="w-4 h-4 shrink-0" />
+            )}
+            <span className="hidden sm:inline">{soundEnabled ? "Audio On" : "Muted"}</span>
+          </button>
+        )}
       </div>
 
       {/* Telemetry Stats Bar */}
@@ -99,16 +124,9 @@ export function LiveScanControls({
         </div>
 
         {lastScanTime && (
-          <div className="flex items-center gap-1.5 font-mono text-muted-foreground">
-            <span className="text-[10px] uppercase text-muted-foreground/70">Last:</span>
-            <span>{lastScanTime}</span>
-          </div>
-        )}
-
-        {isMonitoring && (
-          <div className="flex items-center gap-2 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>2.5s Auto Loop</span>
+          <div className="flex items-center gap-2">
+            <span>Last Scan:</span>
+            <span className="font-mono text-foreground font-medium">{lastScanTime}</span>
           </div>
         )}
       </div>

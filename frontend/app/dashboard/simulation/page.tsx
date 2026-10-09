@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { LiveCameraPreview, LiveCameraPreviewRef } from "@/components/ai/live-camera-preview";
+import { LiveCameraPreview, LiveCameraPreviewRef, CameraOverlayResult } from "@/components/ai/live-camera-preview";
 import { AccessResultCard } from "@/components/ai/access-result-card";
 import { LiveScanControls } from "@/components/ai/live-scan-controls";
 import { scanFace, AccessScanResponse } from "@/lib/access/access-client";
-import { Camera, History, CheckCircle2, XCircle, AlertTriangle, HelpCircle } from "lucide-react";
+import { playBiometricSound } from "@/lib/audio";
+import { Camera, History, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ShieldCheck } from "lucide-react";
 
 export interface ScanHistoryItem {
   id: string;
@@ -24,7 +25,10 @@ export default function WebcamSimulationPage() {
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [isMonitoring, setIsMonitoring] = useState<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [latestResult, setLatestResult] = useState<AccessScanResponse | null>(null);
+  const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
+  const [cameraOverlay, setCameraOverlay] = useState<CameraOverlayResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [scanCount, setScanCount] = useState<number>(0);
   const [lastScanTime, setLastScanTime] = useState<string | null>(null);
@@ -50,10 +54,20 @@ export default function WebcamSimulationPage() {
       if (!next) {
         setIsMonitoring(false);
         setIsCameraReady(false);
+        setCameraOverlay(null);
       }
       return next;
     });
   }, []);
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (capturedImageUrl && capturedImageUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(capturedImageUrl);
+      }
+    };
+  }, [capturedImageUrl]);
 
   // Execute a single face scan
   const executeScan = useCallback(async () => {
@@ -71,6 +85,10 @@ export default function WebcamSimulationPage() {
         return;
       }
 
+      // Create snapshot URL for side-by-side comparison
+      const previewUrl = URL.createObjectURL(imageBlob);
+      setCapturedImageUrl(previewUrl);
+
       const response = await scanFace(imageBlob);
 
       // Stale Response Guard: if camera was stopped or a newer scan began in flight, discard result
@@ -82,6 +100,26 @@ export default function WebcamSimulationPage() {
       const timeStr = new Date().toLocaleTimeString();
       setLastScanTime(timeStr);
       setScanCount((prev) => prev + 1);
+
+      // Auditory Feedback Chime
+      if (soundEnabled) {
+        playBiometricSound(response.access_status === "granted" ? "granted" : "denied");
+      }
+
+      // Display HUD Banner Overlay for 3.5s
+      const personName = response.person
+        ? `${response.person.first_name} ${response.person.last_name}`
+        : undefined;
+
+      setCameraOverlay({
+        status: response.access_status,
+        name: personName,
+        similarity: response.face?.similarity,
+      });
+
+      setTimeout(() => {
+        setCameraOverlay((current) => (current?.name === personName ? null : current));
+      }, 3500);
 
       // Add to local scan history (limit to 10 entries)
       const historyEntry: ScanHistoryItem = {
@@ -105,18 +143,17 @@ export default function WebcamSimulationPage() {
       inFlightRef.current = false;
       setIsScanning(false);
     }
-  }, [isCameraOn]);
+  }, [soundEnabled]);
 
   // Continuous monitoring timer loop (2.5s interval)
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
 
     if (isCameraOn && isMonitoring && isCameraReady) {
-      // Execute initial scan immediately
       executeScan();
 
       intervalId = setInterval(() => {
-        if (isCameraOn && isMonitoringRef.current && !inFlightRef.current) {
+        if (isMonitoringRef.current && isCameraOnRef.current && !inFlightRef.current) {
           executeScan();
         }
       }, 2500);
@@ -140,32 +177,38 @@ export default function WebcamSimulationPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 bg-primary/10 border border-primary/20 text-primary rounded-lg shrink-0">
+            <span className="p-2 bg-primary/10 border border-primary/20 text-primary rounded-xl shrink-0">
               <Camera className="w-5 h-5" />
             </span>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Live Webcam Access Simulation</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Real-time browser face recognition & decision engine testing via live video feed.
+            Real-time biometric terminal testing with live HUD scanning, auditory feedback, and side-by-side profile verification.
           </p>
         </div>
       </div>
 
       {/* Main Grid: Camera Feed & Decision Result Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Live Camera Feed (7 cols) */}
+        {/* Left Column: Live Camera Feed with Biometric HUD (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <LiveCameraPreview
             ref={cameraRef}
             isCameraOn={isCameraOn}
             onToggleCamera={handleToggleCamera}
             onCameraStatusChange={setIsCameraReady}
+            isScanning={isScanning}
+            overlayResult={cameraOverlay}
           />
         </div>
 
-        {/* Right Column: Access Decision Result Card (5 cols) */}
+        {/* Right Column: Access Decision Result Card with Side-by-Side Verification (5 cols) */}
         <div className="lg:col-span-5 h-full">
-          <AccessResultCard result={latestResult} isLoading={isScanning && !latestResult} />
+          <AccessResultCard
+            result={latestResult}
+            isLoading={isScanning && !latestResult}
+            capturedImageUrl={capturedImageUrl}
+          />
         </div>
       </div>
 
@@ -180,14 +223,18 @@ export default function WebcamSimulationPage() {
         isScanning={isScanning}
         scanCount={scanCount}
         lastScanTime={lastScanTime}
+        soundEnabled={soundEnabled}
+        onToggleSound={() => setSoundEnabled((prev) => !prev)}
       />
 
       {/* Recent Scan History List */}
-      <div className="bg-card text-card-foreground border border-border rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 pb-4 border-b border-border">
-          <History className="w-4 h-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold text-foreground">Recent Simulation Scan History</h3>
-          <span className="text-xs text-muted-foreground font-mono ml-auto">Max 10 Scans</span>
+      <div className="bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">Recent Simulation Scan History</h3>
+          </div>
+          <span className="text-xs text-muted-foreground font-mono">Max 10 Scans</span>
         </div>
 
         {scanHistory.length === 0 ? (
@@ -212,19 +259,19 @@ export default function WebcamSimulationPage() {
                     <td className="py-3 font-mono text-muted-foreground">{item.time}</td>
                     <td className="py-3">
                       {item.status === "granted" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
                           <CheckCircle2 className="w-3.5 h-3.5" /> GRANTED
                         </span>
                       ) : item.matchStatus === "ambiguous" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold text-[11px]">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold text-[11px]">
                           <AlertTriangle className="w-3.5 h-3.5" /> AMBIGUOUS
                         </span>
                       ) : item.matchStatus === "unknown" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold text-[11px] border border-border">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold text-[11px] border border-border">
                           <HelpCircle className="w-3.5 h-3.5" /> UNKNOWN
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive font-semibold text-[11px]">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive font-semibold text-[11px]">
                           <XCircle className="w-3.5 h-3.5" /> DENIED
                         </span>
                       )}

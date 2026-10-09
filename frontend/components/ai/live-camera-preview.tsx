@@ -1,20 +1,28 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react";
-import { RefreshCw, AlertCircle, VideoOff, CameraOff, Video } from "lucide-react";
+import { RefreshCw, AlertCircle, VideoOff, CameraOff, Video, ShieldCheck, ShieldAlert, Sparkles } from "lucide-react";
 
 export interface LiveCameraPreviewRef {
   captureFrame: () => Promise<Blob | null>;
+}
+
+export interface CameraOverlayResult {
+  status: "granted" | "denied" | "ambiguous" | "unknown";
+  name?: string;
+  similarity?: number;
 }
 
 interface LiveCameraPreviewProps {
   isCameraOn: boolean;
   onToggleCamera: () => void;
   onCameraStatusChange?: (ready: boolean) => void;
+  isScanning?: boolean;
+  overlayResult?: CameraOverlayResult | null;
 }
 
 export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPreviewProps>(
-  ({ isCameraOn, onToggleCamera, onCameraStatusChange }, ref) => {
+  ({ isCameraOn, onToggleCamera, onCameraStatusChange, isScanning = false, overlayResult = null }, ref) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -47,10 +55,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     // Initialize camera stream on demand
     const startCamera = useCallback(
       async (deviceId?: string) => {
-        // Stop existing stream tracks first
         stopTracksOnly();
-
-        // Increment run counter for this specific startup attempt
         const runId = ++currentRunIdRef.current;
 
         setIsLoading(true);
@@ -70,7 +75,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-          // Check if run was cancelled while waiting for getUserMedia
           if (runId !== currentRunIdRef.current) {
             stream.getTracks().forEach((t) => t.stop());
             return;
@@ -97,22 +101,16 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
             onCameraStatusChange(true);
           }
 
-          // Fetch available video input devices
-          try {
-            const allDevices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = allDevices.filter((d) => d.kind === "videoinput");
-            setDevices(videoDevices);
-
-            const activeTrack = stream.getVideoTracks()[0];
-            const activeDeviceId = activeTrack?.getSettings()?.deviceId;
-            if (activeDeviceId && !selectedDeviceId) {
-              setSelectedDeviceId(activeDeviceId);
+          if (navigator.mediaDevices.enumerateDevices) {
+            try {
+              const allDevices = await navigator.mediaDevices.enumerateDevices();
+              const videoDevices = allDevices.filter((d) => d.kind === "videoinput");
+              setDevices(videoDevices);
+            } catch (enumErr) {
+              console.warn("Unable to enumerate devices:", enumErr);
             }
-          } catch (enumErr) {
-            console.warn("Failed to enumerate devices:", enumErr);
           }
         } catch (err: any) {
-          console.error("Camera access error:", err);
           if (runId === currentRunIdRef.current) {
             setIsLoading(false);
             if (onCameraStatusChange) {
@@ -130,10 +128,9 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           }
         }
       },
-      [stopTracksOnly, selectedDeviceId, onCameraStatusChange]
+      [stopTracksOnly, onCameraStatusChange]
     );
 
-    // Handle device change from select dropdown
     const handleDeviceSelect = (newDeviceId: string) => {
       setSelectedDeviceId(newDeviceId);
       if (isCameraOn) {
@@ -141,7 +138,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       }
     };
 
-    // Lifecycle effect: start/stop camera based on isCameraOn state
     useEffect(() => {
       if (isCameraOn) {
         startCamera(selectedDeviceId || undefined);
@@ -157,9 +153,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       return () => {
         stopStreamTracks();
       };
-    }, [isCameraOn]);
+    }, [isCameraOn, startCamera, stopStreamTracks, onCameraStatusChange, selectedDeviceId]);
 
-    // Expose captureFrame method to parent via ref
     useImperativeHandle(ref, () => ({
       captureFrame: () => {
         return new Promise<Blob | null>((resolve) => {
@@ -193,7 +188,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     }));
 
     return (
-      <div className="relative w-full aspect-video bg-card rounded-xl overflow-hidden border border-border shadow-sm flex flex-col items-center justify-center">
+      <div className="relative w-full aspect-video bg-black/90 rounded-2xl overflow-hidden border border-border shadow-md flex flex-col items-center justify-center">
         {/* Hidden Canvas for Frame Extraction */}
         <canvas ref={canvasRef} className="hidden" />
 
@@ -208,6 +203,126 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           }`}
         />
 
+        {/* Active Biometric Reticle & HUD Overlays */}
+        {isCameraOn && !isLoading && !error && (
+          <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 select-none">
+            {/* Top Bar Overlay */}
+            <div className="flex items-center justify-between w-full z-10">
+              <div className="flex items-center gap-2 px-3 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-full text-white text-[10px] sm:text-xs font-mono font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>TERMINAL ACTIVE</span>
+                <span className="text-white/40">•</span>
+                <span className="text-white/70">720P 30FPS</span>
+              </div>
+
+              {/* Status pill if overlayResult */}
+              {overlayResult && (
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide backdrop-blur-md shadow-lg transition-all animate-in fade-in zoom-in-95 duration-200 border ${
+                    overlayResult.status === "granted"
+                      ? "bg-emerald-500/20 border-emerald-400 text-emerald-300"
+                      : overlayResult.status === "ambiguous"
+                      ? "bg-amber-500/20 border-amber-400 text-amber-300"
+                      : "bg-destructive/20 border-destructive text-destructive-foreground"
+                  }`}
+                >
+                  {overlayResult.status === "granted" ? (
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {overlayResult.status === "granted"
+                      ? `MATCH: ${overlayResult.name || "VERIFIED"} (${((overlayResult.similarity || 0) * 100).toFixed(0)}%)`
+                      : overlayResult.status === "ambiguous"
+                      ? "AMBIGUOUS MATCH"
+                      : "ACCESS DENIED"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Center Biometric Face Target Oval & Crosshairs */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              {/* Four Corner Brackets */}
+              <div className="relative w-52 sm:w-64 h-64 sm:h-80 max-w-[80vw] max-h-[70vh] flex items-center justify-center">
+                {/* Top-Left Corner */}
+                <div
+                  className={`absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 transition-colors duration-300 ${
+                    overlayResult?.status === "granted"
+                      ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
+                      : overlayResult?.status === "denied"
+                      ? "border-destructive shadow-[0_0_8px_#ef4444]"
+                      : "border-primary/80"
+                  }`}
+                />
+                {/* Top-Right Corner */}
+                <div
+                  className={`absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 transition-colors duration-300 ${
+                    overlayResult?.status === "granted"
+                      ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
+                      : overlayResult?.status === "denied"
+                      ? "border-destructive shadow-[0_0_8px_#ef4444]"
+                      : "border-primary/80"
+                  }`}
+                />
+                {/* Bottom-Left Corner */}
+                <div
+                  className={`absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 transition-colors duration-300 ${
+                    overlayResult?.status === "granted"
+                      ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
+                      : overlayResult?.status === "denied"
+                      ? "border-destructive shadow-[0_0_8px_#ef4444]"
+                      : "border-primary/80"
+                  }`}
+                />
+                {/* Bottom-Right Corner */}
+                <div
+                  className={`absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 transition-colors duration-300 ${
+                    overlayResult?.status === "granted"
+                      ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
+                      : overlayResult?.status === "denied"
+                      ? "border-destructive shadow-[0_0_8px_#ef4444]"
+                      : "border-primary/80"
+                  }`}
+                />
+
+                {/* Subtle Biometric Oval Guideline */}
+                <div
+                  className={`w-full h-full rounded-[45%] border border-dashed transition-all duration-300 flex flex-col items-center justify-end pb-3 ${
+                    isScanning
+                      ? "border-primary animate-pulse scale-[1.02]"
+                      : overlayResult?.status === "granted"
+                      ? "border-emerald-400/80 bg-emerald-500/5"
+                      : overlayResult?.status === "denied"
+                      ? "border-destructive/80 bg-destructive/5"
+                      : "border-white/30"
+                  }`}
+                >
+                  <span className="text-[10px] font-mono tracking-widest uppercase bg-black/60 px-2 py-0.5 rounded text-white/80">
+                    {isScanning ? "PROCESSING AI INFERENCE..." : "ALIGN FACE"}
+                  </span>
+                </div>
+
+                {/* Animated Laser Scanning Line */}
+                {isScanning && (
+                  <div className="absolute inset-x-2 top-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-pulse" />
+                )}
+              </div>
+            </div>
+
+            {/* Bottom HUD Bar */}
+            <div className="flex items-center justify-between w-full text-white/70 text-[10px] font-mono z-10">
+              <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-sm">
+                ALGORITHM: InsightFace ArcFace
+              </span>
+              <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-sm flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-cyan-400" /> PGVECTOR 512D
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* OFF State Container */}
         {!isCameraOn && !isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/40 p-6 text-center gap-3">
@@ -215,7 +330,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               <CameraOff className="w-8 h-8" />
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-foreground mb-1">Webcam Feed Powered Off</h4>
+              <h4 className="text-sm font-semibold text-foreground mb-1">Webcam Simulation Powered Off</h4>
               <p className="text-xs text-muted-foreground max-w-sm">
                 Click &quot;Turn On Camera&quot; to initialize video feed and test real-time face recognition.
               </p>
@@ -258,28 +373,20 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           </div>
         )}
 
-        {/* Camera Selector Badge */}
+        {/* Camera Selector Dropdown */}
         {isCameraOn && devices.length > 1 && !error && !isLoading && (
-          <div className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-10 max-w-[150px] sm:max-w-xs">
+          <div className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-20 max-w-[150px] sm:max-w-xs pointer-events-auto">
             <select
               value={selectedDeviceId}
               onChange={(e) => handleDeviceSelect(e.target.value)}
-              className="w-full bg-background/80 backdrop-blur-md border border-input text-foreground text-[11px] sm:text-xs rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-ring truncate"
+              className="w-full bg-black/70 backdrop-blur-md border border-white/20 text-white text-[11px] sm:text-xs rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-primary truncate cursor-pointer"
             >
               {devices.map((device, idx) => (
-                <option key={device.deviceId} value={device.deviceId}>
+                <option key={device.deviceId} value={device.deviceId} className="bg-popover text-popover-foreground">
                   {device.label || `Camera ${idx + 1}`}
                 </option>
               ))}
             </select>
-          </div>
-        )}
-
-        {/* Live Indicator */}
-        {isCameraOn && !isLoading && !error && (
-          <div className="absolute top-2.5 sm:top-4 left-2.5 sm:left-4 z-10 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-0.5 sm:py-1 bg-background/80 backdrop-blur-md border border-border rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">LIVE</span>
           </div>
         )}
       </div>
@@ -288,4 +395,3 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 );
 
 LiveCameraPreview.displayName = "LiveCameraPreview";
-
