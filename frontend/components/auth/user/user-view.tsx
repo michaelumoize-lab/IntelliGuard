@@ -20,10 +20,10 @@ export type UserViewProps = {
    */
   hideSubtitle?: boolean
   /** @remarks `User` */
-  user?: Partial<User> & {
+  user?: (Partial<User> & {
     username?: string | null
     displayUsername?: string | null
-  }
+  }) | null
 }
 
 /**
@@ -44,12 +44,12 @@ export function UserView({
   const { authClient } = useAuth()
   const { data: session, isPending: sessionPending } = useSession(
     authClient as UsernameAuthClient,
-    { enabled: !user && !isPending }
+    { enabled: user === undefined && !isPending }
   )
 
   const resolvedUser = user ?? session?.user
 
-  if ((isPending || sessionPending) && !user) {
+  if ((isPending || sessionPending) && user === undefined) {
     return (
       <div className={cn("flex items-center gap-2 min-w-0", className)}>
         <UserAvatar isPending />

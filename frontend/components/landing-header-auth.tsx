@@ -5,12 +5,35 @@ import { ArrowRight, LayoutDashboard, LogIn } from "lucide-react";
 import { UserButton } from "@/components/auth/user/user-button";
 import { useSession } from "@/lib/auth-client";
 
-export function LandingHeaderAuth() {
-  const { data: session } = useSession();
+import type { User } from "better-auth";
+
+export interface LandingHeaderUser {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  username?: string | null;
+  displayUsername?: string | null;
+}
+
+interface LandingHeaderAuthProps {
+  user?: LandingHeaderUser | null;
+}
+
+export function LandingHeaderAuth({ user }: LandingHeaderAuthProps) {
+  const { data: clientSession, isPending } = useSession();
+
+  // Prefer server-passed user on initial mount/hydration to eliminate UI flicker.
+  // When client session finishes loading, use it for live updates (e.g. sign out).
+  const effectiveUser = isPending
+    ? user
+    : (clientSession?.user ?? user);
+
+  const isAuthenticated = !!effectiveUser;
 
   return (
     <div className="flex items-center gap-2.5">
-      {session ? (
+      {isAuthenticated ? (
         <>
           <Link
             href="/dashboard"
@@ -20,7 +43,7 @@ export function LandingHeaderAuth() {
             <span>Command Center</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
-          <UserButton size="icon" />
+          <UserButton size="icon" user={effectiveUser as User} />
         </>
       ) : (
         <>
@@ -31,7 +54,7 @@ export function LandingHeaderAuth() {
             <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>
           </Link>
-          <UserButton size="icon" />
+          <UserButton size="icon" user={null} />
         </>
       )}
     </div>

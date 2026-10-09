@@ -21,9 +21,20 @@ import {
   Clock,
   User,
 } from "lucide-react";
+import { getServerSession } from "@/lib/get-session";
 import { LandingHeaderAuth } from "@/components/landing-header-auth";
 
-export default function Home() {
+export default async function Home() {
+  const session = await getServerSession();
+  const user = session?.user
+    ? {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        image: session.user.image,
+      }
+    : null;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20 selection:text-primary">
       {/* Top Portal Navigation */}
@@ -41,7 +52,7 @@ export default function Home() {
             </div>
           </div>
 
-          <LandingHeaderAuth />
+          <LandingHeaderAuth user={user} />
         </div>
       </header>
 
