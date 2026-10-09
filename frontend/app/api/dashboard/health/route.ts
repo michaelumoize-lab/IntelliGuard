@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     const faStart = Date.now();
     const faRes = await fetch(`${fastApiUrl}/api/v1/health`, {
       method: "GET",
-      signal: AbortSignal.timeout(5000), // 5s timeout
+      signal: AbortSignal.timeout(12000), // 12s timeout for cloud cold starts
     });
     const faLatency = Date.now() - faStart;
 
@@ -52,8 +52,8 @@ export async function GET(req: NextRequest) {
       fastApiStatus = { status: "offline", message: "AI microservice HTTP error response" };
     }
   } catch (err: any) {
-    console.error("FastAPI health check probe failed:", err);
-    fastApiStatus = { status: "offline", message: "AI microservice unreachable" };
+    console.warn("FastAPI health check probe:", err?.name === "TimeoutError" ? "Request timed out (cold start)" : err?.message || "Service unreachable");
+    fastApiStatus = { status: "offline", message: "AI microservice unreachable or starting up" };
   }
 
   // 3. Real PostgreSQL & pgvector Health Check

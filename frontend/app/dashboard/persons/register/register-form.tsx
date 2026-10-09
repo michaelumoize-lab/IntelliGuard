@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UploadIcon, InfoIcon, Loader2, UserPlus, ArrowLeft, CheckCircle2, Camera } from "lucide-react";
+import { UploadIcon, InfoIcon, Loader2, UserPlus, ArrowLeft, CheckCircle2, Camera, Sparkles, ShieldAlert, AlertTriangle, Scan, Check } from "lucide-react";
 import Link from "next/link";
 import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
@@ -29,6 +29,14 @@ const registerPersonSchema = z.object({
 
 type RegisterPersonFormValues = z.infer<typeof registerPersonSchema>;
 
+interface PrecheckData {
+  faceCount: number;
+  confidence: number;
+  message: string;
+  executionTimeMs: number;
+  hasLandmarks: boolean;
+}
+
 export function RegisterPersonForm() {
   const router = useRouter();
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -36,6 +44,8 @@ export function RegisterPersonForm() {
   const [isWebcamOpen, setIsWebcamOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [precheckStatus, setPrecheckStatus] = useState<"idle" | "checking" | "optimal" | "acceptable" | "warning" | "error">("idle");
+  const [precheckData, setPrecheckData] = useState<PrecheckData | null>(null);
 
   const {
     register,
@@ -62,6 +72,42 @@ export function RegisterPersonForm() {
     };
   }, [imagePreview]);
 
+  const runQualityPrecheck = async (file: File) => {
+    setPrecheckStatus("checking");
+    setPrecheckData(null);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/persons/precheck", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPrecheckStatus(data.qualityStatus || "optimal");
+        setPrecheckData({
+          faceCount: data.faceCount,
+          confidence: data.confidence,
+          message: data.message,
+          executionTimeMs: data.executionTimeMs,
+          hasLandmarks: data.hasLandmarks,
+        });
+      } else {
+        setPrecheckStatus("warning");
+        setPrecheckData({
+          faceCount: data.faceCount || 0,
+          confidence: data.confidence || 0,
+          message: data.message || "Quality check could not verify photo.",
+          executionTimeMs: data.executionTimeMs || 0,
+          hasLandmarks: false,
+        });
+      }
+    } catch (err: any) {
+      console.warn("Precheck non-blocking error:", err);
+      setPrecheckStatus("idle");
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -76,6 +122,7 @@ export function RegisterPersonForm() {
         URL.revokeObjectURL(imagePreview);
       }
       setImagePreview(URL.createObjectURL(file));
+      runQualityPrecheck(file);
     }
   };
 
@@ -87,6 +134,7 @@ export function RegisterPersonForm() {
     }
     setImagePreview(URL.createObjectURL(file));
     toast.success("Photo captured from webcam!");
+    runQualityPrecheck(file);
   };
 
   const onSubmit = async (values: RegisterPersonFormValues) => {
@@ -213,7 +261,94 @@ export function RegisterPersonForm() {
                   )}
                 </div>
               </div>
+
+              {/* Biometric Face Quality Pre-Check Telemetry */}
+              {precheckStatus === "checking" && (
+                <div className="flex items-center gap-3 p-3.5 rounded-xl border border-primary/20 bg-primary/5 animate-pulse text-xs text-primary font-medium">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-semibold">AI Biometric Pre-Check Running...</p>
+                    <p className="text-[11px] text-muted-foreground">Probing InsightFace engine for facial boundary and landmark alignment.</p>
+                  </div>
+                </div>
+              )}
+
+              {precheckStatus !== "idle" && precheckStatus !== "checking" && precheckData && (
+                <div
+                  className={`p-3.5 rounded-xl border transition-all text-xs space-y-2.5 ${
+                    precheckStatus === "optimal"
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100"
+                      : precheckStatus === "acceptable"
+                      ? "border-blue-500/30 bg-blue-500/10 text-blue-950 dark:text-blue-100"
+                      : "border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {precheckStatus === "optimal" || precheckStatus === "acceptable" ? (
+                        <div className="p-1 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </div>
+                      ) : (
+                        <div className="p-1 rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                      <span className="font-semibold text-xs">
+                        {precheckStatus === "optimal"
+                          ? "Biometric Quality: Optimal"
+                          : precheckStatus === "acceptable"
+                          ? "Biometric Quality: Acceptable"
+                          : "Biometric Quality Advisory"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground">
+                      <Scan className="w-3 h-3" />
+                      <span>{precheckData.executionTimeMs}ms</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] opacity-90 leading-relaxed">{precheckData.message}</p>
+
+                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border/40 text-[11px]">
+                    <div className="bg-background/60 p-2 rounded-lg border border-border/30">
+                      <span className="text-[10px] text-muted-foreground block">Faces Found</span>
+                      <span className="font-bold flex items-center gap-1 mt-0.5">
+                        {precheckData.faceCount === 1 ? (
+                          <Check className="w-3 h-3 text-emerald-500" />
+                        ) : (
+                          <AlertTriangle className="w-3 h-3 text-amber-500" />
+                        )}
+                        {precheckData.faceCount} face{precheckData.faceCount !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+
+                    <div className="bg-background/60 p-2 rounded-lg border border-border/30">
+                      <span className="text-[10px] text-muted-foreground block">Confidence</span>
+                      <span className="font-bold font-mono mt-0.5 block">
+                        {precheckData.confidence}%
+                      </span>
+                    </div>
+
+                    <div className="bg-background/60 p-2 rounded-lg border border-border/30">
+                      <span className="text-[10px] text-muted-foreground block">5-Pt Landmarks</span>
+                      <span className="font-bold flex items-center gap-1 mt-0.5">
+                        {precheckData.hasLandmarks ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                            <span>Aligned</span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">None</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+
 
           {/* Name Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

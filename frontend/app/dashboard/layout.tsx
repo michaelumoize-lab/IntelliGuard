@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { NavbarSystemHealthBadge } from "@/components/dashboard/navbar-health-badge";
+import { CommandPalette, CommandPaletteTrigger } from "@/components/command-palette";
 import { Camera, Bell } from "lucide-react";
 
 export default async function DashboardLayout({
@@ -53,8 +54,11 @@ export default async function DashboardLayout({
                 </div>
               </div>
 
-              {/* Center Section: Real-Time AI Engine Status Badge */}
-              <NavbarSystemHealthBadge />
+              {/* Center Section: Command Palette Trigger & Health Badge */}
+              <div className="flex items-center gap-2">
+                <CommandPaletteTrigger />
+                <NavbarSystemHealthBadge />
+              </div>
 
               {/* Right Section: Quick Live Scan Button + Alerts Bell */}
               <div className="flex items-center gap-2 sm:gap-3">
@@ -90,6 +94,9 @@ export default async function DashboardLayout({
             <main className="flex-1 overflow-y-auto">
               {children}
             </main>
+
+            {/* Global Cmd+K Command Palette */}
+            <CommandPalette />
           </SidebarInset>
         </div>
       </SidebarProvider>

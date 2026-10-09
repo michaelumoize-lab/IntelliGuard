@@ -6,7 +6,7 @@ import { RecognitionBreakdown } from "@/components/dashboard/recognition-breakdo
 import { RecentAccessTable, AccessEventItem } from "@/components/dashboard/recent-access-table";
 import { SecurityAlertsPanel, SecurityAlertItem } from "@/components/dashboard/security-alerts-panel";
 import { SystemHealthPanel } from "@/components/dashboard/system-health-panel";
-import { DashboardLastUpdated } from "@/components/dashboard/dashboard-last-updated";
+import { DashboardLiveRefresh } from "@/components/dashboard/dashboard-live-refresh";
 import { Users, ShieldCheck, History, AlertTriangle, UserCheck, ShieldAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +41,7 @@ export default async function AdminDashboardPage() {
     latencyAggregate,
     rawRecentEvents,
     rawAlerts,
+    rawTodayLogs,
   ] = await Promise.all([
     prisma.person.count(),
     prisma.person.count({ where: { status: "active" } }),
@@ -92,11 +93,42 @@ export default async function AdminDashboardPage() {
         person: { select: { id: true, personCode: true, firstName: true, lastName: true } },
       },
     }),
+
+    prisma.accessLog.findMany({
+      where: { createdAt: { gte: startOfToday } },
+      select: { createdAt: true, accessStatus: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   const avgQualityPct = qualityAggregate._avg.qualityScore ? qualityAggregate._avg.qualityScore * 100 : 0;
   const avgSimilarityPct = similarityAggregate._avg.confidenceScore ? similarityAggregate._avg.confidenceScore * 100 : 0;
   const avgLatencySec = latencyAggregate._avg.processingTimeMs ? latencyAggregate._avg.processingTimeMs / 1000 : 0;
+
+  // Bucket today's access attempts into 4-hour slots for timeline area chart
+  const hoursMap: Record<string, { time: string; granted: number; denied: number }> = {
+    "00:00": { time: "00:00", granted: 0, denied: 0 },
+    "04:00": { time: "04:00", granted: 0, denied: 0 },
+    "08:00": { time: "08:00", granted: 0, denied: 0 },
+    "12:00": { time: "12:00", granted: 0, denied: 0 },
+    "16:00": { time: "16:00", granted: 0, denied: 0 },
+    "20:00": { time: "20:00", granted: 0, denied: 0 },
+  };
+
+  rawTodayLogs.forEach((log) => {
+    const h = new Date(log.createdAt).getHours();
+    let slot = "00:00";
+    if (h >= 20) slot = "20:00";
+    else if (h >= 16) slot = "16:00";
+    else if (h >= 12) slot = "12:00";
+    else if (h >= 8) slot = "08:00";
+    else if (h >= 4) slot = "04:00";
+
+    if (log.accessStatus === "granted") hoursMap[slot].granted++;
+    else hoursMap[slot].denied++;
+  });
+
+  const hourlyData = Object.values(hoursMap);
 
   // Format events for client component
   const recentEvents: AccessEventItem[] = rawRecentEvents.map((evt) => ({
@@ -140,6 +172,7 @@ export default async function AdminDashboardPage() {
             Real-time biometric access control telemetry, recognition analytics, and system health.
           </p>
         </div>
+        <DashboardLiveRefresh initialTimestamp={lastUpdatedIso} />
       </div>
 
       {/* 2. Full-Width Horizontal System Service Health Panel */}
@@ -194,7 +227,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* 4. Decision Analytics & Recognition Results */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
         <AccessOverviewChart
           total={totalAccess}
           granted={grantedAccess}
@@ -202,6 +235,7 @@ export default async function AdminDashboardPage() {
           todayTotal={todayTotalAccess}
           todayGranted={todayGrantedAccess}
           todayDenied={todayDeniedAccess}
+          hourlyData={hourlyData}
         />
         <RecognitionBreakdown
           matched={matchedRecognition}

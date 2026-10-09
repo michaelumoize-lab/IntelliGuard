@@ -122,3 +122,68 @@ export async function generateEmbedding(
     executionTimeMs: data.execution_time_ms || 0.0,
   };
 }
+
+export interface DetectedFaceItem {
+  bbox: number[];
+  confidence: number;
+  landmarks?: number[][];
+}
+
+export interface FaceDetectionResult {
+  success: boolean;
+  faceCount: number;
+  faces: DetectedFaceItem[];
+  executionTimeMs: number;
+}
+
+/**
+ * Server-side client function to run face detection and landmark pre-check on an image.
+ */
+export async function detectFaces(
+  imageBuffer: Buffer,
+  filename: string = "face.jpg"
+): Promise<FaceDetectionResult> {
+  const baseUrl = process.env.FASTAPI_URL || "http://localhost:8000";
+  const endpoint = `${baseUrl.replace(/\/$/, "")}/api/v1/detect`;
+
+  const formData = new FormData();
+  const blob = new Blob([new Uint8Array(imageBuffer)], { type: "image/jpeg" });
+  formData.append("file", blob, filename);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(`AI Detection responded with status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: !!data.success,
+      faceCount: typeof data.face_count === "number" ? data.face_count : (data.faces?.length || 0),
+      faces: (data.faces || []).map((f: any) => ({
+        bbox: f.bbox || [],
+        confidence: typeof f.confidence === "number" ? f.confidence : 0,
+        landmarks: f.landmarks || undefined,
+      })),
+      executionTimeMs: data.execution_time_ms || 0,
+    };
+  } catch (err: any) {
+    console.error("FastAPI detectFaces error:", err);
+    throw new FastAPIError(
+      "FASTAPI_UNAVAILABLE",
+      err.message || "Failed to contact AI detection microservice.",
+      503
+    );
+  }
+}
+
