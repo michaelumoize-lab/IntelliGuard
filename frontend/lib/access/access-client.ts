@@ -17,6 +17,7 @@ export interface AccessScanResponse {
     last_name: string;
     category: string;
     department: string | null;
+    status?: string;
     face_image_url?: string | null;
   } | null;
   face?: {

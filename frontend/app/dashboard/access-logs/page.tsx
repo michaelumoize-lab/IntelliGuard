@@ -74,6 +74,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
           firstName: true,
           lastName: true,
           category: true,
+          status: true,
         },
       },
       device: {
@@ -142,19 +143,19 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
       </Card>
 
       {/* Standardized Logs Table */}
-      <Card className="border border-border shadow-sm overflow-hidden">
+      <Card className="border border-border shadow-sm overflow-hidden bg-card text-card-foreground rounded-2xl">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/50 border-b border-border">
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Log ID</TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Time</TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Individual</TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Match</TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Access</TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Reason</TableHead>
-                <TableHead className="text-right font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Similarity</TableHead>
-                <TableHead className="text-right font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Latency</TableHead>
+              <TableRow className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider hover:bg-transparent">
+                <TableHead className="py-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Log ID</TableHead>
+                <TableHead className="py-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Time</TableHead>
+                <TableHead className="py-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Individual</TableHead>
+                <TableHead className="py-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Match</TableHead>
+                <TableHead className="py-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Access</TableHead>
+                <TableHead className="py-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Reason</TableHead>
+                <TableHead className="py-3 text-right font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Similarity</TableHead>
+                <TableHead className="py-3 text-right font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Latency</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -180,7 +181,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                   }
 
                   return (
-                    <TableRow key={log.id} className="hover:bg-muted/30 transition-colors">
+                    <TableRow key={log.id} className="hover:bg-muted/40 transition-colors">
                       <TableCell className="py-3.5 font-mono text-muted-foreground">#{log.id}</TableCell>
                       <TableCell className="py-3.5 font-mono text-muted-foreground whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString()}
@@ -189,11 +190,16 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                         {log.person ? (
                           <Link
                             href={`/dashboard/persons/${log.person.id}`}
-                            className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+                            className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1.5 flex-wrap"
                           >
-                            <User className="w-3.5 h-3.5 text-muted-foreground" />
+                            <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <span>{log.person.firstName} {log.person.lastName}</span>
                             <span className="font-mono text-[10px] text-muted-foreground">({log.person.personCode})</span>
+                            {log.person.status && log.person.status !== "active" && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-destructive/15 text-destructive border border-destructive/30">
+                                DEACTIVATED
+                              </span>
+                            )}
                           </Link>
                         ) : (
                           <span className="text-muted-foreground italic">Unknown</span>
@@ -215,8 +221,12 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="py-3.5 font-mono text-muted-foreground uppercase text-[11px]">
-                        {log.reason.replaceAll("_", " ")}
+                      <TableCell className="py-3.5 font-mono uppercase text-[11px]">
+                        {log.person && log.person.status !== "active" && !isGranted ? (
+                          <span className="text-destructive font-semibold">USER DEACTIVATED</span>
+                        ) : (
+                          <span className="text-muted-foreground">{log.reason.replaceAll("_", " ")}</span>
+                        )}
                       </TableCell>
                       <TableCell className="py-3.5 font-mono text-right font-semibold text-foreground">
                         {similarityDisplay}

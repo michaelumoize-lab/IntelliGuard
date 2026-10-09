@@ -125,7 +125,7 @@ model FaceEmbedding {
   id                    Int      @id @default(autoincrement())
   personId              Int      @map("person_id")
   embedding             Unsupported("vector(512)")
-  embeddingModel        String   @default("Buffalo_L") @map("embedding_model") @db.VarChar(100)
+  embeddingModel        String   @default("buffalo_s") @map("embedding_model") @db.VarChar(100)
   embeddingModelVersion String?  @map("embedding_model_version") @db.VarChar(50)
   imagePath             String   @map("image_path")
   imageHash             String?  @unique @map("image_hash")
@@ -137,6 +137,8 @@ model FaceEmbedding {
   person     Person      @relation(fields: [personId], references: [id], onDelete: Cascade)
   accessLogs AccessLog[]
 
+  // Note: PostgreSQL HNSW vector index is applied via pgvector:
+  // CREATE INDEX idx_face_embeddings_hnsw ON face_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
   @@index([isActive], map: "idx_face_embedding_active")
   @@index([personId], map: "idx_face_embedding_person")
   @@map("face_embeddings")

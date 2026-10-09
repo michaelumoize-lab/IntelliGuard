@@ -13,6 +13,7 @@ import {
   Cpu,
   Camera,
   ShieldCheck,
+  ShieldAlert,
   Zap,
 } from "lucide-react";
 
@@ -50,6 +51,11 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
   const isGranted = result.access_status === "granted";
   const isAmbiguous = result.match_status === "ambiguous";
   const isUnknown = result.match_status === "unknown";
+  const isDeactivated = Boolean(
+    result.person &&
+    result.person.status &&
+    result.person.status.toLowerCase() !== "active"
+  ) || (result.message?.toLowerCase().includes("deactivated") ?? false);
 
   const getBadgeStyle = () => {
     if (isGranted) {
@@ -57,6 +63,13 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
         bg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400",
         icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
         label: "ACCESS GRANTED",
+      };
+    }
+    if (isDeactivated) {
+      return {
+        bg: "bg-destructive/15 border-destructive/40 text-destructive",
+        icon: <ShieldAlert className="w-5 h-5 text-destructive" />,
+        label: "USER DEACTIVATED - ACCESS DENIED",
       };
     }
     if (isAmbiguous) {
@@ -94,7 +107,7 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
           <span>{badge.label}</span>
         </div>
         <span className="text-[11px] font-mono text-muted-foreground uppercase font-semibold">
-          {result.reason?.replaceAll("_", " ")}
+          {isDeactivated ? "USER IS DEACTIVATED" : result.reason?.replaceAll("_", " ")}
         </span>
       </div>
 
@@ -133,6 +146,19 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
         </div>
       </div>
 
+      {/* Deactivated Notice Banner */}
+      {isDeactivated && (
+        <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-xl mb-4 text-center space-y-1">
+          <div className="flex items-center justify-center gap-1.5 text-destructive font-bold text-xs uppercase tracking-wide">
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            <span>Account Deactivated</span>
+          </div>
+          <p className="text-xs text-destructive/90 font-medium">
+            This user is deactivated and not allowed to access the system.
+          </p>
+        </div>
+      )}
+
       {/* Person Details Header (if matched) */}
       {result.person ? (
         <div className="mb-4 p-3 rounded-xl bg-muted/30 border border-border/70">
@@ -140,9 +166,16 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
             <h3 className="text-base font-bold text-foreground leading-snug truncate">
               {result.person.first_name} {result.person.last_name}
             </h3>
-            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-              {result.person.category}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {isDeactivated && (
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-destructive/15 text-destructive border border-destructive/30">
+                  {result.person.status?.toUpperCase() || "DEACTIVATED"}
+                </span>
+              )}
+              <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                {result.person.category}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground font-mono">
             <span>{result.person.person_code}</span>

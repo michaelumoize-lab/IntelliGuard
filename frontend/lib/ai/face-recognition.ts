@@ -49,7 +49,8 @@ export interface RecognitionClassificationResult {
  */
 export async function findTopFaceMatches(
   embedding: number[],
-  topN: number = 2
+  topN: number = 2,
+  modelName: string = "buffalo_s"
 ): Promise<RecognitionClassificationResult> {
   if (!embedding || embedding.length !== 512) {
     throw new Error("Invalid embedding vector: expected 512 dimensions.");
@@ -61,7 +62,7 @@ export async function findTopFaceMatches(
   // Format 512D float array into pgvector literal format: '[v1,v2,...,v512]'
   const vectorString = `[${embedding.join(",")}]`;
 
-  // Query only active embeddings belonging to active persons
+  // Query only active embeddings matching the exact model architecture
   const rawResults: Array<{
     embeddingId: number;
     personId: number;
@@ -96,12 +97,14 @@ export async function findTopFaceMatches(
       (1 - (fe.embedding <=> $1::vector)) AS similarity
     FROM face_embeddings fe
     JOIN persons p ON p.id = fe.person_id
-    WHERE fe.is_active = true AND p.status = 'active'
+    WHERE fe.is_active = true
+      AND LOWER(fe.embedding_model) = LOWER($3)
     ORDER BY fe.embedding <=> $1::vector ASC
     LIMIT $2;
     `,
     vectorString,
-    topN
+    topN,
+    modelName
   );
 
   if (!rawResults || rawResults.length === 0) {
@@ -111,6 +114,7 @@ export async function findTopFaceMatches(
       face: {
         similarity: 0.0,
         distance: 1.0,
+        model: modelName,
       },
     };
   }
@@ -128,7 +132,7 @@ export async function findTopFaceMatches(
         similarity: bestSimilarity,
         distance: bestDistance,
         qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
-        model: bestCandidate.embeddingModel || "buffalo_l",
+        model: bestCandidate.embeddingModel || modelName || "buffalo_s",
       },
     };
   }
@@ -152,7 +156,7 @@ export async function findTopFaceMatches(
         similarity: bestSimilarity,
         distance: bestDistance,
         qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
-        model: bestCandidate.embeddingModel || "buffalo_l",
+        model: bestCandidate.embeddingModel || modelName || "buffalo_s",
       },
     };
   }
@@ -171,7 +175,7 @@ export async function findTopFaceMatches(
         similarity: bestSimilarity,
         distance: bestDistance,
         qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
-        model: bestCandidate.embeddingModel || "buffalo_l",
+        model: bestCandidate.embeddingModel || modelName || "buffalo_s",
       },
       candidates: [
         {
@@ -208,7 +212,7 @@ export async function findTopFaceMatches(
       similarity: bestSimilarity,
       distance: bestDistance,
       qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
-      model: bestCandidate.embeddingModel || "buffalo_l",
+      model: bestCandidate.embeddingModel || modelName || "buffalo_s",
     },
   };
 }

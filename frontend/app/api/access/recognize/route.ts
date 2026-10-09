@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Perform PostgreSQL pgvector similarity search & threshold classification
-    const recognition = await findTopFaceMatches(aiResult.embedding);
+    const recognition = await findTopFaceMatches(aiResult.embedding, 2, aiResult.model || "buffalo_s");
     const processingTimeMs = Date.now() - startTime;
 
     // 4. Return structured recognition response (omitting raw 512D floats)
@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
           last_name: recognition.person.lastName,
           category: recognition.person.category,
           department: recognition.person.department,
+          status: recognition.person.status,
           face_image_url: recognition.person.faceImageUrl,
         },
         face: {

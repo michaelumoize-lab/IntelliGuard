@@ -274,7 +274,7 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
           <SidebarMenu>
             {supportNavItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || (item.title === "Settings" && pathname.startsWith("/settings"));
 
               return (
                 <SidebarMenuItem key={item.href}>

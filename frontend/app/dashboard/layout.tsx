@@ -8,7 +8,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { NavbarSystemHealthBadge } from "@/components/dashboard/navbar-health-badge";
-import { CommandPalette, CommandPaletteTrigger } from "@/components/command-palette";
+import { CommandPalette } from "@/components/command-palette";
 import { Camera, Bell } from "lucide-react";
 
 export default async function DashboardLayout({
@@ -54,9 +54,8 @@ export default async function DashboardLayout({
                 </div>
               </div>
 
-              {/* Center Section: Command Palette Trigger & Health Badge */}
+              {/* Center Section: Health Badge */}
               <div className="flex items-center gap-2">
-                <CommandPaletteTrigger />
                 <NavbarSystemHealthBadge />
               </div>
 

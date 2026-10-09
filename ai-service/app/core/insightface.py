@@ -149,5 +149,6 @@ class InsightFaceManager:
 # Shared model manager instance initialized with model name from settings
 insightface_manager = InsightFaceManager(model_name=settings.INSIGHTFACE_MODEL)
 
-# Model-safe concurrency limiter to serialize InsightFace inference across endpoints
-inference_semaphore = asyncio.Semaphore(1)
+# Model-safe concurrency limiter to regulate InsightFace inference across endpoints
+# Defaults to 2 concurrent requests (configurable via MAX_CONCURRENT_INFERENCE) to prevent single-threaded bottleneck
+inference_semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_INFERENCE)

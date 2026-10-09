@@ -6,7 +6,7 @@ import { AccessResultCard } from "@/components/ai/access-result-card";
 import { LiveScanControls } from "@/components/ai/live-scan-controls";
 import { scanFace, AccessScanResponse } from "@/lib/access/access-client";
 import { playBiometricSound } from "@/lib/audio";
-import { Camera, History, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ShieldCheck } from "lucide-react";
+import { Camera, History, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ShieldCheck, ShieldAlert } from "lucide-react";
 
 export interface ScanHistoryItem {
   id: string;
@@ -111,28 +111,35 @@ export default function WebcamSimulationPage() {
         ? `${response.person.first_name} ${response.person.last_name}`
         : undefined;
 
+      const isDeactivated = Boolean(
+        response.person &&
+        (response.person.status || "active").toLowerCase() !== "active"
+      );
+
       setCameraOverlay({
-        status: response.access_status,
-        name: personName,
+        status: isDeactivated ? "deactivated" : response.access_status,
+        name: isDeactivated ? `${personName || "User"} (Deactivated)` : personName,
         similarity: response.face?.similarity,
       });
 
       setTimeout(() => {
-        setCameraOverlay((current) => (current?.name === personName ? null : current));
+        setCameraOverlay((current) => (current?.name === (isDeactivated ? `${personName || "User"} (Deactivated)` : personName) ? null : current));
       }, 3500);
 
       // Add to local scan history (limit to 10 entries)
       const historyEntry: ScanHistoryItem = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         time: timeStr,
-        name: response.person
+        name: isDeactivated
+          ? `${personName} (User is deactivated)`
+          : response.person
           ? `${response.person.first_name} ${response.person.last_name}`
           : response.match_status === "ambiguous"
           ? "Ambiguous Match"
           : "Unknown Face",
         code: response.person ? response.person.person_code : "N/A",
         status: response.access_status,
-        matchStatus: response.match_status,
+        matchStatus: isDeactivated ? "deactivated" : response.match_status,
         similarity: response.face ? response.face.similarity : 0,
       };
 
@@ -190,7 +197,7 @@ export default function WebcamSimulationPage() {
 
       {/* Main Grid: Camera Feed & Decision Result Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Live Camera Feed with Biometric HUD (7 cols) */}
+        {/* Left Column: Live Camera Feed with Biometric HUD & Controls (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <LiveCameraPreview
             ref={cameraRef}
@@ -199,6 +206,21 @@ export default function WebcamSimulationPage() {
             onCameraStatusChange={setIsCameraReady}
             isScanning={isScanning}
             overlayResult={cameraOverlay}
+          />
+
+          {/* Scan Control Panel directly under Camera Preview */}
+          <LiveScanControls
+            isCameraOn={isCameraOn}
+            onToggleCamera={handleToggleCamera}
+            onScan={executeScan}
+            isMonitoring={isMonitoring}
+            onToggleMonitoring={handleToggleMonitoring}
+            isCameraReady={isCameraReady}
+            isScanning={isScanning}
+            scanCount={scanCount}
+            lastScanTime={lastScanTime}
+            soundEnabled={soundEnabled}
+            onToggleSound={() => setSoundEnabled((prev) => !prev)}
           />
         </div>
 
@@ -211,21 +233,6 @@ export default function WebcamSimulationPage() {
           />
         </div>
       </div>
-
-      {/* Scan Control Panel */}
-      <LiveScanControls
-        isCameraOn={isCameraOn}
-        onToggleCamera={handleToggleCamera}
-        onScan={executeScan}
-        isMonitoring={isMonitoring}
-        onToggleMonitoring={handleToggleMonitoring}
-        isCameraReady={isCameraReady}
-        isScanning={isScanning}
-        scanCount={scanCount}
-        lastScanTime={lastScanTime}
-        soundEnabled={soundEnabled}
-        onToggleSound={() => setSoundEnabled((prev) => !prev)}
-      />
 
       {/* Recent Scan History List */}
       <div className="bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
@@ -245,12 +252,12 @@ export default function WebcamSimulationPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px]">
-                  <th className="pb-3">Time</th>
-                  <th className="pb-3">Decision</th>
-                  <th className="pb-3">Individual</th>
-                  <th className="pb-3">Person Code</th>
-                  <th className="pb-3 text-right">Similarity</th>
+                <tr className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider">
+                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Time</th>
+                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Decision</th>
+                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Individual</th>
+                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Person Code</th>
+                  <th className="pb-3 text-right font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Similarity</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
@@ -261,6 +268,10 @@ export default function WebcamSimulationPage() {
                       {item.status === "granted" ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
                           <CheckCircle2 className="w-3.5 h-3.5" /> GRANTED
+                        </span>
+                      ) : item.matchStatus === "deactivated" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/15 border border-destructive/30 text-destructive font-semibold text-[11px]">
+                          <ShieldAlert className="w-3.5 h-3.5" /> USER DEACTIVATED
                         </span>
                       ) : item.matchStatus === "ambiguous" ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold text-[11px]">

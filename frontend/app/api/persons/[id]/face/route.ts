@@ -70,14 +70,17 @@ export async function POST(
     const aiResult = await generateEmbedding(imageBuffer, imageFile.name || "face.jpg");
 
     // 4. Step B: Check for duplicate face using pgvector (excluding this personId)
-    const duplicateResult = await checkForDuplicateFace(aiResult.embedding, 0.85, personId);
+    const duplicateResult = await checkForDuplicateFace(aiResult.embedding, 0.85, personId, aiResult.model || "buffalo_s");
     if (duplicateResult.isDuplicate && duplicateResult.matchingPerson) {
       const match = duplicateResult.matchingPerson;
+      const isDeactivated = (match.status || "active").toLowerCase() !== "active";
       return NextResponse.json(
         {
           success: false,
-          error: "DUPLICATE_FACE",
-          message: `Duplicate face detected. This image matches registered person ${match.firstName} ${match.lastName} (${match.personCode}) with ${Math.round(match.similarity * 100)}% similarity match.`,
+          error: isDeactivated ? "DUPLICATE_FACE_DEACTIVATED" : "DUPLICATE_FACE",
+          message: isDeactivated
+            ? `Duplicate face detected. This image matches deactivated/banned person ${match.firstName} ${match.lastName} (${match.personCode}) with ${Math.round(match.similarity * 100)}% similarity match.`
+            : `Duplicate face detected. This image matches registered person ${match.firstName} ${match.lastName} (${match.personCode}) with ${Math.round(match.similarity * 100)}% similarity match.`,
           matchingPerson: match,
         },
         { status: 400 }
@@ -109,7 +112,7 @@ export async function POST(
           `,
           personId,
           vectorLiteral,
-          aiResult.model || "Buffalo_L",
+          aiResult.model || "buffalo_s",
           ikResult.url,
           aiResult.qualityScore
         );
