@@ -5,24 +5,13 @@ import type { HealthCheckResponse } from "@/types/health";
 export const dynamic = "force-dynamic";
 export type { HealthCheckResponse };
 
-// Server-side in-memory cache for health check probes (5-minute TTL)
+// Server-side in-memory cache for health check probes (15-second TTL to avoid burst storms while staying responsive)
 let cachedHealth: { data: HealthCheckResponse; timestamp: number } | null = null;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let activeProbePromise: Promise<HealthCheckResponse> | null = null;
+const CACHE_TTL_MS = 15 * 1000; // 15 seconds
 
-export async function GET(req: NextRequest) {
-  const forceRefresh = req.nextUrl.searchParams.get("force") === "true";
-  const now = Date.now();
-
-  // Return cached health report if within 5-minute TTL and not forced
-  if (!forceRefresh && cachedHealth && now - cachedHealth.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json({
-      ...cachedHealth.data,
-      cached: true,
-      cachedAt: new Date(cachedHealth.timestamp).toISOString(),
-    });
-  }
-
-  // 1. Next.js Local Work Timing
+async function runHealthCheckProbe(): Promise<HealthCheckResponse> {
+  // 1. Next.js Local Timing
   const nextjsStart = Date.now();
   const nextjsStatus = { status: "online" as const, latencyMs: 0 };
   nextjsStatus.latencyMs = Date.now() - nextjsStart;
@@ -37,7 +26,7 @@ export async function GET(req: NextRequest) {
     const faStart = Date.now();
     const faRes = await fetch(`${fastApiUrl}/api/v1/health`, {
       method: "GET",
-      signal: AbortSignal.timeout(12000), // 12s timeout for cloud cold starts
+      signal: AbortSignal.timeout(15000), // 15s timeout for cloud cold starts
     });
     const faLatency = Date.now() - faStart;
 
@@ -46,14 +35,28 @@ export async function GET(req: NextRequest) {
       if (data.status === "ok" || data.status === "healthy" || data.model_loaded === true) {
         fastApiStatus = { status: "online", latencyMs: faLatency };
       } else {
-        fastApiStatus = { status: "error", latencyMs: faLatency, message: "AI service status degraded" };
+        fastApiStatus = { status: "error", latencyMs: faLatency, message: data.error || "AI service status degraded" };
       }
     } else {
-      fastApiStatus = { status: "offline", message: "AI microservice HTTP error response" };
+      let errDetail = "AI microservice HTTP error response";
+      try {
+        const errJson = await faRes.json();
+        if (errJson.status === "degraded" || errJson.error) {
+          errDetail = errJson.error || `AI status: ${errJson.status}`;
+        }
+      } catch (_) {}
+      fastApiStatus = { status: "offline", message: errDetail };
     }
   } catch (err: any) {
-    console.warn("FastAPI health check probe:", err?.name === "TimeoutError" ? "Request timed out (cold start)" : err?.message || "Service unreachable");
-    fastApiStatus = { status: "offline", message: "AI microservice unreachable or starting up" };
+    const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+    console.warn(
+      "FastAPI health check probe:",
+      isTimeout ? "Request timed out (cold start or unreachable)" : err?.message || "Service unreachable"
+    );
+    fastApiStatus = {
+      status: "offline",
+      message: isTimeout ? "AI service starting up (request timed out)" : "AI microservice unreachable",
+    };
   }
 
   // 3. Real PostgreSQL & pgvector Health Check
@@ -90,7 +93,7 @@ export async function GET(req: NextRequest) {
     message: isImageKitConfigured ? "Keys and endpoint configured" : "Missing environment variables",
   };
 
-  const responseData: HealthCheckResponse = {
+  return {
     success: true,
     services: {
       nextjs: nextjsStatus,
@@ -100,14 +103,51 @@ export async function GET(req: NextRequest) {
       imagekit: imagekitStatus,
     },
   };
-
-  // Cache response in memory
-  cachedHealth = {
-    data: responseData,
-    timestamp: now,
-  };
-
-  return NextResponse.json(responseData);
 }
 
+export async function GET(req: NextRequest) {
+  const forceRefresh = req.nextUrl.searchParams.get("force") === "true";
+  const now = Date.now();
 
+  const noCacheHeaders = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+    Pragma: "no-cache",
+    Expires: "0",
+  };
+
+  // Return cached health report if within short 15s TTL and not forced
+  if (!forceRefresh && cachedHealth && now - cachedHealth.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(
+      {
+        ...cachedHealth.data,
+        cached: true,
+        cachedAt: new Date(cachedHealth.timestamp).toISOString(),
+      },
+      { headers: noCacheHeaders }
+    );
+  }
+
+  // If a probe is currently in-flight and this is not a forced refresh, share its promise
+  if (!forceRefresh && activeProbePromise) {
+    const data = await activeProbePromise;
+    return NextResponse.json(data, { headers: noCacheHeaders });
+  }
+
+  // Execute a new probe and coordinate concurrent requests
+  const probePromise = runHealthCheckProbe()
+    .then((result) => {
+      cachedHealth = {
+        data: result,
+        timestamp: Date.now(),
+      };
+      return result;
+    })
+    .finally(() => {
+      activeProbePromise = null;
+    });
+
+  activeProbePromise = probePromise;
+  const data = await probePromise;
+
+  return NextResponse.json(data, { headers: noCacheHeaders });
+}

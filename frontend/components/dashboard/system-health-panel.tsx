@@ -1,40 +1,15 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import type { HealthCheckResponse } from "@/types/health";
+import React from "react";
 import { Activity, Server, Database, Cpu, Cloud, RefreshCw, AlertTriangle } from "lucide-react";
+import { useSystemHealth } from "@/hooks/use-system-health";
 
 export function SystemHealthPanel() {
-  const [health, setHealth] = useState<HealthCheckResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [fetchError, setFetchError] = useState<boolean>(false);
-  const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const { health, isLoading, isRefreshing, isError, dataUpdatedAt, refresh } = useSystemHealth();
 
-  const fetchHealth = useCallback(async (force = false) => {
-    setIsLoading(true);
-    setFetchError(false);
-    try {
-      const url = force ? "/api/dashboard/health?force=true" : "/api/dashboard/health";
-      const res = await fetch(url, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setHealth(data);
-      } else {
-        setFetchError(true);
-      }
-    } catch (err) {
-      console.error("Failed to fetch system health:", err);
-      setFetchError(true);
-    } finally {
-      setIsLoading(false);
-      setLastChecked(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchHealth();
-  }, [fetchHealth]);
-
+  const lastChecked = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : null;
 
   const getStatusBadge = (status: string) => {
     const isOk = status === "online" || status === "connected" || status === "available" || status === "configured";
@@ -42,6 +17,14 @@ export function SystemHealthPanel() {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-xs w-fit">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="capitalize">{status}</span>
+        </span>
+      );
+    }
+    if (status === "error" || status === "degraded") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold text-xs w-fit">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
           <span className="capitalize">{status}</span>
         </span>
       );
@@ -102,20 +85,26 @@ export function SystemHealthPanel() {
             </span>
           )}
           <button
-            onClick={() => fetchHealth(true)}
-            disabled={isLoading}
-            className="px-3 py-1.5 bg-secondary hover:bg-muted text-secondary-foreground text-xs font-medium rounded-lg transition-all border border-border flex items-center gap-1.5"
+            onClick={() => refresh()}
+            disabled={isRefreshing}
+            className="px-3 py-1.5 bg-secondary hover:bg-muted text-secondary-foreground text-xs font-medium rounded-lg transition-all border border-border flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
+            title="Refresh all system service health checks"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             <span>Refresh</span>
           </button>
         </div>
       </div>
 
-      {fetchError ? (
+      {isError && !health ? (
         <div className="py-8 text-center text-xs text-destructive flex items-center justify-center gap-2">
           <AlertTriangle className="w-4 h-4" />
           <span>Failed to retrieve system service health status.</span>
+        </div>
+      ) : isLoading && !health ? (
+        <div className="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin text-primary" />
+          <span>Polling service health statuses...</span>
         </div>
       ) : !health ? (
         <div className="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
