@@ -9,7 +9,7 @@ import { Logo } from "./logo";
 export async function Header() {
   const queryClient = getQueryClient()
 
-  await getServerSession();
+  const session = await getServerSession();
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -21,7 +21,7 @@ export async function Header() {
             <h1 className="text-base">BETTER-AUTH. UI</h1>
           </Link>
 
-          <UserButton size="icon" />
+          <UserButton size="icon" user={session?.user} />
         </div>
       </header>
     </HydrationBoundary>

@@ -18,7 +18,7 @@ export type UserAvatarProps = {
   fallback?: ReactNode
   isPending?: boolean
   /** @remarks `User` */
-  user?: User & { username?: string | null; displayUsername?: string | null }
+  user?: (Partial<User> & { username?: string | null; displayUsername?: string | null }) | null
 }
 
 /**
@@ -41,10 +41,10 @@ export function UserAvatar({
   const { authClient } = useAuth()
   const { data: session, isPending: sessionPending } = useSession(
     authClient as UsernameAuthClient,
-    { enabled: !user && !isPending }
+    { enabled: user === undefined && !isPending }
   )
 
-  if ((isPending || sessionPending) && !user) {
+  if ((isPending || sessionPending) && user === undefined) {
     return <Skeleton className={cn("size-8 rounded-full", className)} />
   }
 

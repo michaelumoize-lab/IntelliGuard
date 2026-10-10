@@ -93,16 +93,16 @@ export function DeviceTable({
     <>
       <Table className="min-w-[800px]">
         <TableHeader>
-          <TableRow className="bg-muted/50 border-b border-border">
-            <TableHead className="w-[120px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Status</TableHead>
-            <TableHead className="w-[200px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Device Name</TableHead>
-            <TableHead className="w-[140px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Type</TableHead>
-            <TableHead className="w-[150px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Serial Number</TableHead>
-            <TableHead className="w-[160px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Location</TableHead>
-            <TableHead className="w-[110px] text-right font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Events</TableHead>
-            <TableHead className="w-[90px] text-right font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Alerts</TableHead>
-            <TableHead className="w-[120px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Last Seen</TableHead>
-            <TableHead className="w-[70px] text-right font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Actions</TableHead>
+          <TableRow className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider hover:bg-transparent">
+            <TableHead className="w-[120px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</TableHead>
+            <TableHead className="w-[200px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Device Name</TableHead>
+            <TableHead className="w-[140px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Type</TableHead>
+            <TableHead className="w-[150px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Serial Number</TableHead>
+            <TableHead className="w-[160px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Location</TableHead>
+            <TableHead className="w-[110px] py-3 text-right font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Events</TableHead>
+            <TableHead className="w-[90px] py-3 text-right font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Alerts</TableHead>
+            <TableHead className="w-[120px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Last Seen</TableHead>
+            <TableHead className="w-[70px] py-3 text-right font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody className="divide-y divide-border/40">
@@ -120,7 +120,7 @@ export function DeviceTable({
             </TableRow>
           ) : (
             devices.map((device) => (
-              <TableRow key={device.id} className="hover:bg-muted/30 transition-colors">
+              <TableRow key={device.id} className="hover:bg-muted/40 transition-colors">
                 <TableCell className="py-3">
                   <DeviceStatusBadge status={device.status} />
                 </TableCell>

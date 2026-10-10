@@ -6,7 +6,6 @@ import { RecognitionBreakdown } from "@/components/dashboard/recognition-breakdo
 import { RecentAccessTable, AccessEventItem } from "@/components/dashboard/recent-access-table";
 import { SecurityAlertsPanel, SecurityAlertItem } from "@/components/dashboard/security-alerts-panel";
 import { SystemHealthPanel } from "@/components/dashboard/system-health-panel";
-import { DashboardLiveRefresh } from "@/components/dashboard/dashboard-live-refresh";
 import { Users, ShieldCheck, History, AlertTriangle, UserCheck, ShieldAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +13,6 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboardPage() {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-
-  const lastUpdatedIso = new Date().toISOString();
 
   // Execute database queries in parallel for peak performance
   const [
@@ -80,7 +77,7 @@ export default async function AdminDashboardPage() {
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
-        person: { select: { id: true, personCode: true, firstName: true, lastName: true, category: true } },
+        person: { select: { id: true, personCode: true, firstName: true, lastName: true, category: true, status: true } },
         device: { select: { id: true, deviceName: true, serialNumber: true } },
       },
     }),
@@ -172,7 +169,6 @@ export default async function AdminDashboardPage() {
             Real-time biometric access control telemetry, recognition analytics, and system health.
           </p>
         </div>
-        <DashboardLiveRefresh initialTimestamp={lastUpdatedIso} />
       </div>
 
       {/* 2. Full-Width Horizontal System Service Health Panel */}

@@ -118,7 +118,7 @@ export async function generateEmbedding(
     normalized: data.normalized ?? true,
     qualityScore,
     detectionConfidence: data.detection_confidence || 0.0,
-    model: data.model || "buffalo_l",
+    model: data.model || "buffalo_s",
     executionTimeMs: data.execution_time_ms || 0.0,
   };
 }

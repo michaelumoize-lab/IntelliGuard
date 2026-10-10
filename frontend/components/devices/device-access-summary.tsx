@@ -92,19 +92,19 @@ export function DeviceAccessSummary({ stats, recentLogs, deviceId }: DeviceAcces
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Person</TableHead>
-                  <TableHead>Match Status</TableHead>
-                  <TableHead>Access Status</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead className="text-right">Confidence</TableHead>
+                <TableRow className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider hover:bg-transparent">
+                  <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Time</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Person</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Match Status</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Access Status</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reason</TableHead>
+                  <TableHead className="py-2.5 text-right font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Confidence</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="divide-y divide-border/40">
                 {recentLogs.map((log) => (
-                  <TableRow key={log.id} className="text-xs">
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                  <TableRow key={log.id} className="text-xs hover:bg-muted/40 transition-colors">
+                    <TableCell className="text-muted-foreground font-mono whitespace-nowrap py-3">
                       {new Date(log.timestamp).toLocaleString(undefined, {
                         month: "short",
                         day: "numeric",
@@ -113,7 +113,7 @@ export function DeviceAccessSummary({ stats, recentLogs, deviceId }: DeviceAcces
                         second: "2-digit",
                       })}
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium py-3">
                       {log.person ? (
                         <Link
                           href={`/dashboard/persons/${log.person.id}`}
@@ -125,26 +125,26 @@ export function DeviceAccessSummary({ stats, recentLogs, deviceId }: DeviceAcces
                         <span className="text-muted-foreground italic">Unrecognized</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize font-normal text-[11px]">
+                    <TableCell className="py-3">
+                      <span className="font-mono text-xs uppercase font-semibold text-foreground">
                         {log.matchStatus}
-                      </Badge>
+                      </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
                       {log.accessStatus === "granted" ? (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[11px]">
-                          Granted
-                        </Badge>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+                          GRANTED
+                        </span>
                       ) : (
-                        <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[11px]">
-                          Denied
-                        </Badge>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive font-semibold text-[11px]">
+                          DENIED
+                        </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground max-w-[150px] truncate">
+                    <TableCell className="text-muted-foreground max-w-[150px] truncate py-3 font-mono uppercase text-[11px]">
                       {log.reason}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right font-mono font-semibold py-3">
                       {log.confidenceScore != null
                         ? `${(log.confidenceScore * 100).toFixed(1)}%`
                         : "N/A"}

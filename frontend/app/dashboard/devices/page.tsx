@@ -146,7 +146,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
       <DevicesClientFilters initialStatus={status} initialType={deviceType} />
 
       {/* Data Table & Pagination Container */}
-      <Card className="border border-border shadow-sm overflow-hidden">
+      <Card className="border border-border shadow-sm overflow-hidden bg-card text-card-foreground rounded-2xl">
         <CardContent className="p-0">
           <DevicesTableInteractive devices={devices} />
         </CardContent>

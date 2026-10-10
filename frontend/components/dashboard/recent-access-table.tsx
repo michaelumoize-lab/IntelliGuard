@@ -29,6 +29,7 @@ export interface AccessEventItem {
     firstName: string;
     lastName: string;
     category: string;
+    status?: string;
     faceImageUrl?: string | null;
   } | null;
   device?: {
@@ -166,12 +167,19 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                       </div>
                       <div className="min-w-0">
                         {evt.person ? (
-                          <Link
-                            href={`/dashboard/persons/${evt.person.id}`}
-                            className="font-semibold text-xs text-foreground hover:text-primary transition-colors block truncate"
-                          >
-                            {evt.person.firstName} {evt.person.lastName}
-                          </Link>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Link
+                              href={`/dashboard/persons/${evt.person.id}`}
+                              className="font-semibold text-xs text-foreground hover:text-primary transition-colors block truncate"
+                            >
+                              {evt.person.firstName} {evt.person.lastName}
+                            </Link>
+                            {evt.person.status && evt.person.status !== "active" && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-destructive/15 text-destructive border border-destructive/30">
+                                DEACTIVATED
+                              </span>
+                            )}
+                          </div>
                         ) : isDataInconsistency ? (
                           <span className="text-xs text-destructive font-medium flex items-center gap-1">
                             <AlertCircle className="w-3 h-3" /> Unknown (Inconsistent)
@@ -199,8 +207,12 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                   <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-border/40 font-mono">
                     <div>
                       <span className="text-[10px] text-muted-foreground block font-sans">Reason / Gate</span>
-                      <span className="text-foreground capitalize truncate block">
-                        {evt.reason.replaceAll("_", " ")}
+                      <span className="capitalize truncate block">
+                        {evt.person && evt.person.status !== "active" && !isGranted ? (
+                          <span className="text-destructive font-semibold">User Deactivated</span>
+                        ) : (
+                          <span className="text-foreground">{evt.reason.replaceAll("_", " ")}</span>
+                        )}
                       </span>
                     </div>
                     <div className="text-right">
@@ -246,7 +258,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                         {evt.person ? (
                           <Link
                             href={`/dashboard/persons/${evt.person.id}`}
-                            className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-2"
+                            className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-2 flex-wrap"
                           >
                             <div className="w-5 h-5 rounded-full bg-muted border border-border overflow-hidden flex items-center justify-center shrink-0">
                               {evt.person.faceImageUrl ? (
@@ -258,6 +270,11 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                             <span>
                               {evt.person.firstName} {evt.person.lastName}
                             </span>
+                            {evt.person.status && evt.person.status !== "active" && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-destructive/15 text-destructive border border-destructive/30">
+                                DEACTIVATED
+                              </span>
+                            )}
                           </Link>
                         ) : isDataInconsistency ? (
                           <span
@@ -286,8 +303,12 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 font-mono text-muted-foreground uppercase text-[11px]">
-                        {evt.reason.replaceAll("_", " ")}
+                      <td className="py-3.5 font-mono uppercase text-[11px]">
+                        {evt.person && evt.person.status !== "active" && !isGranted ? (
+                          <span className="text-destructive font-semibold">USER DEACTIVATED</span>
+                        ) : (
+                          <span className="text-muted-foreground">{evt.reason.replaceAll("_", " ")}</span>
+                        )}
                       </td>
                       <td className="py-3.5 font-mono text-right font-semibold text-foreground">
                         {similarityDisplay}

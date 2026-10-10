@@ -30,8 +30,11 @@ export async function POST(req: NextRequest) {
     }
 
     const imageFile = formData.get("image") as File | null;
-    const deviceIdInput = formData.get("deviceId") as string | null;
-    const apiKeyInput = formData.get("apiKey") as string | null;
+    const deviceIdInput = (formData.get("deviceId") || req.headers.get("x-device-id")) as string | null;
+    const apiKeyInput = (formData.get("apiKey") || req.headers.get("x-api-key")) as string | null;
+    const timestampInput = (formData.get("timestamp") || req.headers.get("x-timestamp")) as string | null;
+    const nonceInput = (formData.get("nonce") || req.headers.get("x-nonce")) as string | null;
+    const signatureInput = (formData.get("signature") || req.headers.get("x-signature")) as string | null;
 
     if (!imageFile || imageFile.size === 0) {
       return NextResponse.json(
@@ -80,16 +83,40 @@ export async function POST(req: NextRequest) {
       }
       deviceAuth = { isValid: true, device: null };
     } else {
-      deviceAuth = await authenticateDevice(deviceIdInput, apiKeyInput);
+      deviceAuth = await authenticateDevice(deviceIdInput, apiKeyInput, {
+        timestamp: timestampInput,
+        nonce: nonceInput,
+        signature: signatureInput,
+      });
       if (!deviceAuth.isValid) {
         const processingTimeMs = Date.now() - startTime;
+        const isReplay = deviceAuth.reason === "replay_detected" || deviceAuth.reason === "timestamp_expired";
+        const reasonMsg = deviceAuth.reason === "timestamp_expired"
+          ? "Request timestamp expired. Potential replay attack blocked."
+          : deviceAuth.reason === "replay_detected"
+          ? "Replay attack detected: unique nonce has already been consumed."
+          : `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`;
+
+        if (isReplay) {
+          const parsedDevId = deviceIdInput ? parseInt(String(deviceIdInput), 10) : null;
+          await prisma.alert.create({
+            data: {
+              deviceId: isNaN(Number(parsedDevId)) ? null : parsedDevId,
+              alertType: "unauthorized_access",
+              title: "Replay Attack Detected",
+              message: `Device #${deviceIdInput} submitted an invalid or repeated access request (${deviceAuth.reason}). Request blocked.`,
+              severity: "critical",
+            },
+          });
+        }
+
         return NextResponse.json(
           {
             success: false,
             access_status: "denied",
             reason: "system_error",
             door_action: "lock",
-            message: `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`,
+            message: reasonMsg,
             processing_time_ms: processingTimeMs,
           },
           { status: 401 }
@@ -151,8 +178,8 @@ export async function POST(req: NextRequest) {
       throw aiErr;
     }
 
-    // Perform vector search
-    const recognition = await findTopFaceMatches(aiResult.embedding);
+    // Perform vector search scoped to exact model
+    const recognition = await findTopFaceMatches(aiResult.embedding, 2, aiResult.model || "buffalo_s");
 
     // 4. Step 4: Evaluate Access Control Decision Rules
     const decision = evaluateAccess({
@@ -216,13 +243,18 @@ export async function POST(req: NextRequest) {
             deviceId: deviceAuth.device?.id || null,
             personId: recognition.person.id,
             alertType: "unauthorized_access",
-            title: "Unauthorized Access Attempt",
-            message: `${recognition.person.firstName} ${recognition.person.lastName} (${recognition.person.personCode}) attempted access while status is ${personStatus}.`,
+            title: "Access Denied - Deactivated User",
+            message: `${recognition.person.firstName} ${recognition.person.lastName} (${recognition.person.personCode}) attempted access while deactivated (${personStatus}). User is not allowed to access the system.`,
             severity: "high",
           },
         });
       }
     }
+
+    const isDeactivated = Boolean(
+      recognition.person &&
+      (recognition.person.status || "active").toLowerCase() !== "active"
+    );
 
     // 7. Step 7: Return structured access response (NO raw 512 floats)
     return NextResponse.json({
@@ -231,6 +263,9 @@ export async function POST(req: NextRequest) {
       reason: decision.reason,
       door_action: decision.doorAction,
       match_status: recognition.matchStatus,
+      message: isDeactivated
+        ? "User is deactivated and not allowed to access the system."
+        : undefined,
       person: recognition.person
         ? {
             id: recognition.person.id,
@@ -239,6 +274,7 @@ export async function POST(req: NextRequest) {
             last_name: recognition.person.lastName,
             category: recognition.person.category,
             department: recognition.person.department,
+            status: recognition.person.status,
             face_image_url: recognition.person.faceImageUrl,
           }
         : null,

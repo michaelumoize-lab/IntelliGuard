@@ -113,6 +113,7 @@ export function WebcamCaptureModal({ isOpen, onClose, onCapture }: WebcamCapture
               isCameraOn={isCameraOn}
               onToggleCamera={() => setIsCameraOn((prev) => !prev)}
               onCameraStatusChange={(ready) => setIsCameraReady(ready)}
+              circleOnly={true}
             />
           )}
         </div>

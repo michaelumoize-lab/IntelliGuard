@@ -7,6 +7,7 @@ export interface DuplicateCheckResult {
     personCode: string;
     firstName: string;
     lastName: string;
+    status: string;
     similarity: number;
   };
 }
@@ -15,11 +16,13 @@ export interface DuplicateCheckResult {
  * Perform native PostgreSQL + pgvector cosine similarity search to check if a duplicate face exists.
  * 
  * Supports excludePersonId so face replacement on an existing person does not flag their own prior face.
+ * Also checks deactivated/suspended persons to prevent banned individuals from being re-enrolled.
  */
 export async function checkForDuplicateFace(
   embedding: number[],
   similarityThreshold: number = 0.85,
-  excludePersonId?: number
+  excludePersonId?: number,
+  modelName: string = "buffalo_s"
 ): Promise<DuplicateCheckResult> {
   if (!embedding || embedding.length !== 512) {
     return { isDuplicate: false };
@@ -34,6 +37,7 @@ export async function checkForDuplicateFace(
       personCode: string;
       firstName: string;
       lastName: string;
+      status: string;
       similarity: number;
     }>;
 
@@ -45,15 +49,19 @@ export async function checkForDuplicateFace(
           p.person_code AS "personCode",
           p.first_name AS "firstName", 
           p.last_name AS "lastName", 
+          p.status AS "status",
           (1 - (fe.embedding <=> $1::vector)) AS "similarity"
         FROM face_embeddings fe
         JOIN persons p ON fe.person_id = p.id
-        WHERE fe.is_active = true AND p.status = 'active' AND fe.person_id != $2
+        WHERE fe.is_active = true 
+          AND LOWER(fe.embedding_model) = LOWER($3)
+          AND fe.person_id != $2
         ORDER BY fe.embedding <=> $1::vector ASC
         LIMIT 1;
         `,
         vectorString,
-        excludePersonId
+        excludePersonId,
+        modelName
       );
     } else {
       results = await prisma.$queryRawUnsafe(
@@ -63,14 +71,17 @@ export async function checkForDuplicateFace(
           p.person_code AS "personCode",
           p.first_name AS "firstName", 
           p.last_name AS "lastName", 
+          p.status AS "status",
           (1 - (fe.embedding <=> $1::vector)) AS "similarity"
         FROM face_embeddings fe
         JOIN persons p ON fe.person_id = p.id
-        WHERE fe.is_active = true AND p.status = 'active'
+        WHERE fe.is_active = true 
+          AND LOWER(fe.embedding_model) = LOWER($2)
         ORDER BY fe.embedding <=> $1::vector ASC
         LIMIT 1;
         `,
-        vectorString
+        vectorString,
+        modelName
       );
     }
 
@@ -86,6 +97,7 @@ export async function checkForDuplicateFace(
             personCode: topMatch.personCode,
             firstName: topMatch.firstName,
             lastName: topMatch.lastName,
+            status: topMatch.status,
             similarity: roundFloat(similarity, 4),
           },
         };

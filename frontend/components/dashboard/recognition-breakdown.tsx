@@ -66,9 +66,15 @@ export function RecognitionBreakdown({
       {/* Donut Chart & Distribution Highlights */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
         {/* Interactive Donut Chart */}
-        <div className="sm:col-span-5 h-36 relative flex items-center justify-center min-w-0">
+        <div className="sm:col-span-5 w-full h-36 relative flex items-center justify-center min-w-0">
           {isMounted ? (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              minHeight={0}
+              initialDimension={{ width: 160, height: 144 }}
+            >
               <PieChart>
                 <Tooltip
                   content={({ active, payload }) => {

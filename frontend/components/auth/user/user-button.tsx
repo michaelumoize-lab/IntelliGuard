@@ -6,6 +6,7 @@ import {
   useSession,
   useSetActiveSession
 } from "@better-auth-ui/react"
+import type { User } from "better-auth"
 import {
   ChevronsUpDown,
   LogIn,
@@ -68,6 +69,11 @@ export type UserButtonProps = {
   links?: (UserButtonLink | ReactElement)[]
   /** Hide the built-in "Settings" link. Useful when replacing it via `links`. */
   hideSettings?: boolean
+  /** Optional user passed from server session to eliminate hydration flicker. */
+  user?: (Partial<User> & {
+    username?: string | null
+    displayUsername?: string | null
+  }) | null
 }
 
 function renderUserLink(
@@ -103,6 +109,7 @@ function renderUserLink(
  * @param variant - Visual variant of the trigger button
  * @param links - Additional menu entries rendered above the built-in items
  * @param hideSettings - Hide the built-in "Settings" link
+ * @param user - Optional user passed from server session
  * @returns The dropdown menu component with user actions
  */
 export function UserButton({
@@ -112,7 +119,8 @@ export function UserButton({
   size = "default",
   variant = "ghost",
   links,
-  hideSettings = false
+  hideSettings = false,
+  user
 }: UserButtonProps) {
   const { authClient, basePaths, viewPaths, localization, plugins, navigate } =
     useAuth()
@@ -120,13 +128,20 @@ export function UserButton({
   const { isPending: settingActiveSession } = useSetActiveSession(
     authClient as MultiSessionAuthClient
   )
-  const { data: session, isPending: sessionPending } = useSession(authClient)
+  const { data: clientSession, isPending: sessionPending } = useSession(authClient)
+
+  const effectiveUser =
+    sessionPending && user !== undefined
+      ? user
+      : (clientSession?.user ?? user)
+
+  const hasSession = !!effectiveUser
 
   const userLinks = links?.flatMap((link, index) => {
     if (!isValidElement(link)) {
       const visibility = link.visibility ?? "always"
-      if (visibility === "authenticated" && !session) return []
-      if (visibility === "unauthenticated" && session) return []
+      if (visibility === "authenticated" && !hasSession) return []
+      if (visibility === "unauthenticated" && hasSession) return []
     }
     return [
       renderUserLink(link, navigate, `user-button-link-${index.toString()}`)
@@ -156,14 +171,14 @@ export function UserButton({
         }
       >
         {size === "icon" ? (
-          <UserAvatar />
+          <UserAvatar user={effectiveUser ? (effectiveUser as User) : (user === null ? null : undefined)} />
         ) : (
           <>
-            {session || sessionPending || settingActiveSession ? (
-              <UserView isPending={!!settingActiveSession} />
+            {hasSession || settingActiveSession ? (
+              <UserView isPending={!!settingActiveSession} user={effectiveUser ?? undefined} />
             ) : (
               <>
-                <UserAvatar />
+                <UserAvatar user={user === null ? null : undefined} />
 
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   {localization.auth.account}
@@ -181,11 +196,11 @@ export function UserButton({
         sideOffset={sideOffset}
         align={align}
       >
-        {session && (
+        {hasSession && (
           <>
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-sm font-normal">
-                <UserView />
+                <UserView user={effectiveUser ?? undefined} />
               </DropdownMenuLabel>
             </DropdownMenuGroup>
 
@@ -193,7 +208,7 @@ export function UserButton({
           </>
         )}
 
-        {session ? (
+        {hasSession ? (
           <>
             {userLinks}
 

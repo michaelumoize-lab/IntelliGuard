@@ -56,18 +56,18 @@ export function DeviceAlerts({ alerts, deviceId }: DeviceAlertsProps) {
         ) : (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Status</TableHead>
+              <TableRow className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider hover:bg-transparent">
+                <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Time</TableHead>
+                <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Title</TableHead>
+                <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Type</TableHead>
+                <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Severity</TableHead>
+                <TableHead className="py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="divide-y divide-border/40">
               {alerts.map((alert) => (
-                <TableRow key={alert.id} className="text-xs">
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                <TableRow key={alert.id} className="text-xs hover:bg-muted/40 transition-colors">
+                  <TableCell className="text-muted-foreground font-mono whitespace-nowrap py-3">
                     {new Date(alert.createdAt).toLocaleString(undefined, {
                       month: "short",
                       day: "numeric",
@@ -75,36 +75,35 @@ export function DeviceAlerts({ alerts, deviceId }: DeviceAlertsProps) {
                       minute: "2-digit",
                     })}
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium py-3">
                     <div>{alert.title}</div>
                     <div className="text-[11px] text-muted-foreground truncate max-w-[250px]">
                       {alert.message}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-[11px] font-normal capitalize">
+                  <TableCell className="py-3">
+                    <span className="font-mono text-xs uppercase font-semibold text-foreground">
                       {alert.alertType}
-                    </Badge>
+                    </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-3">
                     {alert.severity === "high" || alert.severity === "critical" ? (
-                      <Badge variant="destructive" className="text-[10px] uppercase">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive font-mono font-semibold text-[10px] uppercase">
                         {alert.severity}
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-[10px] uppercase">
-                        {alert.severity}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {alert.resolved ? (
-                      <span className="flex items-center text-emerald-600 dark:text-emerald-400 font-medium">
-                        <CheckCircle2 className="mr-1 h-3 w-3" />
-                        Resolved
                       </span>
                     ) : (
-                      <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-mono font-semibold text-[10px] uppercase">
+                        {alert.severity}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3">
+                    {alert.resolved ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+                        <CheckCircle2 className="w-3 h-3" /> Resolved
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold text-[11px]">
                         Unresolved
                       </span>
                     )}

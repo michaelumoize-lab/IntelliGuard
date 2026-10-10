@@ -134,30 +134,30 @@ export default async function PersonsPage({
       />
 
       {/* Server-Side Rendered Data Table */}
-      <Card className="border border-border shadow-sm overflow-hidden">
+      <Card className="border border-border shadow-sm overflow-hidden bg-card text-card-foreground rounded-2xl">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/50 border-b border-border">
-                <TableHead className="w-[70px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+              <TableRow className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider hover:bg-transparent">
+                <TableHead className="w-[70px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   Face
                 </TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                <TableHead className="py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   Code & Name
                 </TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                <TableHead className="py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   Category
                 </TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                <TableHead className="py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   Department
                 </TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                <TableHead className="py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   Status
                 </TableHead>
-                <TableHead className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                <TableHead className="py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   Embedding Status
                 </TableHead>
-                <TableHead className="text-right w-[80px] font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                <TableHead className="text-right w-[80px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   Actions
                 </TableHead>
               </TableRow>
@@ -184,7 +184,7 @@ export default async function PersonsPage({
                   const embeddingStatus = activeEmbedding ? "active" : "none";
 
                   return (
-                    <TableRow key={person.id} className="hover:bg-muted/30 transition-colors">
+                    <TableRow key={person.id} className="hover:bg-muted/40 transition-colors">
                       {/* Photo Thumbnail */}
                       <TableCell className="py-3">
                         <div className="h-9 w-9 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center">

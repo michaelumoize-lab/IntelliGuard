@@ -31,9 +31,9 @@ export function LiveScanControls({
   onToggleSound,
 }: LiveScanControlsProps) {
   return (
-    <div className="w-full bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
+    <div className="w-full bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
       {/* Control Buttons */}
-      <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
+      <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full xl:w-auto">
         {/* Camera Toggle Button */}
         <button
           onClick={onToggleCamera}
@@ -116,7 +116,7 @@ export function LiveScanControls({
       </div>
 
       {/* Telemetry Stats Bar */}
-      <div className="flex flex-wrap items-center justify-between lg:justify-end gap-3 sm:gap-6 w-full lg:w-auto text-xs text-muted-foreground pt-3 lg:pt-0 border-t lg:border-t-0 border-border">
+      <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 sm:gap-6 w-full xl:w-auto text-xs text-muted-foreground pt-3 xl:pt-0 border-t xl:border-t-0 border-border">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-muted-foreground shrink-0" />
           <span>Scans Executed:</span>
