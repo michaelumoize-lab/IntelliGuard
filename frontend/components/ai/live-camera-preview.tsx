@@ -87,7 +87,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           const min = caps.zoom.min || 1;
           const max = caps.zoom.max || 2;
           const clampedHw = Math.min(max, Math.max(min, clamped));
-          videoTrack.applyConstraints({ advanced: [{ zoom: clampedHw }] }).catch(() => {});
+          videoTrack.applyConstraints({ advanced: [{ zoom: clampedHw } as any] } as any).catch(() => {});
         }
       }
     };
