@@ -53,6 +53,49 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       stopTracksOnly();
     }, [stopTracksOnly]);
 
+    // Helper to compute media stream constraints based on device and screen orientation
+    const getCameraConstraints = (deviceId?: string): MediaStreamConstraints => {
+      const isMobilePortrait =
+        typeof window !== "undefined" &&
+        (window.innerWidth < 640 || window.matchMedia("(orientation: portrait) and (max-width: 768px)").matches);
+
+      if (isMobilePortrait) {
+        // Native portrait mode constraints for mobile phones (3:4 ratio)
+        return {
+          video: deviceId
+            ? {
+                deviceId: { ideal: deviceId },
+                aspectRatio: { ideal: 3 / 4 },
+                width: { ideal: 720 },
+                height: { ideal: 1280 },
+              }
+            : {
+                facingMode: "user",
+                aspectRatio: { ideal: 3 / 4 },
+                width: { ideal: 720 },
+                height: { ideal: 1280 },
+              },
+        };
+      }
+
+      // Native landscape mode constraints for larger screens / tablets / desktops (16:9 ratio)
+      return {
+        video: deviceId
+          ? {
+              deviceId: { ideal: deviceId },
+              aspectRatio: { ideal: 16 / 9 },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            }
+          : {
+              facingMode: "user",
+              aspectRatio: { ideal: 16 / 9 },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+      };
+    };
+
     // Initialize camera stream on demand
     const startCamera = useCallback(
       async (deviceId?: string) => {
@@ -68,12 +111,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
             throw new Error("Webcam API is not available. Please ensure HTTPS or localhost is used.");
           }
 
-          const constraints: MediaStreamConstraints = {
-            video: deviceId
-              ? { deviceId: { ideal: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-              : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-          };
-
+          const constraints = getCameraConstraints(deviceId);
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
           if (runId !== currentRunIdRef.current) {
@@ -156,6 +194,47 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       };
     }, [isCameraOn, startCamera, stopStreamTracks, onCameraStatusChange, selectedDeviceId]);
 
+    // Dynamically adjust track constraints when rotating mobile device or resizing screen
+    useEffect(() => {
+      if (!isCameraOn) return;
+
+      const handleOrientationOrResize = () => {
+        if (!streamRef.current) return;
+        const videoTrack = streamRef.current.getVideoTracks()[0];
+        if (!videoTrack || typeof videoTrack.applyConstraints !== "function") return;
+
+        const isMobilePortrait =
+          window.innerWidth < 640 || window.matchMedia("(orientation: portrait) and (max-width: 768px)").matches;
+
+        videoTrack
+          .applyConstraints(
+            isMobilePortrait
+              ? {
+                  aspectRatio: { ideal: 3 / 4 },
+                  width: { ideal: 720 },
+                  height: { ideal: 1280 },
+                }
+              : {
+                  aspectRatio: { ideal: 16 / 9 },
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 },
+                }
+          )
+          .catch((err) => {
+            console.debug("Could not apply dynamic track orientation constraints:", err);
+          });
+      };
+
+      const mql = window.matchMedia("(orientation: portrait)");
+      mql.addEventListener("change", handleOrientationOrResize);
+      window.addEventListener("resize", handleOrientationOrResize);
+
+      return () => {
+        mql.removeEventListener("change", handleOrientationOrResize);
+        window.removeEventListener("resize", handleOrientationOrResize);
+      };
+    }, [isCameraOn]);
+
     useImperativeHandle(ref, () => ({
       captureFrame: () => {
         return new Promise<Blob | null>((resolve) => {
@@ -189,7 +268,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     }));
 
     return (
-      <div className="relative w-full aspect-video bg-black/90 rounded-2xl overflow-hidden border border-border shadow-md flex flex-col items-center justify-center">
+      <div className="relative w-full aspect-[3/4] sm:aspect-video landscape:aspect-video max-h-[70vh] sm:max-h-none bg-black/90 rounded-2xl overflow-hidden border border-border shadow-md flex flex-col items-center justify-center transition-all duration-300">
         {/* Hidden Canvas for Frame Extraction */}
         <canvas ref={canvasRef} className="hidden" />
 
@@ -209,23 +288,23 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           circleOnly ? (
             /* Clean Face Alignment Circle Only (for registration) */
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center select-none">
-              <div className="w-52 sm:w-64 h-52 sm:h-64 rounded-full border-2 border-dashed border-white/70 shadow-[0_0_20px_rgba(255,255,255,0.2)]" />
+              <div className="w-48 sm:w-64 h-48 sm:h-64 rounded-full border-2 border-dashed border-white/70 shadow-[0_0_20px_rgba(255,255,255,0.2)]" />
             </div>
           ) : (
             <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 select-none">
               {/* Top Bar Overlay */}
-              <div className="flex items-center justify-between w-full z-10">
-                <div className="flex items-center gap-2 px-3 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-full text-white text-[10px] sm:text-xs font-mono font-medium">
+              <div className="flex items-center justify-between w-full z-10 gap-2">
+                <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-full text-white text-[10px] sm:text-xs font-mono font-medium">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span>TERMINAL ACTIVE</span>
-                  <span className="text-white/40">•</span>
-                  <span className="text-white/70">720P 30FPS</span>
+                  <span className="text-white/40 hidden sm:inline">•</span>
+                  <span className="text-white/70 hidden sm:inline">30FPS</span>
                 </div>
 
                 {/* Status pill if overlayResult */}
                 {overlayResult && (
                   <div
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide backdrop-blur-md shadow-lg transition-all animate-in fade-in zoom-in-95 duration-200 border ${
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md shadow-lg transition-all animate-in fade-in zoom-in-95 duration-200 border ${
                       overlayResult.status === "granted"
                         ? "bg-emerald-500/20 border-emerald-400 text-emerald-300"
                         : overlayResult.status === "ambiguous"
@@ -236,15 +315,15 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                     }`}
                   >
                     {overlayResult.status === "granted" ? (
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     ) : (
-                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                     )}
-                    <span>
+                    <span className="truncate max-w-[140px] sm:max-w-none">
                       {overlayResult.status === "granted"
                         ? `MATCH: ${overlayResult.name || "VERIFIED"} (${((overlayResult.similarity || 0) * 100).toFixed(0)}%)`
                         : overlayResult.status === "deactivated"
-                        ? `USER DEACTIVATED: NOT ALLOWED (${overlayResult.name || "ACCESS RESTRICTED"})`
+                        ? `DEACTIVATED: ${overlayResult.name || "ACCESS RESTRICTED"}`
                         : overlayResult.status === "ambiguous"
                         ? "AMBIGUOUS MATCH"
                         : "ACCESS DENIED"}
@@ -256,10 +335,10 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               {/* Center Biometric Face Target Oval & Crosshairs */}
               <div className="absolute inset-0 flex items-center justify-center">
                 {/* Four Corner Brackets */}
-                <div className="relative w-52 sm:w-64 h-64 sm:h-80 max-w-[80vw] max-h-[70vh] flex items-center justify-center">
+                <div className="relative w-48 sm:w-64 h-60 sm:h-80 max-w-[80vw] max-h-[70vh] flex items-center justify-center">
                   {/* Top-Left Corner */}
                   <div
-                    className={`absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 transition-colors duration-300 ${
+                    className={`absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-2 border-l-2 transition-colors duration-300 ${
                       overlayResult?.status === "granted"
                         ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
                         : overlayResult?.status === "denied" || overlayResult?.status === "deactivated"
@@ -269,7 +348,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   />
                   {/* Top-Right Corner */}
                   <div
-                    className={`absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 transition-colors duration-300 ${
+                    className={`absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-2 border-r-2 transition-colors duration-300 ${
                       overlayResult?.status === "granted"
                         ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
                         : overlayResult?.status === "denied" || overlayResult?.status === "deactivated"
@@ -279,7 +358,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   />
                   {/* Bottom-Left Corner */}
                   <div
-                    className={`absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 transition-colors duration-300 ${
+                    className={`absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-2 border-l-2 transition-colors duration-300 ${
                       overlayResult?.status === "granted"
                         ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
                         : overlayResult?.status === "denied" || overlayResult?.status === "deactivated"
@@ -289,7 +368,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   />
                   {/* Bottom-Right Corner */}
                   <div
-                    className={`absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 transition-colors duration-300 ${
+                    className={`absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-2 border-r-2 transition-colors duration-300 ${
                       overlayResult?.status === "granted"
                         ? "border-emerald-400 shadow-[0_0_8px_#10b981]"
                         : overlayResult?.status === "denied" || overlayResult?.status === "deactivated"
@@ -314,7 +393,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                       {isScanning
                         ? "PROCESSING AI INFERENCE..."
                         : overlayResult?.status === "deactivated"
-                        ? "USER DEACTIVATED - ACCESS BLOCKED"
+                        ? "USER DEACTIVATED"
                         : "ALIGN FACE"}
                     </span>
                   </div>
@@ -327,9 +406,9 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               </div>
 
               {/* Bottom HUD Bar */}
-              <div className="flex items-center justify-between w-full text-white/70 text-[10px] font-mono z-10">
+              <div className="flex items-center justify-between w-full text-white/70 text-[9px] sm:text-[10px] font-mono z-10">
                 <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-sm">
-                  ALGORITHM: InsightFace ArcFace
+                  InsightFace ArcFace
                 </span>
                 <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-sm flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-cyan-400" /> PGVECTOR 512D
@@ -341,19 +420,19 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
         {/* OFF State Container */}
         {!isCameraOn && !isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/40 p-6 text-center gap-3">
-            <div className="p-4 bg-muted rounded-full text-muted-foreground border border-border">
-              <CameraOff className="w-8 h-8" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/40 p-4 sm:p-6 text-center gap-3">
+            <div className="p-3.5 sm:p-4 bg-muted rounded-full text-muted-foreground border border-border">
+              <CameraOff className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-1">Webcam Simulation Powered Off</h4>
-              <p className="text-xs text-muted-foreground max-w-sm">
+              <p className="text-xs text-muted-foreground max-w-xs sm:max-w-sm">
                 Click &quot;Turn On Camera&quot; to initialize video feed and test real-time face recognition.
               </p>
             </div>
             <button
               onClick={onToggleCamera}
-              className="mt-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2"
+              className="mt-1 sm:mt-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
             >
               <Video className="w-4 h-4" /> Turn On Camera
             </button>
@@ -370,19 +449,19 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
         {/* Permission Denied / Error Banner */}
         {isCameraOn && error && (
-          <div className="absolute inset-0 p-6 flex flex-col items-center justify-center text-center bg-background/90 backdrop-blur-md gap-4">
+          <div className="absolute inset-0 p-4 sm:p-6 flex flex-col items-center justify-center text-center bg-background/90 backdrop-blur-md gap-4">
             <div className="p-3 bg-destructive/10 rounded-full border border-destructive/20 text-destructive">
-              {isPermissionDenied ? <VideoOff className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+              {isPermissionDenied ? <VideoOff className="w-7 h-7 sm:w-8 sm:h-8" /> : <AlertCircle className="w-7 h-7 sm:w-8 sm:h-8" />}
             </div>
             <div className="max-w-md">
-              <h4 className="text-base font-semibold text-foreground mb-1">
+              <h4 className="text-sm sm:text-base font-semibold text-foreground mb-1">
                 {isPermissionDenied ? "Camera Access Blocked" : "Camera Error"}
               </h4>
-              <p className="text-sm text-muted-foreground">{error}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">{error}</p>
             </div>
             <button
               onClick={() => startCamera(selectedDeviceId || undefined)}
-              className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" /> Try Again
             </button>
@@ -391,11 +470,11 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
         {/* Camera Selector Dropdown */}
         {isCameraOn && devices.length > 1 && !error && !isLoading && (
-          <div className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-20 max-w-[150px] sm:max-w-xs pointer-events-auto">
+          <div className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-20 max-w-[130px] sm:max-w-xs pointer-events-auto">
             <select
               value={selectedDeviceId}
               onChange={(e) => handleDeviceSelect(e.target.value)}
-              className="w-full bg-black/70 backdrop-blur-md border border-white/20 text-white text-[11px] sm:text-xs rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-primary truncate cursor-pointer"
+              className="w-full bg-black/70 backdrop-blur-md border border-white/20 text-white text-[10px] sm:text-xs rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-primary truncate cursor-pointer"
             >
               {devices.map((device, idx) => (
                 <option key={device.deviceId} value={device.deviceId} className="bg-popover text-popover-foreground">
