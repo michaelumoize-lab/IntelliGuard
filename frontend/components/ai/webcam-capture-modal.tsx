@@ -101,7 +101,7 @@ export function WebcamCaptureModal({ isOpen, onClose, onCapture }: WebcamCapture
 
         <div className="py-2 space-y-4">
           {capturedPreview ? (
-            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border shadow-sm bg-black">
+            <div className="relative w-full aspect-[3/4] sm:aspect-video landscape:aspect-video max-h-[65vh] sm:max-h-none rounded-xl overflow-hidden border border-border shadow-sm bg-black">
               <img src={capturedPreview} alt="Captured face" className="w-full h-full object-cover" />
               <div className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-md text-white text-xs font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 shadow-md">
                 <Check className="w-3.5 h-3.5" /> Photo Captured
