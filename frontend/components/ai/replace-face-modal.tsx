@@ -98,7 +98,7 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
         <DialogHeader>
           <DialogTitle>Replace Face Photo</DialogTitle>
           <DialogDescription>
-            Updating photo for <strong>{person.firstName} {person.lastName}</strong> ({person.personCode}). This will generate a new 512D ArcFace embedding.
+            Updating photo for <strong>{person.firstName} {person.lastName}</strong> ({person.personCode}). This will update the biometric face identity.
           </DialogDescription>
         </DialogHeader>
 

@@ -153,8 +153,8 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
           <DialogTitle>{isEditing ? "Edit Person Details" : "Register New Person"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update administrative metadata. Facial embedding remains unchanged."
-              : "Register an individual and generate their 512D facial recognition profile."}
+              ? "Update administrative metadata. Facial identity remains unchanged."
+              : "Register an individual and generate their biometric facial recognition profile."}
           </DialogDescription>
         </DialogHeader>
 

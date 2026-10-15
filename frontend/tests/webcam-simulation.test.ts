@@ -10,7 +10,9 @@ async function runWebcamSimulationTests() {
   console.log("  Milestone 8: Webcam Simulation Verification");
   console.log("==================================================\n");
 
-  const singleFacePath = path.join(__dirname, "../../backend/tests/single_face.jpg");
+  const aiServicePath = path.join(__dirname, "../../ai-service/tests/single_face.jpg");
+  const backendPath = path.join(__dirname, "../../backend/tests/single_face.jpg");
+  const singleFacePath = fs.existsSync(aiServicePath) ? aiServicePath : backendPath;
 
   if (!fs.existsSync(singleFacePath)) {
     console.error("❌ Test image single_face.jpg not found at:", singleFacePath);
