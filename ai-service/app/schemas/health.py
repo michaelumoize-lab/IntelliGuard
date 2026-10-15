@@ -9,6 +9,8 @@ class HealthResponse(BaseModel):
     service: str = Field(..., description="Name of the service")
     model: str = Field(..., description="Configured InsightFace model name")
     model_loaded: bool = Field(..., description="Indicates whether the AI model is loaded in memory")
+    yolo_loaded: Optional[bool] = Field(default=None, description="Indicates whether the YOLO model is loaded in memory")
+    yolo_model: Optional[str] = Field(default=None, description="Configured YOLO model name")
     execution_provider: str = Field(..., description="Active ONNX Runtime execution provider")
     error: Optional[str] = Field(None, description="Initialization error details if status is degraded")
 

@@ -1,12 +1,28 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { LiveCameraPreview, LiveCameraPreviewRef, CameraOverlayResult } from "@/components/ai/live-camera-preview";
+import {
+  LiveCameraPreview,
+  LiveCameraPreviewRef,
+  CameraOverlayResult,
+  DetectedPersonOverlay,
+  DetectedFaceOverlay,
+} from "@/components/ai/live-camera-preview";
 import { AccessResultCard } from "@/components/ai/access-result-card";
 import { LiveScanControls } from "@/components/ai/live-scan-controls";
 import { scanFace, AccessScanResponse } from "@/lib/access/access-client";
 import { playBiometricSound } from "@/lib/audio";
-import { Camera, History, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ShieldAlert } from "lucide-react";
+import {
+  Camera,
+  History,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  HelpCircle,
+  ShieldAlert,
+  User,
+  Users,
+} from "lucide-react";
 
 export interface ScanHistoryItem {
   id: string;
@@ -29,6 +45,9 @@ export default function WebcamSimulationPage() {
   const [latestResult, setLatestResult] = useState<AccessScanResponse | null>(null);
   const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
   const [cameraOverlay, setCameraOverlay] = useState<CameraOverlayResult | null>(null);
+  const [detectedPersons, setDetectedPersons] = useState<DetectedPersonOverlay[]>([]);
+  const [detectedFaces, setDetectedFaces] = useState<DetectedFaceOverlay[]>([]);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [scanCount, setScanCount] = useState<number>(0);
   const [lastScanTime, setLastScanTime] = useState<string | null>(null);
@@ -40,6 +59,7 @@ export default function WebcamSimulationPage() {
   const requestSequenceRef = useRef<number>(0);
   const soundEnabledRef = useRef<boolean>(soundEnabled);
   const overlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoOffTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     isMonitoringRef.current = isMonitoring;
@@ -61,9 +81,16 @@ export default function WebcamSimulationPage() {
         setIsMonitoring(false);
         setIsCameraReady(false);
         setCameraOverlay(null);
+        setDetectedPersons([]);
+        setDetectedFaces([]);
+        setImageDimensions(null);
         if (overlayTimerRef.current) {
           clearTimeout(overlayTimerRef.current);
           overlayTimerRef.current = null;
+        }
+        if (autoOffTimerRef.current) {
+          clearTimeout(autoOffTimerRef.current);
+          autoOffTimerRef.current = null;
         }
       }
       return next;
@@ -91,6 +118,9 @@ export default function WebcamSimulationPage() {
       if (overlayTimerRef.current) {
         clearTimeout(overlayTimerRef.current);
       }
+      if (autoOffTimerRef.current) {
+        clearTimeout(autoOffTimerRef.current);
+      }
     };
   }, []);
 
@@ -101,6 +131,12 @@ export default function WebcamSimulationPage() {
     const requestSeq = ++requestSequenceRef.current;
     inFlightRef.current = true;
     setIsScanning(true);
+
+    // Show client-side in-flight processing state immediately on HUD
+    setCameraOverlay({
+      status: "processing",
+      message: "Processing biometrics...",
+    });
 
     try {
       const imageBlob = await cameraRef.current.captureFrame();
@@ -131,9 +167,70 @@ export default function WebcamSimulationPage() {
       setLastScanTime(timeStr);
       setScanCount((prev) => prev + 1);
 
+      // Update AI Person & Face Detection Overlays (with smooth 150ms anti-flicker reset)
+      if (response.persons && response.persons.length > 0) {
+        setDetectedPersons(
+          response.persons.map((p) => ({
+            bbox: p.bbox,
+            confidence: p.confidence,
+            isPrimary: p.is_primary,
+          }))
+        );
+      } else if (response.person_bbox) {
+        setDetectedPersons([
+          {
+            bbox: response.person_bbox,
+            confidence: 1.0,
+            isPrimary: true,
+          },
+        ]);
+      } else {
+        setDetectedPersons([]);
+      }
+
+      if (response.faces && response.faces.length > 0) {
+        setDetectedFaces(
+          response.faces.map((f) => ({
+            bbox: f.bbox,
+            confidence: f.confidence,
+            landmarks: f.landmarks,
+          }))
+        );
+      } else if (response.face_bbox) {
+        setDetectedFaces([
+          {
+            bbox: response.face_bbox,
+            confidence: 1.0,
+          },
+        ]);
+      } else {
+        setDetectedFaces([]);
+      }
+
+      if (response.image_width && response.image_height) {
+        setImageDimensions({
+          width: response.image_width,
+          height: response.image_height,
+        });
+      }
+
+      const isDeactivated = Boolean(
+        response.person &&
+        (response.person.status || "active").toLowerCase() !== "active"
+      );
+
       // Auditory Feedback Chime (reading stable ref so callback does not rebind)
+      // Only chime for authenticated pass or evaluated unauthorized intruder - NEVER for empty or faceless frames
       if (soundEnabledRef.current) {
-        playBiometricSound(response.access_status === "granted" ? "granted" : "denied");
+        if (response.access_status === "granted") {
+          playBiometricSound("granted");
+        } else if (
+          response.status === "unknown_individual" ||
+          response.match_status === "unknown" ||
+          isDeactivated
+        ) {
+          playBiometricSound("denied");
+        }
       }
 
       // Display HUD Banner Overlay for 3.5s
@@ -141,40 +238,99 @@ export default function WebcamSimulationPage() {
         ? `${response.person.first_name} ${response.person.last_name}`
         : undefined;
 
-      const isDeactivated = Boolean(
-        response.person &&
-        (response.person.status || "active").toLowerCase() !== "active"
-      );
+      let overlayStatus: CameraOverlayResult["status"] = "denied";
+      if (response.status === "no_person") {
+        overlayStatus = "no_person";
+      } else if (response.status === "person_no_face") {
+        overlayStatus = "person_no_face";
+      } else if (response.status === "face_low_quality") {
+        overlayStatus = "face_low_quality";
+      } else if (response.status === "recognition_error") {
+        overlayStatus = "error";
+      } else if (isDeactivated) {
+        overlayStatus = "deactivated";
+      } else if (response.access_status === "granted") {
+        overlayStatus = "granted";
+      } else if (response.match_status === "ambiguous") {
+        overlayStatus = "ambiguous";
+      } else if (response.match_status === "unknown" || response.status === "unknown_individual") {
+        overlayStatus = "unknown";
+      } else {
+        overlayStatus = "denied";
+      }
 
       setCameraOverlay({
-        status: isDeactivated ? "deactivated" : response.access_status,
+        status: overlayStatus,
         name: isDeactivated ? `${personName || "User"} (Deactivated)` : personName,
         similarity: response.face?.similarity,
+        message: response.message,
       });
 
       if (overlayTimerRef.current) {
         clearTimeout(overlayTimerRef.current);
       }
 
+      // Display HUD banner for 8s on access granted, or 3.5s for ephemeral/denied states
+      const overlayDisplayMs = response.access_status === "granted" ? 8000 : 3500;
       overlayTimerRef.current = setTimeout(() => {
         setCameraOverlay(null);
         overlayTimerRef.current = null;
-      }, 3500);
+      }, overlayDisplayMs);
 
-      // Add to local scan history (limit to 10 entries)
+      // If access is granted, stop continuous monitoring and auto-turn off the camera after 60 seconds
+      if (response.access_status === "granted") {
+        setIsMonitoring(false);
+        if (autoOffTimerRef.current) {
+          clearTimeout(autoOffTimerRef.current);
+        }
+        autoOffTimerRef.current = setTimeout(() => {
+          setIsCameraOn(false);
+          setIsCameraReady(false);
+          setCameraOverlay(null);
+          setDetectedPersons([]);
+          setDetectedFaces([]);
+          setImageDimensions(null);
+          autoOffTimerRef.current = null;
+        }, 60000);
+      }
+
+      // Map history entry using the 6-state taxonomy (never falsely reporting unknown individual)
+      let historyName = "Unknown Individual";
+      let historyMatchStatus: string = response.match_status || "denied";
+
+      if (isDeactivated) {
+        historyName = `${personName} (User is deactivated)`;
+        historyMatchStatus = "deactivated";
+      } else if (response.person) {
+        historyName = `${response.person.first_name} ${response.person.last_name}`;
+        historyMatchStatus = response.match_status || "matched";
+      } else if (response.status === "no_person") {
+        historyName = "No Person Detected";
+        historyMatchStatus = "no_person";
+      } else if (response.status === "person_no_face") {
+        historyName = "Person Visible (No Face)";
+        historyMatchStatus = "person_no_face";
+      } else if (response.status === "face_low_quality") {
+        historyName = "Low Quality Face";
+        historyMatchStatus = "face_low_quality";
+      } else if (response.status === "recognition_error") {
+        historyName = "Recognition Error";
+        historyMatchStatus = "error";
+      } else if (response.match_status === "ambiguous") {
+        historyName = "Ambiguous Match";
+        historyMatchStatus = "ambiguous";
+      } else if (response.status === "unknown_individual" || response.match_status === "unknown") {
+        historyName = "Unknown Individual";
+        historyMatchStatus = "unknown";
+      }
+
       const historyEntry: ScanHistoryItem = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         time: timeStr,
-        name: isDeactivated
-          ? `${personName} (User is deactivated)`
-          : response.person
-          ? `${response.person.first_name} ${response.person.last_name}`
-          : response.match_status === "ambiguous"
-          ? "Ambiguous Match"
-          : "Unknown Face",
+        name: historyName,
         code: response.person ? response.person.person_code : "N/A",
         status: response.access_status,
-        matchStatus: isDeactivated ? "deactivated" : response.match_status,
+        matchStatus: historyMatchStatus,
         similarity: response.face ? response.face.similarity : 0,
       };
 
@@ -214,17 +370,24 @@ export default function WebcamSimulationPage() {
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-7xl mx-auto space-y-6 sm:space-y-8 bg-background text-foreground">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 bg-primary/10 border border-primary/20 text-primary rounded-xl shrink-0">
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <span className="p-2 bg-primary/10 border border-primary/25 text-primary rounded-xl shrink-0 shadow-sm">
               <Camera className="w-5 h-5" />
             </span>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Live Webcam Access Simulation</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Biometric Terminal Simulation</h1>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Real-time biometric terminal testing with live HUD scanning, auditory feedback, and side-by-side profile verification.
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            Real-time human body & facial recognition access gateway with instant hardware decision mapping.
           </p>
+        </div>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/70 text-xs font-mono text-muted-foreground shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold text-foreground">AI Pipeline:</span>
+            <span>YOLOv8n + Buffalo_S</span>
+          </div>
         </div>
       </div>
 
@@ -239,6 +402,9 @@ export default function WebcamSimulationPage() {
             onCameraStatusChange={handleCameraStatusChange}
             isScanning={isScanning}
             overlayResult={cameraOverlay}
+            detectedPersons={detectedPersons}
+            detectedFaces={detectedFaces}
+            imageDimensions={imageDimensions}
             mirrored={true}
             showHud={true}
           />
@@ -312,6 +478,18 @@ export default function WebcamSimulationPage() {
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold text-[11px]">
                           <AlertTriangle className="w-3.5 h-3.5" /> AMBIGUOUS
                         </span>
+                      ) : item.matchStatus === "no_person" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-500/10 border border-slate-500/20 text-slate-400 font-semibold text-[11px]">
+                          <Users className="w-3.5 h-3.5" /> NO PERSON
+                        </span>
+                      ) : item.matchStatus === "person_no_face" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-semibold text-[11px]">
+                          <User className="w-3.5 h-3.5" /> NO FACE
+                        </span>
+                      ) : item.matchStatus === "face_low_quality" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-semibold text-[11px]">
+                          <AlertTriangle className="w-3.5 h-3.5" /> LOW QUALITY
+                        </span>
                       ) : item.matchStatus === "unknown" ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold text-[11px] border border-border">
                           <HelpCircle className="w-3.5 h-3.5" /> UNKNOWN
@@ -325,7 +503,11 @@ export default function WebcamSimulationPage() {
                     <td className="py-3 font-medium text-foreground">{item.name}</td>
                     <td className="py-3 font-mono text-muted-foreground">{item.code}</td>
                     <td className="py-3 font-mono text-right font-semibold text-foreground">
-                      {item.similarity < 0 ? "< 0%" : `${(item.similarity * 100).toFixed(1)}%`}
+                      {item.matchStatus === "no_person" || item.matchStatus === "person_no_face"
+                        ? "—"
+                        : item.similarity < 0
+                        ? "< 0%"
+                        : `${(item.similarity * 100).toFixed(1)}%`}
                     </td>
                   </tr>
                 ))}

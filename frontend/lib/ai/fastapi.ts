@@ -169,7 +169,7 @@ export async function detectFaces(
     const data = await response.json();
     return {
       success: !!data.success,
-      faceCount: typeof data.face_count === "number" ? data.face_count : (data.faces?.length || 0),
+      faceCount: typeof data.face_count === "number" ? data.face_count : (data.faces || []).length,
       faces: (data.faces || []).map((f: any) => ({
         bbox: f.bbox || [],
         confidence: typeof f.confidence === "number" ? f.confidence : 0,
@@ -179,11 +179,133 @@ export async function detectFaces(
     };
   } catch (err: any) {
     console.error("FastAPI detectFaces error:", err);
+    throw err;
+  }
+}
+
+export interface DetectedPersonItem {
+  bbox: number[];
+  confidence: number;
+  is_primary: boolean;
+}
+
+export interface FastAPIAnalysisResult {
+  success: boolean;
+  status:
+    | "no_person"
+    | "person_no_face"
+    | "face_low_quality"
+    | "face_detected_processing"
+    | "known_individual"
+    | "unknown_individual"
+    | "recognition_error";
+  personDetected: boolean;
+  faceDetected: boolean;
+  personCount: number;
+  faceCount: number;
+  persons: DetectedPersonItem[];
+  faces: DetectedFaceItem[];
+  primaryPersonBbox?: number[] | null;
+  primaryFaceBbox?: number[] | null;
+  embedding?: number[] | null;
+  embeddingSize?: number | null;
+  qualityScore?: number | null;
+  detectionConfidence?: number | null;
+  model?: string;
+  imageWidth: number;
+  imageHeight: number;
+  message?: string;
+  executionTimeMs: number;
+  yoloTimeMs?: number;
+  insightfaceTimeMs?: number;
+}
+
+/**
+ * Server-side client function to request unified YOLO person detection,
+ * InsightFace face detection, and embedding extraction from FastAPI.
+ */
+export async function analyzeImage(
+  imageBuffer: Buffer,
+  filename: string = "frame.jpg"
+): Promise<FastAPIAnalysisResult> {
+  const baseUrl = process.env.FASTAPI_URL || "http://localhost:8000";
+  const endpoint = `${baseUrl.replace(/\/$/, "")}/api/v1/analyze`;
+
+  const formData = new FormData();
+  const blob = new Blob([new Uint8Array(imageBuffer)], { type: "image/jpeg" });
+  formData.append("file", blob, filename);
+
+  let response: Response;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    response = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch (err: any) {
+    console.error("FastAPI analyzeImage connection error:", err);
     throw new FastAPIError(
       "FASTAPI_UNAVAILABLE",
-      err.message || "Failed to contact AI detection microservice.",
+      "AI computer vision service is currently unavailable or unreachable.",
       503
     );
   }
+
+  if (response.status === 503) {
+    throw new FastAPIError(
+      "FASTAPI_UNAVAILABLE",
+      "AI computer vision service is starting up or in degraded state.",
+      503
+    );
+  }
+
+  if (!response.ok) {
+    let errorDetail = "Failed to analyze image.";
+    try {
+      const errJson = await response.json();
+      if (errJson.detail) {
+        errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+      }
+    } catch (_) {}
+    throw new FastAPIError("AI_SERVICE_ERROR", errorDetail, response.status);
+  }
+
+  const data = await response.json();
+
+  return {
+    success: !!data.success,
+    status: data.status,
+    personDetected: !!data.person_detected,
+    faceDetected: !!data.face_detected,
+    personCount: typeof data.person_count === "number" ? data.person_count : 0,
+    faceCount: typeof data.face_count === "number" ? data.face_count : 0,
+    persons: (data.persons || []).map((p: any) => ({
+      bbox: p.bbox || [],
+      confidence: typeof p.confidence === "number" ? p.confidence : 0,
+      is_primary: !!p.is_primary,
+    })),
+    faces: (data.faces || []).map((f: any) => ({
+      bbox: f.bbox || [],
+      confidence: typeof f.confidence === "number" ? f.confidence : 0,
+      landmarks: f.landmarks || undefined,
+    })),
+    primaryPersonBbox: data.primary_person_bbox || null,
+    primaryFaceBbox: data.primary_face_bbox || null,
+    embedding: Array.isArray(data.embedding) ? data.embedding : null,
+    embeddingSize: data.embedding_size || (data.embedding ? data.embedding.length : null),
+    qualityScore: typeof data.quality_score === "number" ? data.quality_score : null,
+    detectionConfidence: typeof data.detection_confidence === "number" ? data.detection_confidence : null,
+    model: data.model || "buffalo_s",
+    imageWidth: data.image_width || 640,
+    imageHeight: data.image_height || 480,
+    message: data.message || undefined,
+    executionTimeMs: data.execution_time_ms || 0,
+    yoloTimeMs: data.yolo_time_ms || 0,
+    insightfaceTimeMs: data.insightface_time_ms || 0,
+  };
 }
 

@@ -12,6 +12,8 @@ import {
   AlertTriangle,
   ShieldAlert,
   HelpCircle,
+  User,
+  Users,
 } from "lucide-react";
 import { useWebcam } from "@/hooks/use-webcam";
 import { cn } from "@/lib/utils";
@@ -22,9 +24,26 @@ export interface LiveCameraPreviewRef {
 }
 
 export interface CameraOverlayResult {
-  status: "granted" | "denied" | "ambiguous" | "unknown" | "deactivated";
+  status:
+    | "granted"
+    | "denied"
+    | "ambiguous"
+    | "unknown"
+    | "deactivated"
+    | "no_person"
+    | "person_no_face"
+    | "face_low_quality"
+    | "processing"
+    | "error";
   name?: string;
   similarity?: number;
+  message?: string;
+}
+
+export interface DetectedPersonOverlay {
+  bbox: number[]; // [x1, y1, x2, y2]
+  confidence: number;
+  isPrimary?: boolean;
 }
 
 export interface DetectedFaceOverlay {
@@ -41,7 +60,9 @@ export interface LiveCameraPreviewProps {
   overlayResult?: CameraOverlayResult | null;
   circleOnly?: boolean;
   mirrored?: boolean;
+  detectedPersons?: DetectedPersonOverlay[];
   detectedFaces?: DetectedFaceOverlay[];
+  imageDimensions?: { width: number; height: number } | null;
   showHud?: boolean;
   className?: string;
 }
@@ -56,7 +77,9 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       overlayResult = null,
       circleOnly = false,
       mirrored = true,
+      detectedPersons = [],
       detectedFaces = [],
+      imageDimensions = null,
       showHud = true,
       className,
     },
@@ -128,13 +151,21 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       if (overlayResult?.status === "granted") {
         return "border-emerald-400 shadow-[0_0_12px_#10b981]";
       }
-      if (overlayResult?.status === "denied" || overlayResult?.status === "deactivated") {
+      if (
+        overlayResult?.status === "denied" ||
+        overlayResult?.status === "deactivated" ||
+        overlayResult?.status === "unknown" ||
+        overlayResult?.status === "error"
+      ) {
         return "border-destructive shadow-[0_0_12px_#ef4444]";
       }
-      if (overlayResult?.status === "ambiguous") {
+      if (overlayResult?.status === "ambiguous" || overlayResult?.status === "face_low_quality") {
         return "border-amber-400 shadow-[0_0_12px_#f59e0b]";
       }
-      if (isScanning) {
+      if (overlayResult?.status === "person_no_face") {
+        return "border-cyan-400 shadow-[0_0_10px_#22d3ee]";
+      }
+      if (isScanning || overlayResult?.status === "processing") {
         return "border-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]";
       }
       return "border-white/60";
@@ -169,15 +200,15 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           }`}
         />
 
-        {/* AI Bounding Boxes & Facial Landmarks Overlay */}
-        {isCameraOn && isCameraReady && detectedFaces.length > 0 && (
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            {detectedFaces.map((face, index) => {
-              if (!face.bbox || face.bbox.length < 4) return null;
-              const [x1, y1, x2, y2] = face.bbox;
+        {/* AI Person Bounding Boxes (YOLO Layer) */}
+        {isCameraOn && isCameraReady && detectedPersons.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden transition-opacity duration-150">
+            {detectedPersons.map((person, index) => {
+              if (!person.bbox || person.bbox.length < 4) return null;
+              const [x1, y1, x2, y2] = person.bbox;
               const video = videoRef.current;
-              const vidW = video?.videoWidth || 720;
-              const vidH = video?.videoHeight || 960;
+              const vidW = imageDimensions?.width || video?.videoWidth || 720;
+              const vidH = imageDimensions?.height || video?.videoHeight || 960;
 
               // Compute object-cover visible bounds relative to 3:4 portrait container
               const containerAspect = 3 / 4;
@@ -205,6 +236,81 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
               return (
                 <div
+                  key={`person-box-${index}`}
+                  style={{
+                    left: `${finalLeftPct}%`,
+                    top: `${topPct}%`,
+                    width: `${widthPct}%`,
+                    height: `${heightPct}%`,
+                  }}
+                  className={`absolute border-2 rounded-xl transition-all duration-150 ${
+                    person.isPrimary
+                      ? "border-cyan-400/80 shadow-[0_0_12px_rgba(34,211,238,0.4)]"
+                      : "border-cyan-500/40 shadow-[0_0_6px_rgba(34,211,238,0.2)]"
+                  }`}
+                >
+                  <div className="absolute -top-5 left-0 bg-cyan-600 text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-1">
+                    <span>PERSON {(person.confidence * 100).toFixed(0)}%</span>
+                    {person.isPrimary && <span className="opacity-75 text-[8px]">• PRIMARY</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* AI Face Bounding Boxes & Facial Landmarks Overlay (InsightFace Layer) */}
+        {isCameraOn && isCameraReady && detectedFaces.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden transition-opacity duration-150">
+            {detectedFaces.map((face, index) => {
+              if (!face.bbox || face.bbox.length < 4) return null;
+              const [x1, y1, x2, y2] = face.bbox;
+              const video = videoRef.current;
+              const vidW = imageDimensions?.width || video?.videoWidth || 720;
+              const vidH = imageDimensions?.height || video?.videoHeight || 960;
+
+              // Compute object-cover visible bounds relative to 3:4 portrait container
+              const containerAspect = 3 / 4;
+              const videoAspect = vidW / vidH;
+
+              let visibleW = vidW;
+              let visibleH = vidH;
+              let cropX = 0;
+              let cropY = 0;
+
+              if (videoAspect > containerAspect) {
+                visibleW = vidH * containerAspect;
+                cropX = (vidW - visibleW) / 2;
+              } else {
+                visibleH = vidW / containerAspect;
+                cropY = (vidH - visibleH) / 2;
+              }
+
+              const leftPct = ((x1 - cropX) / visibleW) * 100;
+              const topPct = ((y1 - cropY) / visibleH) * 100;
+              const widthPct = ((x2 - x1) / visibleW) * 100;
+              const heightPct = ((y2 - y1) / visibleH) * 100;
+
+              const finalLeftPct = shouldMirror ? 100 - leftPct - widthPct : leftPct;
+
+              const faceBoxColor =
+                overlayResult?.status === "granted"
+                  ? "border-emerald-400/90 shadow-[0_0_12px_rgba(16,185,129,0.5)] bg-emerald-500/5"
+                  : overlayResult?.status === "unknown"
+                  ? "border-rose-500/90 shadow-[0_0_12px_rgba(244,63,94,0.5)] bg-rose-500/5"
+                  : overlayResult?.status === "ambiguous" || overlayResult?.status === "face_low_quality"
+                  ? "border-amber-400/90 shadow-[0_0_12px_rgba(245,158,11,0.5)] bg-amber-500/5"
+                  : "border-emerald-400/90 shadow-[0_0_12px_rgba(16,185,129,0.5)]";
+
+              const badgeColor =
+                overlayResult?.status === "unknown"
+                  ? "bg-rose-600 text-white"
+                  : overlayResult?.status === "ambiguous" || overlayResult?.status === "face_low_quality"
+                  ? "bg-amber-600 text-white"
+                  : "bg-emerald-500 text-black";
+
+              return (
+                <div
                   key={`face-box-${index}`}
                   style={{
                     left: `${finalLeftPct}%`,
@@ -212,9 +318,9 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                     width: `${widthPct}%`,
                     height: `${heightPct}%`,
                   }}
-                  className="absolute border-2 border-emerald-400/90 rounded-lg shadow-[0_0_12px_rgba(16,185,129,0.5)] transition-all duration-150"
+                  className={`absolute border-2 rounded-lg transition-all duration-150 ${faceBoxColor}`}
                 >
-                  <div className="absolute -top-5 left-0 bg-emerald-500 text-black text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shadow">
+                  <div className={`absolute -top-5 left-0 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shadow ${badgeColor}`}>
                     FACE {(face.confidence * 100).toFixed(0)}%
                   </div>
 
@@ -246,41 +352,103 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
             <div className="flex items-center justify-between w-full z-10">
               {overlayResult ? (
                 <div
-                  className={`px-3 py-1.5 rounded-full border backdrop-blur-md text-xs font-semibold flex items-center gap-1.5 shadow-lg transition-all animate-in fade-in zoom-in-95 duration-200 ${
+                  className={`px-3 py-1.5 rounded-full border bg-black/90 backdrop-blur-md text-xs shadow-2xl flex items-center gap-2 transition-all animate-in fade-in zoom-in-95 duration-200 select-none ${
                     overlayResult.status === "granted"
-                      ? "bg-emerald-500/25 border-emerald-400/60 text-emerald-200 shadow-emerald-500/20"
+                      ? "border-emerald-400/90 shadow-[0_0_16px_rgba(16,185,129,0.4)]"
                       : overlayResult.status === "deactivated"
-                      ? "bg-destructive/30 border-destructive/60 text-destructive-foreground shadow-destructive/20"
-                      : overlayResult.status === "ambiguous"
-                      ? "bg-amber-500/25 border-amber-400/60 text-amber-200 shadow-amber-500/20"
+                      ? "border-destructive/90 shadow-[0_0_16px_rgba(239,68,68,0.4)]"
+                      : overlayResult.status === "ambiguous" || overlayResult.status === "face_low_quality"
+                      ? "border-amber-400/90 shadow-[0_0_16px_rgba(245,158,11,0.4)]"
+                      : overlayResult.status === "person_no_face"
+                      ? "border-cyan-400/90 shadow-[0_0_16px_rgba(34,211,238,0.4)]"
+                      : overlayResult.status === "no_person"
+                      ? "border-slate-600 shadow-md"
                       : overlayResult.status === "unknown"
-                      ? "bg-neutral-800/80 border-neutral-600 text-neutral-200"
-                      : "bg-destructive/25 border-destructive/60 text-destructive-foreground shadow-destructive/20"
+                      ? "border-rose-400/90 shadow-[0_0_16px_rgba(244,63,94,0.4)]"
+                      : overlayResult.status === "processing"
+                      ? "border-cyan-400/90 shadow-[0_0_16px_rgba(34,211,238,0.4)]"
+                      : "border-destructive/90 shadow-[0_0_16px_rgba(239,68,68,0.4)]"
                   }`}
                 >
-                  {overlayResult.status === "granted" && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-                  {overlayResult.status === "deactivated" && <ShieldAlert className="w-4 h-4 text-destructive shrink-0" />}
-                  {overlayResult.status === "ambiguous" && <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />}
-                  {overlayResult.status === "unknown" && <HelpCircle className="w-4 h-4 text-neutral-300 shrink-0" />}
-                  {overlayResult.status === "denied" && <XCircle className="w-4 h-4 text-destructive shrink-0" />}
-
-                  <span className="font-medium tracking-wide">
-                    {overlayResult.status === "granted"
-                      ? `GRANTED: ${overlayResult.name || "Access Allowed"}`
-                      : overlayResult.status === "deactivated"
-                      ? overlayResult.name || "USER DEACTIVATED"
-                      : overlayResult.status === "ambiguous"
-                      ? "AMBIGUOUS MATCH"
-                      : overlayResult.status === "unknown"
-                      ? "UNKNOWN FACE"
-                      : "ACCESS DENIED"}
-                  </span>
-
-                  {overlayResult.similarity !== undefined && (
-                    <span className="ml-1 text-[10px] font-mono opacity-80 border-l border-white/20 pl-1.5">
-                      {(overlayResult.similarity * 100).toFixed(1)}%
+                  {/* Status Indicator Tag */}
+                  {overlayResult.status === "granted" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider border border-emerald-500/40 shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>GRANTED</span>
+                    </span>
+                  ) : overlayResult.status === "deactivated" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
+                      <ShieldAlert className="w-3.5 h-3.5 text-destructive" />
+                      <span>DEACTIVATED</span>
+                    </span>
+                  ) : overlayResult.status === "ambiguous" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] uppercase tracking-wider border border-amber-400/40 shrink-0">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                      <span>AMBIGUOUS</span>
+                    </span>
+                  ) : overlayResult.status === "face_low_quality" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] uppercase tracking-wider border border-amber-400/40 shrink-0">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                      <span>LOW QUALITY</span>
+                    </span>
+                  ) : overlayResult.status === "person_no_face" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold text-[10px] uppercase tracking-wider border border-cyan-400/40 shrink-0">
+                      <User className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>PERSON DETECTED</span>
+                    </span>
+                  ) : overlayResult.status === "no_person" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold text-[10px] uppercase tracking-wider border border-slate-700 shrink-0">
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      <span>EMPTY FRAME</span>
+                    </span>
+                  ) : overlayResult.status === "unknown" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-bold text-[10px] uppercase tracking-wider border border-rose-500/40 shrink-0">
+                      <HelpCircle className="w-3.5 h-3.5 text-rose-400" />
+                      <span>UNKNOWN</span>
+                    </span>
+                  ) : overlayResult.status === "processing" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold text-[10px] uppercase tracking-wider border border-cyan-400/40 shrink-0">
+                      <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                      <span>SCANNING</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
+                      <XCircle className="w-3.5 h-3.5 text-destructive" />
+                      <span>DENIED</span>
                     </span>
                   )}
+
+                  {/* High-Contrast Individual Name or Primary Message */}
+                  <span className="font-bold text-white text-xs tracking-wide truncate max-w-[160px] sm:max-w-xs drop-shadow-sm">
+                    {overlayResult.status === "granted"
+                      ? overlayResult.name || "Access Allowed"
+                      : overlayResult.status === "deactivated"
+                      ? overlayResult.name || "User Deactivated"
+                      : overlayResult.status === "ambiguous"
+                      ? "Multiple Candidates Matched"
+                      : overlayResult.status === "person_no_face"
+                      ? "No Face Visible"
+                      : overlayResult.status === "no_person"
+                      ? "No Person Detected"
+                      : overlayResult.status === "face_low_quality"
+                      ? "Please Face Camera Directly"
+                      : overlayResult.status === "processing"
+                      ? "Analyzing Biometrics..."
+                      : overlayResult.status === "unknown"
+                      ? "Unregistered Individual"
+                      : overlayResult.status === "error"
+                      ? "Camera / System Error"
+                      : "Access Denied"}
+                  </span>
+
+                  {/* Similarity Score Tag */}
+                  {overlayResult.similarity !== undefined &&
+                    overlayResult.status !== "no_person" &&
+                    overlayResult.status !== "person_no_face" && (
+                      <span className="ml-1 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
+                        {(overlayResult.similarity * 100).toFixed(1)}%
+                      </span>
+                    )}
                 </div>
               ) : isScanning ? (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-950/80 backdrop-blur-md border border-cyan-500/40 text-cyan-200 text-[10px] font-mono">
@@ -288,7 +456,10 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   <span>AI SCANNING ACTIVE</span>
                 </div>
               ) : (
-                <div />
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white/80 text-[10px] font-mono shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>FEED ACTIVE</span>
+                </div>
               )}
             </div>
 
@@ -304,82 +475,109 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                 {!circleOnly && (
                   <>
                     {/* Top-Left Corner */}
-                    <div className={`absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 transition-colors duration-300 ${cornerBorder}`} />
+                    <div className={`absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 rounded-tl transition-all duration-300 ${cornerBorder}`} />
                     {/* Top-Right Corner */}
-                    <div className={`absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 transition-colors duration-300 ${cornerBorder}`} />
+                    <div className={`absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 rounded-tr transition-all duration-300 ${cornerBorder}`} />
                     {/* Bottom-Left Corner */}
-                    <div className={`absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 transition-colors duration-300 ${cornerBorder}`} />
+                    <div className={`absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 rounded-bl transition-all duration-300 ${cornerBorder}`} />
                     {/* Bottom-Right Corner */}
-                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 transition-colors duration-300 ${cornerBorder}`} />
+                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 rounded-br transition-all duration-300 ${cornerBorder}`} />
                   </>
                 )}
 
-                {/* Anatomical Biometric Face Oval Guideline */}
+                {/* Minimalist Biometric Face Oval Guideline */}
                 <div
-                  className={`w-full h-full rounded-[50%_50%_45%_45%/55%_55%_45%_45%] border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-between py-4 ${
-                    isScanning
-                      ? "border-primary animate-pulse scale-[1.01]"
+                  className={`w-full h-full rounded-[48%_48%_44%_44%/52%_52%_44%_44%] border transition-all duration-300 flex flex-col items-center justify-between py-4 relative overflow-hidden ${
+                    isScanning || overlayResult?.status === "processing"
+                      ? "border-cyan-400 bg-cyan-500/5 shadow-[0_0_20px_rgba(34,211,238,0.25)] scale-[1.01]"
                       : overlayResult?.status === "granted"
-                      ? "border-emerald-400/90 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                      : overlayResult?.status === "denied" || overlayResult?.status === "deactivated"
-                      ? "border-destructive/90 bg-destructive/5 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                      : "border-white/40"
+                      ? "border-emerald-400/90 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
+                      : overlayResult?.status === "denied" || overlayResult?.status === "deactivated" || overlayResult?.status === "unknown"
+                      ? "border-destructive/90 bg-destructive/5 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                      : overlayResult?.status === "person_no_face"
+                      ? "border-cyan-400/80 bg-cyan-500/5 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                      : "border-white/20 hover:border-white/30"
                   }`}
                 >
-                  {/* Top Marker */}
-                  <span className="text-[9px] sm:text-[10px] font-mono tracking-widest uppercase bg-black/60 px-2.5 py-0.5 rounded text-white/80 border border-white/10">
-                    FOREHEAD
-                  </span>
-
-                  {/* Eye Horizon Guideline */}
-                  <div className="w-3/4 flex items-center justify-between opacity-60 my-auto">
-                    <span className="h-0.5 w-3 bg-white/70 rounded-full" />
-                    <span className="text-[8px] font-mono uppercase tracking-widest text-white/70">
-                      EYE LINE
-                    </span>
-                    <span className="h-0.5 w-3 bg-white/70 rounded-full" />
+                  {/* Subtle Horizon Alignment Ticks */}
+                  <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex items-center justify-between pointer-events-none opacity-40">
+                    <span className="h-0.5 w-3 bg-white rounded-full" />
+                    <span className="h-0.5 w-3 bg-white rounded-full" />
                   </div>
 
-                  {/* Bottom Action Status Pill */}
-                  <span className="text-[10px] font-mono tracking-wider uppercase bg-black/75 px-3 py-0.5 rounded-full text-white/90 border border-white/10">
-                    {isScanning
-                      ? "PROCESSING AI INFERENCE..."
-                      : overlayResult?.status === "deactivated"
-                      ? "USER DEACTIVATED"
-                      : overlayResult?.status === "granted"
-                      ? "FACE VERIFIED"
-                      : overlayResult?.status === "denied"
-                      ? "ACCESS DENIED"
-                      : "ALIGN FACE"}
-                  </span>
-                </div>
+                  {/* Top Minimal Alignment Indicator */}
+                  <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
 
-                {/* Animated Laser Scanning Line */}
-                {isScanning && (
-                  <div className="absolute inset-x-2 top-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-pulse" />
-                )}
+                  {/* Bottom Action Status Pill */}
+                  <div className="px-3 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-[10px] font-mono tracking-wider uppercase text-white/90 flex items-center gap-1.5 shadow-md">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        overlayResult?.status === "granted"
+                          ? "bg-emerald-400 shadow-[0_0_6px_#10b981]"
+                          : overlayResult?.status === "unknown" || overlayResult?.status === "denied"
+                          ? "bg-rose-400 shadow-[0_0_6px_#f43f5e]"
+                          : overlayResult?.status === "face_low_quality" || overlayResult?.status === "ambiguous"
+                          ? "bg-amber-400 shadow-[0_0_6px_#f59e0b]"
+                          : overlayResult?.status === "person_no_face"
+                          ? "bg-cyan-400 shadow-[0_0_6px_#22d3ee]"
+                          : isScanning || overlayResult?.status === "processing"
+                          ? "bg-cyan-400 animate-ping"
+                          : "bg-white/60"
+                      }`}
+                    />
+                    <span>
+                      {isScanning || overlayResult?.status === "processing"
+                        ? "SCANNING BIOMETRICS..."
+                        : overlayResult?.status === "deactivated"
+                        ? "USER DEACTIVATED"
+                        : overlayResult?.status === "granted"
+                        ? "FACE VERIFIED"
+                        : overlayResult?.status === "no_person"
+                        ? "NO PERSON DETECTED"
+                        : overlayResult?.status === "person_no_face"
+                        ? "FACE NOT VISIBLE"
+                        : overlayResult?.status === "face_low_quality"
+                        ? "POOR BIOMETRIC QUALITY"
+                        : overlayResult?.status === "unknown"
+                        ? "UNKNOWN INDIVIDUAL"
+                        : overlayResult?.status === "denied"
+                        ? "ACCESS DENIED"
+                        : "POSITION FACE IN OVAL"}
+                    </span>
+                  </div>
+
+                  {/* Animated Laser Scanning Beam */}
+                  {(isScanning || overlayResult?.status === "processing") && (
+                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_16px_#22d3ee] animate-pulse top-1/2 -translate-y-1/2" />
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* OFF State Container */}
+        {/* OFF State Container (Modern Terminal Standby) */}
         {!isCameraOn && !isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/40 p-4 sm:p-6 text-center gap-3">
-            <div className="p-3.5 sm:p-4 bg-muted rounded-full text-muted-foreground border border-border">
-              <CameraOff className="w-7 h-7 sm:w-8 sm:h-8" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-card/90 via-card/60 to-background/95 p-6 text-center gap-4 select-none">
+            <div className="w-16 h-16 rounded-2xl bg-muted/60 border border-border/80 flex items-center justify-center text-muted-foreground shadow-inner">
+              <CameraOff className="w-8 h-8 opacity-75" />
             </div>
-            <div>
-              <h4 className="text-sm font-semibold text-foreground mb-1">Webcam Simulation Powered Off</h4>
-              <p className="text-xs text-muted-foreground max-w-xs sm:max-w-sm">
-                Click &quot;Turn On Camera&quot; to initialize video feed and test real-time face recognition.
+            <div className="space-y-1 max-w-xs">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted/80 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border border-border/60 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
+                <span>TERMINAL STANDBY</span>
+              </div>
+              <h4 className="text-sm font-semibold text-foreground tracking-tight">Camera Feed Disconnected</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Activate the webcam to start real-time human detection and facial verification.
               </p>
             </div>
             <button
               onClick={onToggleCamera}
-              className="mt-1 sm:mt-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              className="mt-1 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer hover:shadow-primary/20 active:scale-[0.98]"
             >
-              <Video className="w-4 h-4" /> Turn On Camera
+              <Video className="w-4 h-4" />
+              <span>Turn On Camera</span>
             </button>
           </div>
         )}

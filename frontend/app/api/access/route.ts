@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateEmbedding, FastAPIError } from "@/lib/ai/fastapi";
+import { analyzeImage, FastAPIError } from "@/lib/ai/fastapi";
 import { findTopFaceMatches } from "@/lib/ai/face-recognition";
 import { evaluateAccess } from "@/lib/access/access-control";
 import { authenticateDevice } from "@/lib/access/device-auth";
@@ -126,10 +126,10 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await imageFile.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
 
-    // 3. Step 3: Run Milestone 6 recognition service
+    // 3. Step 3: Run Unified YOLO Person Detection & InsightFace Biometric Pipeline
     let aiResult;
     try {
-      aiResult = await generateEmbedding(imageBuffer, imageFile.name || "access.jpg");
+      aiResult = await analyzeImage(imageBuffer, imageFile.name || "access.jpg");
     } catch (aiErr: any) {
       const processingTimeMs = Date.now() - startTime;
 
@@ -163,6 +163,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
+            status: "recognition_error",
+            person_detected: false,
+            face_detected: false,
             access_status: "denied",
             reason: "system_error",
             door_action: "lock",
@@ -177,11 +180,113 @@ export async function POST(req: NextRequest) {
       throw aiErr;
     }
 
-    // Perform vector search scoped to exact model
+    const processingTimeMs = Date.now() - startTime;
+
+    // Handle Non-Biometric Scenarios (No Person / Person with No Face / Low Quality Face)
+    // IMPORTANT: Suppress database AccessLog and Alert creation for these ephemeral states!
+    if (aiResult.status === "no_person") {
+      return NextResponse.json({
+        success: true,
+        status: "no_person",
+        person_detected: false,
+        face_detected: false,
+        access_status: "denied",
+        reason: "no_person_detected",
+        door_action: "no_action",
+        match_status: null,
+        message: aiResult.message || "No person detected in the camera frame.",
+        person: null,
+        face: null,
+        person_bbox: null,
+        face_bbox: null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: [],
+        faces: [],
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    if (aiResult.status === "person_no_face") {
+      return NextResponse.json({
+        success: true,
+        status: "person_no_face",
+        person_detected: true,
+        face_detected: false,
+        access_status: "denied",
+        reason: "no_face_detected",
+        door_action: "no_action",
+        match_status: null,
+        message: aiResult.message || "Person detected — no face visible in the frame.",
+        person: null,
+        face: null,
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: [],
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    if (aiResult.status === "face_low_quality" || !aiResult.embedding) {
+      return NextResponse.json({
+        success: true,
+        status: "face_low_quality",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "poor_quality_face",
+        door_action: "no_action",
+        match_status: null,
+        message:
+          aiResult.message ||
+          "Face detected with low quality or obstruction. Please face the camera directly in good lighting.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    // Step 4: Face Detected & Evaluated -> Perform pgvector similarity search
     const recognition = await findTopFaceMatches(aiResult.embedding, 2, aiResult.model || "buffalo_s");
 
-    // 4. Step 4: Evaluate Access Control Decision Rules
+    // Step 5: Evaluate Access Control Decision Rules
     const decision = evaluateAccess({
+      status: recognition.matchStatus === "matched" ? "known_individual" : "unknown_individual",
       matchStatus: recognition.matchStatus,
       person: recognition.person,
       similarity: recognition.face.similarity,
@@ -189,14 +294,17 @@ export async function POST(req: NextRequest) {
       qualityScore: recognition.face.qualityScore,
     });
 
-    const processingTimeMs = Date.now() - startTime;
+    const isDeactivated = Boolean(
+      recognition.person &&
+      (recognition.person.status || "active").toLowerCase() !== "active"
+    );
 
-    // 5. Step 5 & 6: Persist AccessLog and Security Alert in PostgreSQL
+    // Step 6: Persist AccessLog and Security Alert in PostgreSQL ONLY for evaluated biometric events
     const matchedPersonId = recognition.person?.id || null;
     const matchedEmbeddingId = recognition.face?.embeddingId || null;
 
     // Create AccessLog record
-    const accessLog = await prisma.accessLog.create({
+    await prisma.accessLog.create({
       data: {
         deviceId: deviceAuth.device?.id || null,
         personId: matchedPersonId,
@@ -235,7 +343,7 @@ export async function POST(req: NextRequest) {
             severity: "medium",
           },
         });
-      } else if (recognition.person && (recognition.person.status || "active") !== "active") {
+      } else if (isDeactivated && recognition.person) {
         const personStatus = recognition.person.status || "inactive";
         await prisma.alert.create({
           data: {
@@ -250,14 +358,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const isDeactivated = Boolean(
-      recognition.person &&
-      (recognition.person.status || "active").toLowerCase() !== "active"
-    );
+    const finalStatus: "known_individual" | "unknown_individual" =
+      decision.accessStatus === "granted" ? "known_individual" : "unknown_individual";
 
-    // 7. Step 7: Return structured access response (NO raw 512 floats)
+    // Step 7: Return structured access response (including person and face bounding boxes)
     return NextResponse.json({
       success: true,
+      status: finalStatus,
+      person_detected: true,
+      face_detected: true,
       access_status: decision.accessStatus,
       reason: decision.reason,
       door_action: decision.doorAction,
@@ -284,6 +393,12 @@ export async function POST(req: NextRequest) {
         quality_score: recognition.face.qualityScore ?? aiResult.qualityScore,
         model: recognition.face.model || aiResult.model,
       },
+      person_bbox: aiResult.primaryPersonBbox || null,
+      face_bbox: aiResult.primaryFaceBbox || null,
+      image_width: aiResult.imageWidth,
+      image_height: aiResult.imageHeight,
+      persons: aiResult.persons,
+      faces: aiResult.faces,
       device: deviceAuth.device
         ? {
             id: deviceAuth.device.id,

@@ -1,15 +1,28 @@
 export interface AccessScanResponse {
   success: boolean;
+  status?:
+    | "no_person"
+    | "person_no_face"
+    | "face_low_quality"
+    | "face_detected_processing"
+    | "known_individual"
+    | "unknown_individual"
+    | "recognition_error";
+  person_detected?: boolean;
+  face_detected?: boolean;
   access_status: "granted" | "denied";
   reason:
     | "face_match"
     | "face_no_match"
+    | "no_person_detected"
+    | "no_face_detected"
+    | "poor_quality_face"
     | "insufficient_confidence"
     | "time_restriction"
     | "manual_override"
     | "system_error";
   door_action: "unlock" | "lock" | "no_action";
-  match_status: "matched" | "unknown" | "ambiguous" | "rejected";
+  match_status?: "matched" | "unknown" | "ambiguous" | "rejected" | null;
   person?: {
     id: number;
     person_code: string;
@@ -27,6 +40,12 @@ export interface AccessScanResponse {
     quality_score?: number | null;
     model?: string;
   };
+  person_bbox?: number[] | null;
+  face_bbox?: number[] | null;
+  image_width?: number;
+  image_height?: number;
+  persons?: Array<{ bbox: number[]; confidence: number; is_primary: boolean }>;
+  faces?: Array<{ bbox: number[]; confidence: number; landmarks?: number[][] }>;
   device?: {
     id: number;
     serial_number: string;
@@ -66,6 +85,9 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
   if (!response.ok && !data.access_status) {
     return {
       success: false,
+      status: "recognition_error",
+      person_detected: false,
+      face_detected: false,
       access_status: "denied",
       reason: "system_error",
       door_action: "lock",
