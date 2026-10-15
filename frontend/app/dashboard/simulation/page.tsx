@@ -6,7 +6,7 @@ import { AccessResultCard } from "@/components/ai/access-result-card";
 import { LiveScanControls } from "@/components/ai/live-scan-controls";
 import { scanFace, AccessScanResponse } from "@/lib/access/access-client";
 import { playBiometricSound } from "@/lib/audio";
-import { Camera, History, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Camera, History, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ShieldAlert } from "lucide-react";
 
 export interface ScanHistoryItem {
   id: string;
@@ -33,11 +33,13 @@ export default function WebcamSimulationPage() {
   const [scanCount, setScanCount] = useState<number>(0);
   const [lastScanTime, setLastScanTime] = useState<string | null>(null);
 
-  // Refs for race-condition & stale response guards
+  // Guards against race conditions, overlapping requests, and stale responses
   const isMonitoringRef = useRef<boolean>(false);
   const isCameraOnRef = useRef<boolean>(false);
   const inFlightRef = useRef<boolean>(false);
   const requestSequenceRef = useRef<number>(0);
+  const soundEnabledRef = useRef<boolean>(soundEnabled);
+  const overlayTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     isMonitoringRef.current = isMonitoring;
@@ -47,6 +49,10 @@ export default function WebcamSimulationPage() {
     isCameraOnRef.current = isCameraOn;
   }, [isCameraOn]);
 
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
   // Turn Camera On / Off
   const handleToggleCamera = useCallback(() => {
     setIsCameraOn((prev) => {
@@ -55,19 +61,38 @@ export default function WebcamSimulationPage() {
         setIsMonitoring(false);
         setIsCameraReady(false);
         setCameraOverlay(null);
+        if (overlayTimerRef.current) {
+          clearTimeout(overlayTimerRef.current);
+          overlayTimerRef.current = null;
+        }
       }
       return next;
     });
   }, []);
 
-  // Cleanup blob URLs on unmount
+  const handleCameraStatusChange = useCallback((ready: boolean) => {
+    setIsCameraReady(ready);
+    if (!ready) {
+      setIsMonitoring(false);
+    }
+  }, []);
+
+  const capturedImageUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    capturedImageUrlRef.current = capturedImageUrl;
+  }, [capturedImageUrl]);
+
+  // Cleanup blob URLs and timers on unmount
   useEffect(() => {
     return () => {
-      if (capturedImageUrl && capturedImageUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(capturedImageUrl);
+      if (capturedImageUrlRef.current && capturedImageUrlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(capturedImageUrlRef.current);
+      }
+      if (overlayTimerRef.current) {
+        clearTimeout(overlayTimerRef.current);
       }
     };
-  }, [capturedImageUrl]);
+  }, []);
 
   // Execute a single face scan
   const executeScan = useCallback(async () => {
@@ -87,7 +112,12 @@ export default function WebcamSimulationPage() {
 
       // Create snapshot URL for side-by-side comparison
       const previewUrl = URL.createObjectURL(imageBlob);
-      setCapturedImageUrl(previewUrl);
+      setCapturedImageUrl((prev) => {
+        if (prev && prev.startsWith("blob:")) {
+          URL.revokeObjectURL(prev);
+        }
+        return previewUrl;
+      });
 
       const response = await scanFace(imageBlob);
 
@@ -101,8 +131,8 @@ export default function WebcamSimulationPage() {
       setLastScanTime(timeStr);
       setScanCount((prev) => prev + 1);
 
-      // Auditory Feedback Chime
-      if (soundEnabled) {
+      // Auditory Feedback Chime (reading stable ref so callback does not rebind)
+      if (soundEnabledRef.current) {
         playBiometricSound(response.access_status === "granted" ? "granted" : "denied");
       }
 
@@ -122,8 +152,13 @@ export default function WebcamSimulationPage() {
         similarity: response.face?.similarity,
       });
 
-      setTimeout(() => {
-        setCameraOverlay((current) => (current?.name === (isDeactivated ? `${personName || "User"} (Deactivated)` : personName) ? null : current));
+      if (overlayTimerRef.current) {
+        clearTimeout(overlayTimerRef.current);
+      }
+
+      overlayTimerRef.current = setTimeout(() => {
+        setCameraOverlay(null);
+        overlayTimerRef.current = null;
       }, 3500);
 
       // Add to local scan history (limit to 10 entries)
@@ -150,7 +185,7 @@ export default function WebcamSimulationPage() {
       inFlightRef.current = false;
       setIsScanning(false);
     }
-  }, [soundEnabled]);
+  }, []);
 
   // Continuous monitoring timer loop (2.5s interval)
   useEffect(() => {
@@ -164,8 +199,6 @@ export default function WebcamSimulationPage() {
           executeScan();
         }
       }, 2500);
-    } else {
-      if (intervalId) clearInterval(intervalId);
     }
 
     return () => {
@@ -174,7 +207,7 @@ export default function WebcamSimulationPage() {
   }, [isCameraOn, isMonitoring, isCameraReady, executeScan]);
 
   const handleToggleMonitoring = () => {
-    if (!isCameraOn) return;
+    if (!isCameraOn || !isCameraReady) return;
     setIsMonitoring((prev) => !prev);
   };
 
@@ -197,15 +230,17 @@ export default function WebcamSimulationPage() {
 
       {/* Main Grid: Camera Feed & Decision Result Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Live Camera Feed with Biometric HUD & Controls (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        {/* Left Column: Live Camera Feed with Biometric HUD & Controls (5 cols on lg) */}
+        <div className="lg:col-span-5 space-y-4">
           <LiveCameraPreview
             ref={cameraRef}
             isCameraOn={isCameraOn}
             onToggleCamera={handleToggleCamera}
-            onCameraStatusChange={setIsCameraReady}
+            onCameraStatusChange={handleCameraStatusChange}
             isScanning={isScanning}
             overlayResult={cameraOverlay}
+            mirrored={true}
+            showHud={true}
           />
 
           {/* Scan Control Panel directly under Camera Preview */}
@@ -224,8 +259,8 @@ export default function WebcamSimulationPage() {
           />
         </div>
 
-        {/* Right Column: Access Decision Result Card with Side-by-Side Verification (5 cols) */}
-        <div className="lg:col-span-5 h-full">
+        {/* Right Column: Access Decision Result Card with Side-by-Side Verification (7 cols on lg) */}
+        <div className="lg:col-span-7 h-full">
           <AccessResultCard
             result={latestResult}
             isLoading={isScanning && !latestResult}

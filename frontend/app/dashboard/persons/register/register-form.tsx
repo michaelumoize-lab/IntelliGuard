@@ -72,7 +72,10 @@ export function RegisterPersonForm() {
     };
   }, [imagePreview]);
 
+  const precheckRequestIdRef = React.useRef(0);
+
   const runQualityPrecheck = async (file: File) => {
+    const currentRequestId = ++precheckRequestIdRef.current;
     setPrecheckStatus("checking");
     setPrecheckData(null);
     try {
@@ -83,6 +86,8 @@ export function RegisterPersonForm() {
         body: fd,
       });
       const data = await res.json();
+      if (precheckRequestIdRef.current !== currentRequestId) return;
+
       if (res.ok && data.success) {
         setPrecheckStatus(data.qualityStatus || "optimal");
         setPrecheckData({
@@ -103,6 +108,7 @@ export function RegisterPersonForm() {
         });
       }
     } catch (err: any) {
+      if (precheckRequestIdRef.current !== currentRequestId) return;
       console.warn("Precheck non-blocking error:", err);
       setPrecheckStatus("idle");
     }
@@ -192,7 +198,7 @@ export function RegisterPersonForm() {
               <div>
                 <CardTitle className="text-lg">Biometric Identity Enrollment</CardTitle>
                 <CardDescription className="text-xs">
-                  Register an individual and extract 512D ArcFace embeddings for instant face recognition.
+                  Register an individual and enroll biometric facial identity for instant recognition.
                 </CardDescription>
               </div>
             </div>
@@ -211,7 +217,7 @@ export function RegisterPersonForm() {
               <InfoIcon className="h-4 w-4 text-blue-500 shrink-0" />
               <AlertTitle className="text-xs font-semibold">Face Photo Quality Guidelines</AlertTitle>
               <AlertDescription className="text-xs opacity-90">
-                Ensure exactly <strong>one front-facing face</strong> is clearly visible and well-lit. The InsightFace AI engine automatically crops, aligns, and generates normalized 512D vector embeddings.
+                Ensure exactly <strong>one front-facing face</strong> is clearly visible and well-lit. The biometric system automatically detects, aligns, and verifies the identity.
               </AlertDescription>
             </Alert>
 
@@ -268,7 +274,7 @@ export function RegisterPersonForm() {
                   <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                   <div className="flex-1">
                     <p className="font-semibold">AI Biometric Pre-Check Running...</p>
-                    <p className="text-[11px] text-muted-foreground">Probing InsightFace engine for facial boundary and landmark alignment.</p>
+                    <p className="text-[11px] text-muted-foreground">Checking facial boundary and key landmark alignment.</p>
                   </div>
                 </div>
               )}
@@ -475,12 +481,12 @@ export function RegisterPersonForm() {
             {isLoading ? (
               <>
                 <Loader className="w-3.5 h-3.5 animate-spin" />
-                <span>Processing InsightFace AI...</span>
+                <span>Processing Biometrics...</span>
               </>
             ) : (
               <>
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>Enroll Person & Extract Embedding</span>
+                <span>Enroll Person</span>
               </>
             )}
           </Button>

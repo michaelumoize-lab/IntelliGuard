@@ -27,7 +27,7 @@ export function LandingHeaderAuth({ user }: LandingHeaderAuthProps) {
   // When client session finishes loading, use it for live updates (e.g. sign out).
   const effectiveUser = isPending
     ? user
-    : (clientSession?.user ?? user);
+    : (clientSession?.user ?? null);
 
   const isAuthenticated = !!effectiveUser;
 

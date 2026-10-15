@@ -97,14 +97,13 @@ export async function POST(req: NextRequest) {
           ? "Replay attack detected: unique nonce has already been consumed."
           : `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`;
 
-        if (isReplay) {
-          const parsedDevId = deviceIdInput ? parseInt(String(deviceIdInput), 10) : null;
+        if (isReplay && deviceAuth.device) {
           await prisma.alert.create({
             data: {
-              deviceId: isNaN(Number(parsedDevId)) ? null : parsedDevId,
+              deviceId: deviceAuth.device.id,
               alertType: "unauthorized_access",
               title: "Replay Attack Detected",
-              message: `Device #${deviceIdInput} submitted an invalid or repeated access request (${deviceAuth.reason}). Request blocked.`,
+              message: `Device #${deviceAuth.device.id} (${deviceAuth.device.deviceName}) submitted an invalid or repeated access request (${deviceAuth.reason}). Request blocked.`,
               severity: "critical",
             },
           });

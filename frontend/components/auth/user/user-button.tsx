@@ -133,7 +133,7 @@ export function UserButton({
   const effectiveUser =
     sessionPending && user !== undefined
       ? user
-      : (clientSession?.user ?? user)
+      : (clientSession?.user ?? null)
 
   const hasSession = !!effectiveUser
 

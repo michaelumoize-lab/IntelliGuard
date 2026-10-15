@@ -41,6 +41,30 @@ export async function checkForDuplicateFace(
       similarity: number;
     }>;
 
+    // Check if active embeddings exist on other models to prevent silent skipping
+    const mismatchedEmbedding = await prisma.faceEmbedding.findFirst({
+      where: {
+        isActive: true,
+        NOT: {
+          embeddingModel: {
+            equals: modelName,
+            mode: "insensitive",
+          },
+        },
+      },
+      select: {
+        id: true,
+        embeddingModel: true,
+        personId: true,
+      },
+    });
+
+    if (mismatchedEmbedding) {
+      console.warn(
+        `Active face embedding #${mismatchedEmbedding.id} for person #${mismatchedEmbedding.personId} uses model '${mismatchedEmbedding.embeddingModel}', which does not match active duplicate-check model '${modelName}'. Active embeddings must be re-embedded with '${modelName}'.`
+      );
+    }
+
     if (excludePersonId !== undefined && excludePersonId !== null) {
       results = await prisma.$queryRawUnsafe(
         `

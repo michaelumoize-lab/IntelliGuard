@@ -13,6 +13,12 @@ class Settings:
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s")
     MAX_CONCURRENT_INFERENCE: int = int(os.getenv("MAX_CONCURRENT_INFERENCE", "2"))
+
+    def __init__(self) -> None:
+        if self.MAX_CONCURRENT_INFERENCE < 1:
+            raise ValueError(
+                f"MAX_CONCURRENT_INFERENCE must be at least 1, got {self.MAX_CONCURRENT_INFERENCE}"
+            )
     
     # Raw CORS string
     _allowed_origins_raw: str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")

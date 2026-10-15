@@ -17,7 +17,7 @@ export default function RegisterPersonPage() {
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Register New Person</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Enroll a new individual into the IntelliGuard biometric database with automatic 512D face vector generation.
+            Enroll a new individual into the IntelliGuard biometric database for real-time face verification.
           </p>
         </div>
       </div>
