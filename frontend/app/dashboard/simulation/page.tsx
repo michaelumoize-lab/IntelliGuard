@@ -77,17 +77,22 @@ export default function WebcamSimulationPage() {
     }
   }, []);
 
+  const capturedImageUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    capturedImageUrlRef.current = capturedImageUrl;
+  }, [capturedImageUrl]);
+
   // Cleanup blob URLs and timers on unmount
   useEffect(() => {
     return () => {
-      if (capturedImageUrl && capturedImageUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(capturedImageUrl);
+      if (capturedImageUrlRef.current && capturedImageUrlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(capturedImageUrlRef.current);
       }
       if (overlayTimerRef.current) {
         clearTimeout(overlayTimerRef.current);
       }
     };
-  }, [capturedImageUrl]);
+  }, []);
 
   // Execute a single face scan
   const executeScan = useCallback(async () => {

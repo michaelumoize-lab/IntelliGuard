@@ -66,7 +66,6 @@ export function CommandPalette() {
             >
               <Camera className="w-4 h-4 text-primary" />
               <span>Launch Live Camera Scan</span>
-              <CommandShortcut>S</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => runCommand(() => router.push("/dashboard/persons/register"))}
@@ -74,7 +73,6 @@ export function CommandPalette() {
             >
               <UserPlus className="w-4 h-4 text-emerald-500" />
               <span>Enroll New Biometric Identity</span>
-              <CommandShortcut>N</CommandShortcut>
             </CommandItem>
           </CommandGroup>
 

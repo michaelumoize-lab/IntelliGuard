@@ -215,7 +215,6 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
         </div>
         <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
           <span>0.00</span>
-          <span>Threshold: 0.50</span>
           <span>1.00</span>
         </div>
       </div>

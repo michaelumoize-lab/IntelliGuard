@@ -143,7 +143,9 @@ export async function GET(req: NextRequest) {
       return result;
     })
     .finally(() => {
-      activeProbePromise = null;
+      if (activeProbePromise === probePromise) {
+        activeProbePromise = null;
+      }
     });
 
   activeProbePromise = probePromise;

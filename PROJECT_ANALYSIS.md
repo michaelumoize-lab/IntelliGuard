@@ -40,7 +40,7 @@ IntelliGuard addresses these challenges by employing an **asymmetric edge-cloud 
 Standard electronic access control systems cannot reliably prevent identity spoofing while remaining scalable, auditable, and cost-effective. Furthermore, embedded AI systems frequently falter when developers attempt to run heavy neural networks directly on edge microcontrollers or tightly couple biometric inference with web application servers.
 
 ### Documented Project Objectives
-As defined in [README.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/README.md) and [ARCHITECTURE.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ARCHITECTURE.md):
+As defined in [README.md](./README.md) and [ARCHITECTURE.md](./ARCHITECTURE.md):
 1. **AI Face Recognition Pipeline:** Build an accurate biometric pipeline extracting 512D ArcFace embeddings with composite image quality validation (sharpness, resolution, and detection confidence).
 2. **PostgreSQL Vector Persistence:** Store and search biometric embeddings directly in PostgreSQL using `pgvector` cosine similarity (`<=>`).
 3. **Fail-Closed Access Control Engine:** Implement deterministic security rules evaluating similarity thresholds, ambiguity margins between competing candidates, and user deactivation states.
@@ -71,20 +71,20 @@ As defined in [README.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20A
 ### 5.1 Biometric Enrollment & Quality Precheck
 * **What it does:** Enrolls individuals into the database with validated biometric vectors. Includes a live client-side precheck that evaluates image quality prior to form submission.
 * **Implementation:**
-  * Endpoint: [`POST /api/persons`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/persons/route.ts#L14-L225)
-  * Precheck Endpoint: [`POST /api/persons/precheck`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/persons/precheck/route.ts#L7-L83)
-  * Form UI: [`register-form.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/persons/register/register-form.tsx)
-  * Webcam Capture Modal: [`webcam-capture-modal.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/components/ai/webcam-capture-modal.tsx)
+  * Endpoint: [`POST /api/persons`](./frontend/app/api/persons/route.ts#L14-L225)
+  * Precheck Endpoint: [`POST /api/persons/precheck`](./frontend/app/api/persons/precheck/route.ts#L7-L83)
+  * Form UI: [`register-form.tsx`](./frontend/app/dashboard/persons/register/register-form.tsx)
+  * Webcam Capture Modal: [`webcam-capture-modal.tsx`](./frontend/components/ai/webcam-capture-modal.tsx)
 * **Key Mechanisms:**
   * Enforces single-face presence (rejects zero faces or multiple faces with HTTP 400).
-  * Runs [`checkForDuplicateFace`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/ai/duplicate-check.ts#L19-L100) using pgvector at an 85% cosine similarity threshold to prevent duplicate enrollments under different names.
+  * Runs [`checkForDuplicateFace`](./frontend/lib/ai/duplicate-check.ts#L19-L100) using pgvector at an 85% cosine similarity threshold to prevent duplicate enrollments under different names.
   * Uploads original portraits to ImageKit cloud storage (`/intelliguard/persons/`).
-  * Executes an atomic database transaction via Prisma; if the DB write fails, it executes an automated compensating rollback to delete the uploaded ImageKit asset ([`deleteFaceImage`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/ai/imagekit.ts#L102-L112)).
+  * Executes an atomic database transaction via Prisma; if the DB write fails, it executes an automated compensating rollback to delete the uploaded ImageKit asset ([`deleteFaceImage`](./frontend/lib/ai/imagekit.ts#L102-L112)).
 * **Status:** Complete and fully verified with integration tests.
 
 ### 5.2 Face Replacement & Biometric Re-enrollment
 * **What it does:** Allows administrators to update a person's biometric portrait without losing historical records.
-* **Implementation:** [`POST /api/persons/[id]/face`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/persons/%5Bid%5D/face/route.ts#L10-L194) and [`replace-face-modal.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/components/ai/replace-face-modal.tsx).
+* **Implementation:** [`POST /api/persons/[id]/face`](./frontend/app/api/persons/%5Bid%5D/face/route.ts#L10-L194) and [`replace-face-modal.tsx`](./frontend/components/ai/replace-face-modal.tsx).
 * **Key Mechanisms:**
   * Runs duplicate detection excluding the person's own ID (`excludePersonId`).
   * Deactivates older `FaceEmbedding` records (`isActive: false`) and inserts the new active vector.
@@ -94,9 +94,9 @@ As defined in [README.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20A
 ### 5.3 Core Access Control & Recognition Engine
 * **What it does:** Ingests captured frames, runs AI inference, performs vector search, evaluates business rules, and outputs door unlock commands.
 * **Implementation:**
-  * Route Handler: [`POST /api/access`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/access/route.ts#L11-L287)
-  * Vector Search: [`findTopFaceMatches`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/ai/face-recognition.ts#L50-L214)
-  * Rule Engine: [`evaluateAccess`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/access/access-control.ts#L41-L106)
+  * Route Handler: [`POST /api/access`](./frontend/app/api/access/route.ts#L11-L287)
+  * Vector Search: [`findTopFaceMatches`](./frontend/lib/ai/face-recognition.ts#L50-L214)
+  * Rule Engine: [`evaluateAccess`](./frontend/lib/access/access-control.ts#L41-L106)
 * **Access Rules:**
   * **Rule 1 (Matched):** `matchStatus === "matched"`, person `status === "active"`, and `similarity >= FACE_MATCH_THRESHOLD` (default: 0.50) $\rightarrow$ `GRANTED`, `doorAction: "unlock"`.
   * **Rule 2 (Unknown):** Best candidate similarity $< 0.50 \rightarrow$ `DENIED`, `doorAction: "lock"`, creates `unknown_face` Alert.
@@ -108,7 +108,7 @@ As defined in [README.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20A
 
 ### 5.4 Live Webcam Simulation Terminal
 * **What it does:** Browser-based biometric terminal for desktop testing without physical ESP32 hardware.
-* **Implementation:** [`app/dashboard/simulation/page.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/simulation/page.tsx), [`live-camera-preview.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/components/ai/live-camera-preview.tsx), [`access-result-card.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/components/ai/access-result-card.tsx), and [`audio.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/audio.ts).
+* **Implementation:** [`app/dashboard/simulation/page.tsx`](./frontend/app/dashboard/simulation/page.tsx), [`live-camera-preview.tsx`](./frontend/components/ai/live-camera-preview.tsx), [`access-result-card.tsx`](./frontend/components/ai/access-result-card.tsx), and [`audio.ts`](./frontend/lib/audio.ts).
 * **Key Features:**
   * Canvas-rendered futuristic scanning HUD overlay with animated scanline.
   * Single-scan or automated continuous monitoring loop (2.5s interval).
@@ -121,9 +121,9 @@ As defined in [README.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20A
 ### 5.5 IoT Device Management & Authentication
 * **What it does:** Registers, manages, and authenticates edge camera terminals and door controllers.
 * **Implementation:**
-  * API Routes: [`app/api/devices/route.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/devices/route.ts), [`app/api/devices/[id]/route.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/devices/%5Bid%5D/route.ts), and [`app/api/devices/[id]/regenerate-key/route.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/devices/%5Bid%5D/regenerate-key/route.ts)
-  * Authentication Helper: [`device-auth.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/access/device-auth.ts)
-  * UI: [`app/dashboard/devices/page.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/devices/page.tsx) and [`app/dashboard/devices/[id]/page.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/devices/%5Bid%5D/page.tsx)
+  * API Routes: [`app/api/devices/route.ts`](./frontend/app/api/devices/route.ts), [`app/api/devices/[id]/route.ts`](./frontend/app/api/devices/%5Bid%5D/route.ts), and [`app/api/devices/[id]/regenerate-key/route.ts`](./frontend/app/api/devices/%5Bid%5D/regenerate-key/route.ts)
+  * Authentication Helper: [`device-auth.ts`](./frontend/lib/access/device-auth.ts)
+  * UI: [`app/dashboard/devices/page.tsx`](./frontend/app/dashboard/devices/page.tsx) and [`app/dashboard/devices/[id]/page.tsx`](./frontend/app/dashboard/devices/%5Bid%5D/page.tsx)
 * **Security Design:**
   * Generates 24-byte cryptographically secure random API keys prefixed with `ig_dev_`.
   * Computes SHA-256 hash; stores only `apiKeyHash` in PostgreSQL; plaintext key is displayed once in modal.
@@ -135,10 +135,10 @@ As defined in [README.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20A
 ### 5.6 Security Telemetry, Dashboard Analytics, & Health Probes
 * **What it does:** Displays real-time KPIs, recognition breakdowns, activity timelines, and microservice health checks.
 * **Implementation:**
-  * Main Dashboard: [`app/dashboard/page.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/page.tsx)
-  * Stats API: [`GET /api/dashboard/stats`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/dashboard/stats/route.ts)
-  * Health Probe API: [`GET /api/dashboard/health`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/dashboard/health/route.ts)
-  * Event Activity API: [`GET /api/dashboard/activity`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/dashboard/activity/route.ts)
+  * Main Dashboard: [`app/dashboard/page.tsx`](./frontend/app/dashboard/page.tsx)
+  * Stats API: [`GET /api/dashboard/stats`](./frontend/app/api/dashboard/stats/route.ts)
+  * Health Probe API: [`GET /api/dashboard/health`](./frontend/app/api/dashboard/health/route.ts)
+  * Event Activity API: [`GET /api/dashboard/activity`](./frontend/app/api/dashboard/activity/route.ts)
 * **Key Components:**
   * 6 KPI cards (Total registered, active personnel, today's attempts, today's granted, today's denied, active alerts).
   * Recharts area chart breaking down today's access attempts into 4-hour time slots.
@@ -149,10 +149,10 @@ As defined in [README.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20A
 ### 5.7 Audit Logs & Security Alerts Center
 * **What it does:** Provides queryable, filterable access audit records and actionable security alert management.
 * **Implementation:**
-  * Access Logs Page: [`app/dashboard/access-logs/page.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/access-logs/page.tsx)
-  * Access Logs API: [`GET /api/access/logs`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/access/logs/route.ts)
-  * Alerts Page: [`app/dashboard/alerts/page.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/alerts/page.tsx)
-  * Alerts API: [`GET /api/alerts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/alerts/route.ts) & [`PATCH /api/alerts/[id]`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/alerts/%5Bid%5D/route.ts)
+  * Access Logs Page: [`app/dashboard/access-logs/page.tsx`](./frontend/app/dashboard/access-logs/page.tsx)
+  * Access Logs API: [`GET /api/access/logs`](./frontend/app/api/access/logs/route.ts)
+  * Alerts Page: [`app/dashboard/alerts/page.tsx`](./frontend/app/dashboard/alerts/page.tsx)
+  * Alerts API: [`GET /api/alerts`](./frontend/app/api/alerts/route.ts) & [`PATCH /api/alerts/[id]`](./frontend/app/api/alerts/%5Bid%5D/route.ts)
 * **Features:** Full pagination, debounce search, status filtering, and one-click alert resolution.
 * **Status:** Complete.
 
@@ -295,37 +295,37 @@ sequenceDiagram
 ## 9. Codebase Structure and Important Files
 
 ### 9.1 Root Level Configuration
-* [`README.md`](file:///c:/Users/Michael%20Umoize/Desktop/Learning AI-ML/IntelliGuard/README.md): Primary system documentation, architecture overview, and project roadmap.
-* [`ARCHITECTURE.md`](file:///c:/Users/Michael%20Umoize/Desktop/Learning AI-ML/IntelliGuard/ARCHITECTURE.md): Architectural specification of layer boundaries, registration workflows, and fail-closed policies.
-* [`IMPROVEMENTS.md`](file:///c:/Users/Michael%20Umoize/Desktop/Learning AI-ML/IntelliGuard/IMPROVEMENTS.md): Future engineering roadmap for MQTT, deep sleep, liveness detection, and academic evaluation.
-* [`vercel.json`](file:///c:/Users/Michael%20Umoize/Desktop/Learning AI-ML/IntelliGuard/vercel.json): Vercel multi-service routing configuration.
+* [`README.md`](./README.md): Primary system documentation, architecture overview, and project roadmap.
+* [`ARCHITECTURE.md`](./ARCHITECTURE.md): Architectural specification of layer boundaries, registration workflows, and fail-closed policies.
+* [`IMPROVEMENTS.md`](./IMPROVEMENTS.md): Future engineering roadmap for MQTT, deep sleep, liveness detection, and academic evaluation.
+* [`vercel.json`](./vercel.json): Vercel multi-service routing configuration.
 
 ### 9.2 Python AI Microservice (`ai-service/`)
-* [`app/main.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/main.py): FastAPI application initialization, lifespan event handler (model preloading), CORS middleware, and route mounting.
-* [`app/core/config.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/core/config.py): Configuration parser for environment variables (`INSIGHTFACE_MODEL`, `ALLOWED_ORIGINS`).
-* [`app/core/insightface.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/core/insightface.py): Model lifecycle manager, selective ONNX weight loader (`ensure_minimal_models` discards 143MB unused 3D landmark weights), threadpool configuration, and inference semaphore (`asyncio.Semaphore(1)`).
-* [`app/core/image.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/core/image.py): OpenCV image decoding routines from raw bytes and base64 strings with decompression bomb protections (10MB payload cap, 4096px dimension cap).
-* [`app/core/quality.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/core/quality.py): Composite biometric quality formula combining detection score (40%), bounding box size factor (30%), and Laplacian variance sharpness (30%).
-* [`app/api/v1/endpoints/detect.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/api/v1/endpoints/detect.py): Bounding box and 5-point facial landmark detection endpoint.
-* [`app/api/v1/endpoints/embedding.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/api/v1/endpoints/embedding.py): ArcFace 512D embedding extractor enforcing single-face presence and L2 vector normalization.
-* [`app/api/v1/endpoints/health.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/api/v1/endpoints/health.py): Health probe endpoint reporting model loading status and active execution provider without reloading models.
-* [`tests/test_detect.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/tests/test_detect.py) & [`tests/test_embedding.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/tests/test_embedding.py): Pytest unit test suites covering single-face, multi-face, zero-face, dimensions, size limits, and vector determinism.
+* [`app/main.py`](./ai-service/app/main.py): FastAPI application initialization, lifespan event handler (model preloading), CORS middleware, and route mounting.
+* [`app/core/config.py`](./ai-service/app/core/config.py): Configuration parser for environment variables (`INSIGHTFACE_MODEL`, `ALLOWED_ORIGINS`).
+* [`app/core/insightface.py`](./ai-service/app/core/insightface.py): Model lifecycle manager, selective ONNX weight loader (`ensure_minimal_models` discards 143MB unused 3D landmark weights), threadpool configuration, and inference semaphore (`asyncio.Semaphore(1)`).
+* [`app/core/image.py`](./ai-service/app/core/image.py): OpenCV image decoding routines from raw bytes and base64 strings with decompression bomb protections (10MB payload cap, 4096px dimension cap).
+* [`app/core/quality.py`](./ai-service/app/core/quality.py): Composite biometric quality formula combining detection score (40%), bounding box size factor (30%), and Laplacian variance sharpness (30%).
+* [`app/api/v1/endpoints/detect.py`](./ai-service/app/api/v1/endpoints/detect.py): Bounding box and 5-point facial landmark detection endpoint.
+* [`app/api/v1/endpoints/embedding.py`](./ai-service/app/api/v1/endpoints/embedding.py): ArcFace 512D embedding extractor enforcing single-face presence and L2 vector normalization.
+* [`app/api/v1/endpoints/health.py`](./ai-service/app/api/v1/endpoints/health.py): Health probe endpoint reporting model loading status and active execution provider without reloading models.
+* [`tests/test_detect.py`](./ai-service/tests/test_detect.py) & [`tests/test_embedding.py`](./ai-service/tests/test_embedding.py): Pytest unit test suites covering single-face, multi-face, zero-face, dimensions, size limits, and vector determinism.
 
 ### 9.3 Next.js Application & Backend (`frontend/`)
-* [`prisma/schema.prisma`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/prisma/schema.prisma): Database models including PostgreSQL extensions (`vector`), enums, relations, and table mappings.
-* [`lib/prisma.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/prisma.ts): Prisma client singleton utilizing `@prisma/adapter-neon` serverless connection pool.
-* [`lib/auth.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/auth.ts): Better Auth setup with administrative roles, multi-session, and session cookie security.
-* [`lib/ai/fastapi.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/ai/fastapi.ts): Server-side client wrapper for FastAPI endpoints with custom error handling (`FastAPIError`).
-* [`lib/ai/face-recognition.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/ai/face-recognition.ts): Executes native PostgreSQL `$queryRawUnsafe` vector cosine similarity search (`<=>`) and classifies match status (`matched`, `unknown`, `ambiguous`).
-* [`lib/ai/duplicate-check.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/ai/duplicate-check.ts): Proactive duplicate face search preventing enrollment of identical faces under multiple identities.
-* [`lib/ai/imagekit.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/ai/imagekit.ts): Cloud storage wrapper managing upload, deletion, and canonical URL derivation for personnel avatars.
-* [`lib/access/access-control.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/access/access-control.ts): Deterministic access control rule evaluator implementing fail-closed logic.
-* [`lib/access/device-auth.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/access/device-auth.ts): Constant-time SHA-256 API key authentication for physical devices.
-* [`lib/audio.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/lib/audio.ts): Client-side Web Audio API procedural synthesizer for granted/denied auditory cues.
-* [`app/api/access/route.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/access/route.ts): Main access control gateway orchestrating authentication, AI inference, vector search, rule decisions, audit logging, and alert creation.
-* [`app/api/persons/route.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/persons/route.ts): Person registration and pagination handler with duplicate checks and transactional rollback.
-* [`app/api/devices/route.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/api/devices/route.ts): Device CRUD handler with secure cryptographic API key generation.
-* [`app/dashboard/simulation/page.tsx`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/app/dashboard/simulation/page.tsx): Comprehensive webcam access simulation interface.
+* [`prisma/schema.prisma`](./frontend/prisma/schema.prisma): Database models including PostgreSQL extensions (`vector`), enums, relations, and table mappings.
+* [`lib/prisma.ts`](./frontend/lib/prisma.ts): Prisma client singleton utilizing `@prisma/adapter-neon` serverless connection pool.
+* [`lib/auth.ts`](./frontend/lib/auth.ts): Better Auth setup with administrative roles, multi-session, and session cookie security.
+* [`lib/ai/fastapi.ts`](./frontend/lib/ai/fastapi.ts): Server-side client wrapper for FastAPI endpoints with custom error handling (`FastAPIError`).
+* [`lib/ai/face-recognition.ts`](./frontend/lib/ai/face-recognition.ts): Executes native PostgreSQL `$queryRawUnsafe` vector cosine similarity search (`<=>`) and classifies match status (`matched`, `unknown`, `ambiguous`).
+* [`lib/ai/duplicate-check.ts`](./frontend/lib/ai/duplicate-check.ts): Proactive duplicate face search preventing enrollment of identical faces under multiple identities.
+* [`lib/ai/imagekit.ts`](./frontend/lib/ai/imagekit.ts): Cloud storage wrapper managing upload, deletion, and canonical URL derivation for personnel avatars.
+* [`lib/access/access-control.ts`](./frontend/lib/access/access-control.ts): Deterministic access control rule evaluator implementing fail-closed logic.
+* [`lib/access/device-auth.ts`](./frontend/lib/access/device-auth.ts): Constant-time SHA-256 API key authentication for physical devices.
+* [`lib/audio.ts`](./frontend/lib/audio.ts): Client-side Web Audio API procedural synthesizer for granted/denied auditory cues.
+* [`app/api/access/route.ts`](./frontend/app/api/access/route.ts): Main access control gateway orchestrating authentication, AI inference, vector search, rule decisions, audit logging, and alert creation.
+* [`app/api/persons/route.ts`](./frontend/app/api/persons/route.ts): Person registration and pagination handler with duplicate checks and transactional rollback.
+* [`app/api/devices/route.ts`](./frontend/app/api/devices/route.ts): Device CRUD handler with secure cryptographic API key generation.
+* [`app/dashboard/simulation/page.tsx`](./frontend/app/dashboard/simulation/page.tsx): Comprehensive webcam access simulation interface.
 
 ---
 
@@ -474,7 +474,7 @@ LIMIT $2;
 1. **Critical Memory Optimization Discovery:** The repository documents an important engineering shift regarding InsightFace models:
    - Initial architecture planned for **`buffalo_l`** (large model zoo containing ResNet-100 ArcFace weights and a 143MB 3D facial landmark ONNX model).
    - In cloud container testing (specifically Render's 512MB RAM free tier), loading `buffalo_l` caused Out-Of-Memory (OOM) crashes.
-   - The developer implemented [`ensure_minimal_models`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/app/core/insightface.py#L15-L59) in `insightface.py`, which downloads **`buffalo_s`** (MobileFaceNet/ResNet-18 weights) and prunes `1k3d68.onnx`, `2d106det.onnx`, and `genderage.onnx` from disk, restricting memory footprint to ~139.85 MB.
+   - The developer implemented [`ensure_minimal_models`](./ai-service/app/core/insightface.py#L15-L59) in `insightface.py`, which downloads **`buffalo_s`** (MobileFaceNet/ResNet-18 weights) and prunes `1k3d68.onnx`, `2d106det.onnx`, and `genderage.onnx` from disk, restricting memory footprint to ~139.85 MB.
    - **Important Inconsistency:** The Prisma schema defaults to `embeddingModel: "Buffalo_L"`, while the active Python service runs `buffalo_s`.
 
 ---
@@ -527,12 +527,12 @@ LIMIT $2;
 ### 14.1 Existing Testing Infrastructure
 * **Python AI Tests (`ai-service/tests/`):**
   * Built on `pytest` and `fastapi.testclient.TestClient`.
-  * [`test_detect.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/tests/test_detect.py): Tests health status, image upload detection, base64 detection, 0-face black images, 0-byte uploads, oversized images, and semaphore sharing.
-  * [`test_embedding.py`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ai-service/tests/test_embedding.py): Tests single-face embedding extraction, 512D dimension verification, L2-norm verification ($||v|| = 1.0$), quality score bounds, multi-face rejection, and deterministic embedding consistency ($\text{similarity} = 1.0$).
+  * [`test_detect.py`](./ai-service/tests/test_detect.py): Tests health status, image upload detection, base64 detection, 0-face black images, 0-byte uploads, oversized images, and semaphore sharing.
+  * [`test_embedding.py`](./ai-service/tests/test_embedding.py): Tests single-face embedding extraction, 512D dimension verification, L2-norm verification ($||v|| = 1.0$), quality score bounds, multi-face rejection, and deterministic embedding consistency ($\text{similarity} = 1.0$).
 * **Frontend & Gateway Integration Tests (`frontend/tests/`):**
   * Standalone TypeScript scripts executed via `tsx`.
-  * [`access.test.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/tests/access.test.ts): Tests known active person access pipeline, `AccessLog` persistence, `Alert` generation, and zero raw 512D vector leakage.
-  * [`devices.test.ts`](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/frontend/tests/devices.test.ts): 12 comprehensive unit and integration assertions testing unauthenticated rejection, SHA-256 API key hashing, constant-time validation, search/filtering, key regeneration and old key invalidation, zero hash leakage, and foreign key cascading.
+  * [`access.test.ts`](./frontend/tests/access.test.ts): Tests known active person access pipeline, `AccessLog` persistence, `Alert` generation, and zero raw 512D vector leakage.
+  * [`devices.test.ts`](./frontend/tests/devices.test.ts): 12 comprehensive unit and integration assertions testing unauthenticated rejection, SHA-256 API key hashing, constant-time validation, search/filtering, key regeneration and old key invalidation, zero hash leakage, and foreign key cascading.
 
 ### 14.2 Security Analysis
 * **Biometric Privacy:** Enrolled raw images are stored in ImageKit; biometric vectors are stored in PostgreSQL; raw floats are never transmitted to client browsers.

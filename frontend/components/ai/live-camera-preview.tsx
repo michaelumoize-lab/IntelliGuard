@@ -179,16 +179,35 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               const vidW = video?.videoWidth || 720;
               const vidH = video?.videoHeight || 960;
 
-              const leftPct = (x1 / vidW) * 100;
-              const topPct = (y1 / vidH) * 100;
-              const widthPct = ((x2 - x1) / vidW) * 100;
-              const heightPct = ((y2 - y1) / vidH) * 100;
+              // Compute object-cover visible bounds relative to 3:4 portrait container
+              const containerAspect = 3 / 4;
+              const videoAspect = vidW / vidH;
+
+              let visibleW = vidW;
+              let visibleH = vidH;
+              let cropX = 0;
+              let cropY = 0;
+
+              if (videoAspect > containerAspect) {
+                visibleW = vidH * containerAspect;
+                cropX = (vidW - visibleW) / 2;
+              } else {
+                visibleH = vidW / containerAspect;
+                cropY = (vidH - visibleH) / 2;
+              }
+
+              const leftPct = ((x1 - cropX) / visibleW) * 100;
+              const topPct = ((y1 - cropY) / visibleH) * 100;
+              const widthPct = ((x2 - x1) / visibleW) * 100;
+              const heightPct = ((y2 - y1) / visibleH) * 100;
+
+              const finalLeftPct = shouldMirror ? 100 - leftPct - widthPct : leftPct;
 
               return (
                 <div
                   key={`face-box-${index}`}
                   style={{
-                    left: `${leftPct}%`,
+                    left: `${finalLeftPct}%`,
                     top: `${topPct}%`,
                     width: `${widthPct}%`,
                     height: `${heightPct}%`,
@@ -203,7 +222,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   {face.landmarks &&
                     face.landmarks.map((pt, pIdx) => {
                       if (!pt || pt.length < 2) return null;
-                      const ptX = ((pt[0] - x1) / (x2 - x1)) * 100;
+                      const rawPtX = ((pt[0] - x1) / (x2 - x1)) * 100;
+                      const ptX = shouldMirror ? 100 - rawPtX : rawPtX;
                       const ptY = ((pt[1] - y1) / (y2 - y1)) * 100;
                       return (
                         <div

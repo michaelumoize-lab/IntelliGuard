@@ -124,7 +124,10 @@ export function DashboardLiveRefresh({ initialTimestamp }: DashboardLiveRefreshP
         size="sm"
         onClick={() => {
           triggerRefresh();
-          if (selectedInterval > 0) setSecondsRemaining(selectedInterval);
+          if (selectedInterval > 0) {
+            remainingRef.current = selectedInterval;
+            setSecondsRemaining(selectedInterval);
+          }
         }}
         disabled={isPending}
         className="h-8 px-2.5 text-xs gap-1.5 border-border bg-background hover:bg-muted"

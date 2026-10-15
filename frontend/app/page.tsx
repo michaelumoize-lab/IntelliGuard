@@ -282,7 +282,7 @@ export default async function Home() {
                 </div>
                 <h3 className="text-sm font-semibold text-foreground">512D ArcFace Inference</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  InsightFace buffalo_l deep neural network crops, normalizes, and embeds faces with extreme fidelity.
+                  InsightFace buffalo_s deep neural network crops, normalizes, and embeds faces with extreme fidelity.
                 </p>
               </div>
 

@@ -72,7 +72,10 @@ export function RegisterPersonForm() {
     };
   }, [imagePreview]);
 
+  const precheckRequestIdRef = React.useRef(0);
+
   const runQualityPrecheck = async (file: File) => {
+    const currentRequestId = ++precheckRequestIdRef.current;
     setPrecheckStatus("checking");
     setPrecheckData(null);
     try {
@@ -83,6 +86,8 @@ export function RegisterPersonForm() {
         body: fd,
       });
       const data = await res.json();
+      if (precheckRequestIdRef.current !== currentRequestId) return;
+
       if (res.ok && data.success) {
         setPrecheckStatus(data.qualityStatus || "optimal");
         setPrecheckData({
@@ -103,6 +108,7 @@ export function RegisterPersonForm() {
         });
       }
     } catch (err: any) {
+      if (precheckRequestIdRef.current !== currentRequestId) return;
       console.warn("Precheck non-blocking error:", err);
       setPrecheckStatus("idle");
     }

@@ -160,16 +160,19 @@ export async function POST(
     }
 
     const clientIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("x-real-ip") ||
-      body.ip_address ||
-      body.ipAddress;
+      req.headers.get("cf-connecting-ip") ||
+      undefined;
 
-    const firmwareVersion = body.firmware_version || body.firmwareVersion;
-    const wifiRssi = typeof body.wifi_rssi === "number" ? body.wifi_rssi : body.wifiRssi;
-    const freeHeapBytes = typeof body.free_heap_bytes === "number" ? body.free_heap_bytes : body.freeHeapBytes;
-    const uptimeSeconds = typeof body.uptime_seconds === "number" ? body.uptime_seconds : body.uptimeSeconds;
-    const doorState = body.door_state || body.doorState || "locked";
+    const firmwareVersion = typeof body.firmware_version === "string" ? body.firmware_version : typeof body.firmwareVersion === "string" ? body.firmwareVersion : undefined;
+    const rawWifiRssi = body.wifi_rssi ?? body.wifiRssi;
+    const wifiRssi = typeof rawWifiRssi === "number" && !isNaN(rawWifiRssi) ? rawWifiRssi : undefined;
+    const rawFreeHeapBytes = body.free_heap_bytes ?? body.freeHeapBytes;
+    const freeHeapBytes = typeof rawFreeHeapBytes === "number" && !isNaN(rawFreeHeapBytes) ? rawFreeHeapBytes : undefined;
+    const rawUptimeSeconds = body.uptime_seconds ?? body.uptimeSeconds;
+    const uptimeSeconds = typeof rawUptimeSeconds === "number" && !isNaN(rawUptimeSeconds) ? rawUptimeSeconds : undefined;
+    const rawDoorState = body.door_state ?? body.doorState;
+    const doorState: "locked" | "unlocked" = rawDoorState === "unlocked" ? "unlocked" : "locked";
 
     // Record live in-memory telemetry
     recordDeviceHeartbeat({

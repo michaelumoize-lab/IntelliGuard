@@ -66,42 +66,6 @@ export async function authenticateDevice(
     return { isValid: false, reason: "invalid_credentials" };
   }
 
-  // 1. Replay Protection: Timestamp freshness check
-  if (options?.timestamp) {
-    let tsNumber: number;
-    if (typeof options.timestamp === "number") {
-      tsNumber = options.timestamp < 10000000000 ? options.timestamp * 1000 : options.timestamp;
-    } else {
-      const parsedNum = Number(options.timestamp);
-      if (!isNaN(parsedNum)) {
-        tsNumber = options.timestamp.length <= 10 ? parsedNum * 1000 : parsedNum;
-      } else {
-        tsNumber = Date.parse(options.timestamp);
-      }
-    }
-
-    if (isNaN(tsNumber)) {
-      return { isValid: false, reason: "invalid_timestamp" };
-    }
-
-    const timeDiff = Math.abs(Date.now() - tsNumber);
-    if (timeDiff > MAX_TIMESTAMP_SKEW_MS) {
-      return { isValid: false, reason: "timestamp_expired" };
-    }
-  }
-
-  // 2. Replay Protection: Nonce uniqueness check
-  if (options?.nonce) {
-    const nonceKey = `${deviceId}:${options.nonce.trim()}`;
-    if (recentNonces.has(nonceKey)) {
-      return { isValid: false, reason: "replay_detected" };
-    }
-    recentNonces.set(nonceKey, {
-      deviceId,
-      expiresAt: Date.now() + MAX_TIMESTAMP_SKEW_MS,
-    });
-  }
-
   try {
     const device = await prisma.device.findUnique({
       where: { id: deviceId },
@@ -130,6 +94,42 @@ export async function authenticateDevice(
 
     if (device.status === "error") {
       return { isValid: false, reason: "device_error", device };
+    }
+
+    // 1. Replay Protection: Timestamp freshness check (gated on authenticated device credentials)
+    if (options?.timestamp) {
+      let tsNumber: number;
+      if (typeof options.timestamp === "number") {
+        tsNumber = options.timestamp < 10000000000 ? options.timestamp * 1000 : options.timestamp;
+      } else {
+        const parsedNum = Number(options.timestamp);
+        if (!isNaN(parsedNum)) {
+          tsNumber = options.timestamp.length <= 10 ? parsedNum * 1000 : parsedNum;
+        } else {
+          tsNumber = Date.parse(options.timestamp);
+        }
+      }
+
+      if (isNaN(tsNumber)) {
+        return { isValid: false, reason: "invalid_timestamp", device };
+      }
+
+      const timeDiff = Math.abs(Date.now() - tsNumber);
+      if (timeDiff > MAX_TIMESTAMP_SKEW_MS) {
+        return { isValid: false, reason: "timestamp_expired", device };
+      }
+    }
+
+    // 2. Replay Protection: Nonce uniqueness check (gated on authenticated device credentials)
+    if (options?.nonce) {
+      const nonceKey = `${deviceId}:${options.nonce.trim()}`;
+      if (recentNonces.has(nonceKey)) {
+        return { isValid: false, reason: "replay_detected", device };
+      }
+      recentNonces.set(nonceKey, {
+        deviceId,
+        expiresAt: Date.now() + MAX_TIMESTAMP_SKEW_MS,
+      });
     }
 
     // Update lastSeen timestamp and ensure status is online
