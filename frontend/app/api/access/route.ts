@@ -359,7 +359,7 @@ export async function POST(req: NextRequest) {
     }
 
     const finalStatus: "known_individual" | "unknown_individual" =
-      decision.accessStatus === "granted" ? "known_individual" : "unknown_individual";
+      recognition.matchStatus === "matched" ? "known_individual" : "unknown_individual";
 
     // Step 7: Return structured access response (including person and face bounding boxes)
     return NextResponse.json({

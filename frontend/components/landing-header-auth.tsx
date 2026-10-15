@@ -21,11 +21,11 @@ interface LandingHeaderAuthProps {
 }
 
 export function LandingHeaderAuth({ user }: LandingHeaderAuthProps) {
-  const { data: clientSession, isPending } = useSession();
+  const { data: clientSession, isPending, error } = useSession();
 
   // Prefer server-passed user on initial mount/hydration to eliminate UI flicker.
   // When client session finishes loading, use it for live updates (e.g. sign out).
-  const effectiveUser = isPending
+  const effectiveUser = isPending || error
     ? user
     : (clientSession?.user ?? null);
 

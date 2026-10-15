@@ -132,6 +132,17 @@ class YoloPersonDetector:
                 if len(shape) == 4 and isinstance(shape[2], int) and isinstance(shape[3], int):
                     self.input_shape = (shape[2], shape[3])
 
+            # Validate output layout: feature dimension (other than detection-count) must be 84
+            outputs = self.session.get_outputs()
+            if not outputs:
+                raise ValueError("YOLO model has no outputs defined.")
+            out_shape = outputs[0].shape
+            non_batch_dims = [d for d in out_shape[1:] if isinstance(d, int)]
+            if 84 not in non_batch_dims:
+                raise ValueError(
+                    f"Unsupported YOLO output layout: expected feature dimension 84 in shape {out_shape}."
+                )
+
             self.is_loaded = True
             self.error_message = None
             logger.info(f"YOLO Person Detector loaded ({self.model_name}, input={self.input_shape}).")
@@ -141,7 +152,7 @@ class YoloPersonDetector:
             self.session = None
             self.error_message = str(e)
             logger.error(f"Failed to initialize YOLO detector: {e}", exc_info=True)
-            return False
+            raise RuntimeError(f"YOLO detector initialization failed: {e}") from e
 
     def _letterbox(
         self,

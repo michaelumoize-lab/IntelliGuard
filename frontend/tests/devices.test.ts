@@ -110,13 +110,25 @@ async function runMilestone10Tests() {
     // Test 4: Device Credentials Authentication Check
     // ----------------------------------------------------
     console.log("\n[Test 4] Testing Device Authentication via `device-auth.ts`...");
-    const authResultValid = await authenticateDevice(createdDeviceId, firstApiKey);
+    const authResultValid = await authenticateDevice(createdDeviceId, firstApiKey, {
+      timestamp: Date.now(),
+      nonce: crypto.randomUUID(),
+    });
     assert(
       authResultValid.isValid === true && authResultValid.device?.id === createdDeviceId,
       "Test 4: Correct plaintext API key authenticates successfully against device-auth.ts"
     );
 
-    const authResultInvalid = await authenticateDevice(createdDeviceId, "invalid_wrong_key");
+    const authResultMissingReplay = await authenticateDevice(createdDeviceId, firstApiKey);
+    assert(
+      authResultMissingReplay.isValid === false,
+      "Test 4: Missing timestamp or nonce is rejected by device-auth.ts"
+    );
+
+    const authResultInvalid = await authenticateDevice(createdDeviceId, "invalid_wrong_key", {
+      timestamp: Date.now(),
+      nonce: crypto.randomUUID(),
+    });
     assert(
       authResultInvalid.isValid === false,
       "Test 4: Invalid API key is rejected by device-auth.ts"
@@ -200,13 +212,19 @@ async function runMilestone10Tests() {
       data: { apiKeyHash: newApiKeyHash },
     });
 
-    const authResultOldKey = await authenticateDevice(createdDeviceId, firstApiKey);
+    const authResultOldKey = await authenticateDevice(createdDeviceId, firstApiKey, {
+      timestamp: Date.now(),
+      nonce: crypto.randomUUID(),
+    });
     assert(
       authResultOldKey.isValid === false,
       "Test 8: Previous API key is immediately invalidated after regeneration"
     );
 
-    const authResultNewKey = await authenticateDevice(createdDeviceId, secondApiKey);
+    const authResultNewKey = await authenticateDevice(createdDeviceId, secondApiKey, {
+      timestamp: Date.now(),
+      nonce: crypto.randomUUID(),
+    });
     assert(
       authResultNewKey.isValid === true,
       "Test 8: Newly regenerated API key authenticates successfully"

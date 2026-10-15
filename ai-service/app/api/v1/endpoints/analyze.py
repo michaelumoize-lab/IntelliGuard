@@ -225,6 +225,34 @@ async def _execute_analysis(
     embedding_vec = _extract_embedding_vector(primary_face_raw)
     total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
+    if embedding_vec is None:
+        logger.warning(
+            f"Embedding extraction failed for face (quality={quality_score}) in {total_time_ms} ms."
+        )
+        return UnifiedAnalysisResponse(
+            success=False,
+            status="recognition_error",
+            person_detected=True,
+            face_detected=True,
+            person_count=len(persons),
+            face_count=len(detected_faces),
+            persons=persons,
+            faces=detected_faces,
+            primary_person_bbox=primary_person.bbox,
+            primary_face_bbox=primary_face_bbox,
+            embedding=None,
+            embedding_size=None,
+            quality_score=quality_score,
+            detection_confidence=face_conf,
+            model=model_name,
+            image_width=img_w,
+            image_height=img_h,
+            message="Face detected, but biometric embedding extraction failed.",
+            execution_time_ms=total_time_ms,
+            yolo_time_ms=yolo_time_ms,
+            insightface_time_ms=insightface_time_ms,
+        )
+
     logger.info(
         f"Analysis complete: Usable face processed (quality={quality_score}) in {total_time_ms} ms."
     )
@@ -241,7 +269,7 @@ async def _execute_analysis(
         primary_person_bbox=primary_person.bbox,
         primary_face_bbox=primary_face_bbox,
         embedding=embedding_vec,
-        embedding_size=512 if embedding_vec else None,
+        embedding_size=512,
         quality_score=quality_score,
         detection_confidence=face_conf,
         model=model_name,
