@@ -158,3 +158,129 @@ def test_analyze_face_low_quality(client: TestClient, monkeypatch):
     finally:
         yolo.detect = orig_detect
         client.app.state.insightface_app = orig_face_app
+
+
+def test_analyze_spoof_detected_skips_embedding(client: TestClient):
+    """Scenario: Valid person and face, but MiniFASNet classifies frame as a presentation attack."""
+    from app.core.yolo import DetectedPersonData
+    from app.core.liveness import LivenessResult
+
+    class MockFace:
+        def __init__(self):
+            self.bbox = np.array([100.0, 100.0, 250.0, 250.0])
+            self.det_score = 0.95
+            self.kps = None
+            self.embedding = np.ones(512, dtype=np.float32)
+
+    def mock_detect(img, conf=None, iou=None):
+        return [DetectedPersonData(bbox=[50.0, 50.0, 350.0, 500.0], confidence=0.95, is_primary=True)]
+
+    class MockFaceApp:
+        def get(self, img):
+            return [MockFace()]
+
+    class MockSpoofDetector:
+        def predict(self, img, bbox, threshold=0.60):
+            return LivenessResult(
+                is_live=False,
+                status="spoof",
+                score=0.08,
+                real_logit=-2.5,
+                spoof_logit=2.5,
+                execution_time_ms=12.5,
+                error_message=None,
+            )
+
+    yolo = client.app.state.yolo_detector
+    orig_detect = yolo.detect
+    orig_face_app = client.app.state.insightface_app
+    orig_liveness = getattr(client.app.state, "liveness_detector", None)
+
+    try:
+        yolo.detect = mock_detect
+        client.app.state.insightface_app = MockFaceApp()
+        client.app.state.liveness_detector = MockSpoofDetector()
+
+        blank = np.full((480, 640, 3), 120, dtype=np.uint8)
+        _, img_bytes = cv2.imencode(".jpg", blank)
+
+        response = client.post(
+            "/api/v1/analyze",
+            files={"file": ("spoof_screen.jpg", img_bytes.tobytes(), "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["status"] == "spoof_detected"
+        assert data["liveness_status"] == "spoof"
+        assert data["liveness_score"] == 0.08
+        # CRUCIAL SECURITY REQUIREMENT: Embedding extraction is skipped!
+        assert data["embedding"] is None
+        assert "presentation attack" in data["message"].lower() or "spoof" in data["message"].lower()
+    finally:
+        yolo.detect = orig_detect
+        client.app.state.insightface_app = orig_face_app
+        client.app.state.liveness_detector = orig_liveness
+
+
+def test_analyze_liveness_inconclusive_fails_closed(client: TestClient):
+    """Scenario: Model failure or uninitialized liveness -> fails closed without labeling as spoof."""
+    from app.core.yolo import DetectedPersonData
+    from app.core.liveness import LivenessResult
+
+    class MockFace:
+        def __init__(self):
+            self.bbox = np.array([100.0, 100.0, 250.0, 250.0])
+            self.det_score = 0.95
+            self.kps = None
+            self.embedding = np.ones(512, dtype=np.float32)
+
+    def mock_detect(img, conf=None, iou=None):
+        return [DetectedPersonData(bbox=[50.0, 50.0, 350.0, 500.0], confidence=0.95, is_primary=True)]
+
+    class MockFaceApp:
+        def get(self, img):
+            return [MockFace()]
+
+    class MockFailingDetector:
+        def predict(self, img, bbox, threshold=0.60):
+            return LivenessResult(
+                is_live=False,
+                status="inconclusive",
+                score=0.0,
+                real_logit=0.0,
+                spoof_logit=0.0,
+                execution_time_ms=5.0,
+                error_message="Liveness model runtime crashed",
+            )
+
+    yolo = client.app.state.yolo_detector
+    orig_detect = yolo.detect
+    orig_face_app = client.app.state.insightface_app
+    orig_liveness = getattr(client.app.state, "liveness_detector", None)
+
+    try:
+        yolo.detect = mock_detect
+        client.app.state.insightface_app = MockFaceApp()
+        client.app.state.liveness_detector = MockFailingDetector()
+
+        blank = np.full((480, 640, 3), 120, dtype=np.uint8)
+        _, img_bytes = cv2.imencode(".jpg", blank)
+
+        response = client.post(
+            "/api/v1/analyze",
+            files={"file": ("error_frame.jpg", img_bytes.tobytes(), "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert data["status"] == "liveness_inconclusive"
+        assert data["liveness_status"] == "inconclusive"
+        assert data["embedding"] is None
+        assert "inconclusive" in data["message"].lower()
+    finally:
+        yolo.detect = orig_detect
+        client.app.state.insightface_app = orig_face_app
+        client.app.state.liveness_detector = orig_liveness

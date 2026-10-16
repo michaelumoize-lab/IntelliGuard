@@ -225,6 +225,7 @@ export default function WebcamSimulationPage() {
         if (response.access_status === "granted") {
           playBiometricSound("granted");
         } else if (
+          response.status === "spoof_detected" ||
           response.status === "unknown_individual" ||
           response.match_status === "unknown" ||
           isDeactivated
@@ -239,7 +240,11 @@ export default function WebcamSimulationPage() {
         : undefined;
 
       let overlayStatus: CameraOverlayResult["status"] = "denied";
-      if (response.status === "no_person") {
+      if (response.status === "spoof_detected") {
+        overlayStatus = "spoof_detected";
+      } else if (response.status === "liveness_inconclusive") {
+        overlayStatus = "liveness_inconclusive";
+      } else if (response.status === "no_person") {
         overlayStatus = "no_person";
       } else if (response.status === "person_no_face") {
         overlayStatus = "person_no_face";
@@ -263,6 +268,7 @@ export default function WebcamSimulationPage() {
         status: overlayStatus,
         name: isDeactivated ? `${personName || "User"} (Deactivated)` : personName,
         similarity: response.face?.similarity,
+        liveness_score: response.liveness_score ?? undefined,
         message: response.message,
       });
 
@@ -298,7 +304,13 @@ export default function WebcamSimulationPage() {
       let historyName = "Unknown Individual";
       let historyMatchStatus: string = response.match_status || "denied";
 
-      if (isDeactivated) {
+      if (response.status === "spoof_detected") {
+        historyName = "Presentation Attack (Spoof)";
+        historyMatchStatus = "spoof_detected";
+      } else if (response.status === "liveness_inconclusive") {
+        historyName = "Liveness Inconclusive";
+        historyMatchStatus = "liveness_inconclusive";
+      } else if (isDeactivated) {
         historyName = `${personName} (User is deactivated)`;
         historyMatchStatus = "deactivated";
       } else if (response.person) {
@@ -378,6 +390,20 @@ export default function WebcamSimulationPage() {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
           <CheckCircle2 className="w-3.5 h-3.5" /> GRANTED
+        </span>
+      );
+    }
+    if (item.matchStatus === "spoof_detected") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-500 font-semibold text-[11px] animate-pulse">
+          <ShieldAlert className="w-3.5 h-3.5" /> SPOOF BLOCKED
+        </span>
+      );
+    }
+    if (item.matchStatus === "liveness_inconclusive") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 font-semibold text-[11px]">
+          <AlertTriangle className="w-3.5 h-3.5" /> INCONCLUSIVE
         </span>
       );
     }

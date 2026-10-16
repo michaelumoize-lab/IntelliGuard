@@ -195,6 +195,8 @@ export interface FastAPIAnalysisResult {
     | "no_person"
     | "person_no_face"
     | "face_low_quality"
+    | "spoof_detected"
+    | "liveness_inconclusive"
     | "face_detected_processing"
     | "known_individual"
     | "unknown_individual"
@@ -211,6 +213,8 @@ export interface FastAPIAnalysisResult {
   embeddingSize?: number | null;
   qualityScore?: number | null;
   detectionConfidence?: number | null;
+  livenessStatus?: "live" | "spoof" | "inconclusive" | null;
+  livenessScore?: number | null;
   model?: string;
   imageWidth: number;
   imageHeight: number;
@@ -218,6 +222,7 @@ export interface FastAPIAnalysisResult {
   executionTimeMs: number;
   yoloTimeMs?: number;
   insightfaceTimeMs?: number;
+  livenessTimeMs?: number;
 }
 
 /**
@@ -301,6 +306,8 @@ export async function analyzeImage(
     embeddingSize: data.embedding_size || (data.embedding ? data.embedding.length : null),
     qualityScore: typeof data.quality_score === "number" ? data.quality_score : null,
     detectionConfidence: typeof data.detection_confidence === "number" ? data.detection_confidence : null,
+    livenessStatus: data.liveness_status || null,
+    livenessScore: typeof data.liveness_score === "number" ? data.liveness_score : null,
     model: data.model || "buffalo_s",
     imageWidth: data.image_width || 640,
     imageHeight: data.image_height || 480,
@@ -308,6 +315,7 @@ export async function analyzeImage(
     executionTimeMs: data.execution_time_ms || 0,
     yoloTimeMs: data.yolo_time_ms || 0,
     insightfaceTimeMs: data.insightface_time_ms || 0,
+    livenessTimeMs: data.liveness_time_ms || 0,
   };
 }
 

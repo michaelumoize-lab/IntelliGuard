@@ -100,6 +100,8 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
   const isNoPerson = result.status === "no_person" || result.reason === "no_person_detected";
   const isPersonNoFace = result.status === "person_no_face" || result.reason === "no_face_detected";
   const isLowQuality = result.status === "face_low_quality" || result.reason === "poor_quality_face";
+  const isSpoof = result.status === "spoof_detected" || result.reason === "spoof_detected" || result.liveness_status === "spoof";
+  const isInconclusive = result.status === "liveness_inconclusive" || result.reason === "liveness_failed" || result.liveness_status === "inconclusive";
   const isError = result.status === "recognition_error" || result.reason === "system_error";
   const isDeactivated = Boolean(
     result.person &&
@@ -108,6 +110,20 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
   ) || (result.message?.toLowerCase().includes("deactivated") ?? false);
 
   const getBadgeStyle = () => {
+    if (isSpoof) {
+      return {
+        bg: "bg-rose-500/15 border-rose-500/40 text-rose-500 dark:text-rose-400",
+        icon: <ShieldAlert className="w-4 h-4 text-rose-500" />,
+        label: "PRESENTATION ATTACK DETECTED (SPOOF)",
+      };
+    }
+    if (isInconclusive) {
+      return {
+        bg: "bg-amber-500/15 border-amber-500/40 text-amber-500 dark:text-amber-400",
+        icon: <AlertTriangle className="w-4 h-4 text-amber-500" />,
+        label: "LIVENESS INCONCLUSIVE - ACCESS DENIED",
+      };
+    }
     if (isNoPerson) {
       return {
         bg: "bg-slate-500/10 border-slate-500/30 text-slate-500 dark:text-slate-400",
@@ -252,6 +268,8 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
               className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-black border overflow-hidden flex items-center justify-center shadow-inner transition-all ${
                 isGranted
                   ? "border-emerald-500/60 ring-2 ring-emerald-500/20"
+                  : isSpoof
+                  ? "border-rose-500/80 ring-2 ring-rose-500/30"
                   : isUnknown || isDeactivated
                   ? "border-destructive/60 ring-2 ring-destructive/20"
                   : "border-border/80"
@@ -275,7 +293,7 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
           {/* Right: Enrolled Database Reference */}
           <div className="flex flex-col items-center text-center">
             <span className="text-[10px] font-mono font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-emerald-500" /> Registered Profile
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Registered Profile
             </span>
             <div
               className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-muted border overflow-hidden flex items-center justify-center shadow-inner transition-all ${
@@ -297,6 +315,32 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
             </div>
           </div>
         </div>
+
+        {/* Presentation Attack (Spoof) Warning Banner */}
+        {isSpoof && (
+          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl mb-4 text-center space-y-1">
+            <div className="flex items-center justify-center gap-1.5 text-rose-500 font-bold text-xs uppercase tracking-wide">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>Security Alert: Presentation Attack Detected</span>
+            </div>
+            <p className="text-xs text-rose-500/90 font-medium">
+              Spoof presentation detected (printed photo, screen replay, or mask). Access denied; identity matching bypassed.
+            </p>
+          </div>
+        )}
+
+        {/* Liveness Inconclusive Warning Banner */}
+        {isInconclusive && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-4 text-center space-y-1">
+            <div className="flex items-center justify-center gap-1.5 text-amber-500 font-bold text-xs uppercase tracking-wide">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Liveness Check Inconclusive</span>
+            </div>
+            <p className="text-xs text-amber-500/90 font-medium">
+              Biometric liveness could not be verified with high confidence. Access denied safely (fail-closed).
+            </p>
+          </div>
+        )}
 
         {/* Deactivated Notice Banner */}
         {isDeactivated && (
@@ -348,6 +392,10 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
                 ? "Person detected, but face is not visible or obscured. Please face the camera directly."
                 : isLowQuality
                 ? "Face detected, but image quality or lighting is insufficient for biometric verification."
+                : isSpoof
+                ? "Presentation attack detected. Biometric identity matching bypassed to protect system integrity."
+                : isInconclusive
+                ? "Biometric liveness verification inconclusive. Access denied safely."
                 : isError
                 ? "Biometric recognition error encountered. Please check camera feed or try again."
                 : isAmbiguous
@@ -357,8 +405,64 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
           </div>
         )}
 
+        {/* Passive Facial Liveness Stage (MiniFASNetV2-SE) */}
+        {result.liveness_status && (
+          <div className="mb-4 p-3 bg-muted/20 border border-border/70 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Passive Liveness
+              </span>
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                  result.liveness_status === "live"
+                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                    : result.liveness_status === "spoof"
+                    ? "bg-rose-500/15 text-rose-500 border border-rose-500/30 animate-pulse"
+                    : result.liveness_status === "inconclusive"
+                    ? "bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                    : "bg-muted text-muted-foreground border border-border/70"
+                }`}
+              >
+                {result.liveness_status === "live"
+                  ? "LIVE VERIFIED"
+                  : result.liveness_status === "spoof"
+                  ? "SPOOF DETECTED"
+                  : result.liveness_status === "inconclusive"
+                  ? "INCONCLUSIVE"
+                  : "UNKNOWN"}
+              </span>
+            </div>
+
+            {result.liveness_score != null && (
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground text-[11px]">Real Confidence</span>
+                  <span className="font-mono font-bold text-foreground">
+                    {result.liveness_score.toFixed(3)}
+                  </span>
+                </div>
+                <div className="relative w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    style={{ width: `${Math.max(0, Math.min(100, result.liveness_score * 100))}%` }}
+                    className={`h-full transition-all duration-500 ${
+                      result.liveness_status === "live"
+                        ? "bg-emerald-500"
+                        : result.liveness_status === "spoof"
+                        ? "bg-rose-500"
+                        : "bg-amber-500"
+                    }`}
+                  />
+                </div>
+                <p className="text-[9px] text-muted-foreground/80 leading-tight">
+                  * MiniFASNet model confidence score, not a calibrated probability.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Vector Similarity Gauge */}
-        {!isNoPerson && !isPersonNoFace ? (
+        {!isNoPerson && !isPersonNoFace && !isSpoof && !isInconclusive ? (
           <div className="mb-4 space-y-1.5">
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted-foreground font-medium flex items-center gap-1">
@@ -391,7 +495,15 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
               <Zap className="w-3.5 h-3.5 opacity-40" /> Biometric Vector Evaluation
             </span>
             <span className="font-mono text-[11px] font-medium uppercase text-muted-foreground">
-              {isNoPerson ? "Frame Empty — Skipped" : "No Face Visible — Skipped"}
+              {isNoPerson
+                ? "Frame Empty — Skipped"
+                : isPersonNoFace
+                ? "No Face Visible — Skipped"
+                : isSpoof
+                ? "Attack Detected — Skipped"
+                : isInconclusive
+                ? "Inconclusive — Skipped"
+                : "Skipped"}
             </span>
           </div>
         )}
@@ -430,8 +542,17 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
           </div>
         </div>
 
+        {result.liveness_time_ms != null && (
+          <div className="p-2.5 bg-muted/30 rounded-xl border border-border/70 col-span-2 sm:col-span-1">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-[10px] text-muted-foreground font-medium uppercase">Liveness Time</span>
+              <span className="font-mono font-semibold text-foreground text-xs">{result.liveness_time_ms} ms</span>
+            </div>
+          </div>
+        )}
+
         {qualityPct && (
-          <div className="p-2.5 bg-muted/30 rounded-xl border border-border/70 col-span-2">
+          <div className={`p-2.5 bg-muted/30 rounded-xl border border-border/70 ${result.liveness_time_ms != null ? "col-span-2 sm:col-span-1" : "col-span-2"}`}>
             <div className="flex justify-between items-center text-xs">
               <span className="text-[10px] text-muted-foreground font-medium uppercase">Face Quality Score</span>
               <span className="font-mono font-semibold text-foreground text-xs">{qualityPct}%</span>

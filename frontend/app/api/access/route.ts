@@ -245,6 +245,114 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Handle Biometric Presentation Attack (Spoofing Attempt)
+    if (aiResult.status === "spoof_detected") {
+      // Create High-Severity Security Alert in PostgreSQL
+      await prisma.alert.create({
+        data: {
+          deviceId: deviceAuth.device?.id || null,
+          alertType: "unauthorized_access",
+          title: "Biometric Spoof Attempt Blocked",
+          message: `Presentation attack detected at terminal. MiniFASNet real-face confidence: ${
+            aiResult.livenessScore !== null && aiResult.livenessScore !== undefined
+              ? (aiResult.livenessScore * 100).toFixed(1) + "%"
+              : "N/A"
+          }. Access denied immediately.`,
+          severity: "critical",
+        },
+      });
+
+      // Log access attempt in database as rejected
+      await prisma.accessLog.create({
+        data: {
+          deviceId: deviceAuth.device?.id || null,
+          personId: null,
+          embeddingId: null,
+          matchStatus: "rejected",
+          accessStatus: "denied",
+          reason: "face_no_match",
+          doorAction: "lock",
+          confidenceScore: aiResult.livenessScore || 0,
+          processingTimeMs,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        status: "spoof_detected",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "spoof_detected",
+        door_action: "lock",
+        match_status: "rejected",
+        liveness_status: "spoof",
+        liveness_score: aiResult.livenessScore,
+        liveness_time_ms: aiResult.livenessTimeMs,
+        message: "Presentation attack / spoof detected. Access denied and security alert logged.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    // Handle Inconclusive / Failed Liveness Verification (Fail-Safe, never mark as malicious spoof)
+    if (aiResult.status === "liveness_inconclusive") {
+      return NextResponse.json({
+        success: false,
+        status: "liveness_inconclusive",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "liveness_failed",
+        door_action: "lock",
+        match_status: "rejected",
+        liveness_status: "inconclusive",
+        liveness_score: aiResult.livenessScore,
+        liveness_time_ms: aiResult.livenessTimeMs,
+        message: aiResult.message || "Facial liveness verification inconclusive. Access denied for security.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
     if (aiResult.status === "face_low_quality" || !aiResult.embedding) {
       return NextResponse.json({
         success: true,
@@ -255,6 +363,9 @@ export async function POST(req: NextRequest) {
         reason: "poor_quality_face",
         door_action: "no_action",
         match_status: null,
+        liveness_status: aiResult.livenessStatus,
+        liveness_score: aiResult.livenessScore,
+        liveness_time_ms: aiResult.livenessTimeMs,
         message:
           aiResult.message ||
           "Face detected with low quality or obstruction. Please face the camera directly in good lighting.",
@@ -408,6 +519,9 @@ export async function POST(req: NextRequest) {
           }
         : null,
       candidates: recognition.candidates,
+      liveness_status: aiResult.livenessStatus || "live",
+      liveness_score: aiResult.livenessScore,
+      liveness_time_ms: aiResult.livenessTimeMs,
       processing_time_ms: processingTimeMs,
     });
   } catch (error: unknown) {

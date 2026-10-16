@@ -157,6 +157,36 @@ function runAccessControlUnitTests() {
     process.exitCode = 1;
   }
 
+  // Test 11: Presentation Attack (Spoof) Detected -> Lock & Deny
+  console.log("\n[Test 11] Presentation Attack (Spoof) Detected...");
+  const res11 = evaluateAccess({
+    status: "spoof_detected",
+    similarity: 0.95, // Even if similarity was high, liveness overrides it
+    distance: 0.05,
+    person: mockPerson,
+  });
+  if (res11.accessStatus === "denied" && res11.reason === "spoof_detected" && res11.doorAction === "lock") {
+    console.log("✅ PASSED: Spoof detected correctly locked door and denied access regardless of face match.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for spoof presentation attack:", res11);
+    process.exitCode = 1;
+  }
+
+  // Test 12: Liveness Check Inconclusive -> Fail Closed (Lock & Deny)
+  console.log("\n[Test 12] Liveness Check Inconclusive...");
+  const res12 = evaluateAccess({
+    status: "liveness_inconclusive",
+    similarity: 0.88,
+    distance: 0.12,
+    person: mockPerson,
+  });
+  if (res12.accessStatus === "denied" && res12.reason === "liveness_failed" && res12.doorAction === "lock") {
+    console.log("✅ PASSED: Inconclusive liveness correctly failed closed with lock.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for inconclusive liveness:", res12);
+    process.exitCode = 1;
+  }
+
   console.log("\n==================================================");
   if (process.exitCode === 1) {
     console.error("  Some Decision Engine Unit Tests Failed!");
