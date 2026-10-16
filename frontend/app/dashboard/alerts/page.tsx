@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import type { Prisma, Severity } from "@prisma/client";
 import { SecurityAlertsPanel, SecurityAlertItem } from "@/components/dashboard/security-alerts-panel";
 import { DataTableSearch } from "@/components/dashboard/data-table-search";
 import { DataTablePagination } from "@/components/dashboard/data-table-pagination";
@@ -27,10 +28,10 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const severityFilter = (params.severity || "").trim().toLowerCase();
   const resolvedFilter = params.resolved === undefined ? "false" : params.resolved;
 
-  const where: any = {};
+  const where: Prisma.AlertWhereInput = {};
 
   if (severityFilter && ["low", "medium", "high", "critical"].includes(severityFilter)) {
-    where.severity = severityFilter;
+    where.severity = severityFilter as Severity;
   }
 
   if (resolvedFilter === "false") {
@@ -77,7 +78,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     alertType: alt.alertType,
     title: alt.title,
     message: alt.message,
-    severity: alt.severity as any,
+    severity: alt.severity,
     resolved: alt.resolved,
     createdAt: alt.createdAt.toISOString(),
     person: alt.person,

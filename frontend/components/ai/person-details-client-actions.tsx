@@ -4,11 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { PersonModal } from "@/components/ai/person-modal";
+import { PersonModal, PersonModalInitialData } from "@/components/ai/person-modal";
 import { ReplaceFaceModal } from "@/components/ai/replace-face-modal";
 import { PencilIcon, CameraIcon, UserCheckIcon, UserXIcon, Loader2 } from "lucide-react";
 
-export function PersonDetailsClientHeaderActions({ person }: { person: any }) {
+export interface PersonDetailsData extends PersonModalInitialData {
+  id: number;
+  personCode: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+}
+
+export function PersonDetailsClientHeaderActions({ person }: { person: PersonDetailsData }) {
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isReplaceFaceOpen, setIsReplaceFaceOpen] = useState(false);
@@ -46,7 +54,7 @@ export function PersonDetailsClientHeaderActions({ person }: { person: any }) {
   );
 }
 
-export function PersonDetailsStatusToggle({ person }: { person: any }) {
+export function PersonDetailsStatusToggle({ person }: { person: PersonDetailsData }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -68,7 +76,7 @@ export function PersonDetailsStatusToggle({ person }: { person: any }) {
       } else {
         toast.error(data.message || "Failed to update status.");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to update person status.");
     } finally {
       setIsLoading(false);

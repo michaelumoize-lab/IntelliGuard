@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma";
 
 async function main() {
   console.log("Verifying indexes on face_embeddings...");
-  const indexes: any = await prisma.$queryRawUnsafe(`
+  const indexes = await prisma.$queryRawUnsafe<Array<{ indexName: string; indexDef: string }>>(`
     SELECT indexname::text AS "indexName", indexdef::text AS "indexDef" 
     FROM pg_indexes 
     WHERE tablename = 'face_embeddings';

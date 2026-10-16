@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import type { Prisma, AccessStatus, MatchStatus, AccessReason } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -35,18 +36,18 @@ export async function GET(req: NextRequest) {
     const deviceIdParam = searchParams.get("deviceId");
     const personIdParam = searchParams.get("personId");
 
-    const where: any = {};
+    const where: Prisma.AccessLogWhereInput = {};
 
     if (status && ["granted", "denied"].includes(status)) {
-      where.accessStatus = status;
+      where.accessStatus = status as AccessStatus;
     }
 
     if (matchStatus && ["matched", "unknown", "ambiguous", "rejected"].includes(matchStatus)) {
-      where.matchStatus = matchStatus;
+      where.matchStatus = matchStatus as MatchStatus;
     }
 
     if (reason && VALID_REASONS.includes(reason)) {
-      where.reason = reason;
+      where.reason = reason as AccessReason;
     }
 
     if (deviceIdParam) {
@@ -111,7 +112,7 @@ export async function GET(req: NextRequest) {
         totalPages,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to retrieve access logs:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to retrieve access logs." },

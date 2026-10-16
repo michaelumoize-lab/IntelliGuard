@@ -151,7 +151,7 @@ export async function POST(
           isActive: true,
         },
       });
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
       console.error("Database transaction failed during face replacement. Initiating rollback cleanup:", dbError);
 
       // Rollback: Delete newly uploaded ImageKit asset so previous image/embedding remains active
@@ -172,7 +172,7 @@ export async function POST(
         { status: 500 }
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof FastAPIError) {
       return NextResponse.json(
         {

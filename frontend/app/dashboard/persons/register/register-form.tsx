@@ -107,7 +107,7 @@ export function RegisterPersonForm() {
           hasLandmarks: false,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (precheckRequestIdRef.current !== currentRequestId) return;
       console.warn("Precheck non-blocking error:", err);
       setPrecheckStatus("idle");
@@ -178,9 +178,9 @@ export function RegisterPersonForm() {
       toast.success(`Registered ${data.person.firstName} ${data.person.lastName}! Code: ${data.person.personCode}`);
       router.push(`/dashboard/persons/${data.person.id}`);
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Registration error:", err);
-      toast.error(err.message || "Failed to register person.");
+      toast.error(err instanceof Error ? err.message : "Failed to register person.");
     } finally {
       setIsLoading(false);
     }

@@ -16,25 +16,39 @@ async def get_health_status(request: Request, response: Response) -> HealthRespo
     """
     # Prefer application state set during lifespan, fallback to manager instance
     manager = getattr(request.app.state, "insightface_manager", None)
+    yolo = getattr(request.app.state, "yolo_detector", None)
     
-    if manager is not None and manager.is_loaded:
+    insightface_ready = manager is not None and manager.is_loaded
+    yolo_ready = yolo is not None and yolo.is_loaded
+
+    if insightface_ready and yolo_ready:
         return HealthResponse(
             status="healthy",
             service="intelliguard-ai",
             model=manager.model_name,
             model_loaded=True,
+            yolo_loaded=True,
+            yolo_model=yolo.model_name if yolo else settings.YOLO_MODEL_NAME,
             execution_provider=manager.active_provider,
             error=None,
         )
     
-    # Degraded status if model failed to load during startup
+    # Degraded status if either model failed to load during startup
     response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    error_msg = manager.error_message if manager else "Model manager not initialized"
+    errors = []
+    if not insightface_ready:
+        errors.append(manager.error_message if manager else "InsightFace manager not initialized")
+    if not yolo_ready:
+        errors.append(yolo.error_message if yolo else "YOLO detector not initialized")
+    error_msg = "; ".join(errors)
+
     return HealthResponse(
         status="degraded",
         service="intelliguard-ai",
         model=settings.INSIGHTFACE_MODEL,
-        model_loaded=False,
-        execution_provider="Unavailable",
+        model_loaded=insightface_ready,
+        yolo_loaded=yolo_ready,
+        yolo_model=settings.YOLO_MODEL_NAME,
+        execution_provider=manager.active_provider if manager else "Unavailable",
         error=error_msg,
     )

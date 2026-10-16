@@ -41,7 +41,7 @@ async function runMilestone7IntegrationTests() {
       console.error(`❌ Test 1 FAILED: Expected GRANTED & UNLOCK but got accessStatus=${decision.accessStatus}, doorAction=${decision.doorAction}`);
       process.exitCode = 1;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 1 failed:", err);
     process.exitCode = 1;
   }
@@ -71,7 +71,7 @@ async function runMilestone7IntegrationTests() {
       console.error("❌ Test 2 failed: AccessLog count mismatch.");
       process.exitCode = 1;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 2 failed:", err);
     process.exitCode = 1;
   } finally {
@@ -102,7 +102,7 @@ async function runMilestone7IntegrationTests() {
       console.error("❌ Test 3 failed: Alert count mismatch.");
       process.exitCode = 1;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 3 failed:", err);
     process.exitCode = 1;
   } finally {
@@ -137,10 +137,10 @@ async function runMilestone7IntegrationTests() {
       },
     };
 
-    const hasEmbeddingProp = (obj: any): boolean => {
+    const hasEmbeddingProp = (obj: unknown): boolean => {
       if (!obj || typeof obj !== "object") return false;
       if ("embedding" in obj) return true;
-      return Object.values(obj).some((v) => hasEmbeddingProp(v));
+      return Object.values(obj as Record<string, unknown>).some((v) => hasEmbeddingProp(v));
     };
 
     if (hasEmbeddingProp(responsePayload)) {
@@ -149,7 +149,7 @@ async function runMilestone7IntegrationTests() {
     } else {
       console.log("✅ Test 4 PASSED: Zero raw 512D vector floats exposed in response payload.");
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 4 failed:", err);
     process.exitCode = 1;
   }

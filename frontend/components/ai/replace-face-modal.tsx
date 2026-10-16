@@ -84,9 +84,9 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
       toast.success(`Face photo replaced for ${person.firstName} ${person.lastName}!`);
       onSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Face replacement error:", err);
-      toast.error(err.message || "An unexpected error occurred.");
+      toast.error(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setIsLoading(false);
     }

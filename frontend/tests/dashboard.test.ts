@@ -17,7 +17,7 @@ async function runDashboardTests() {
     console.log(` - Total Persons: ${totalPersons} | Active: ${activePersons}`);
     console.log(` - Total Access Logs: ${totalAccess} | Granted: ${grantedAccess}`);
     console.log("✅ Test 1 PASSED: PostgreSQL database aggregation queries executed successfully.");
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 1 failed:", err);
     process.exitCode = 1;
   }
@@ -31,7 +31,7 @@ async function runDashboardTests() {
 
     console.log(` - Matched: ${matchedCount} | Unknown: ${unknownCount} | Ambiguous: ${ambiguousCount}`);
     console.log("✅ Test 2 PASSED: Recognition breakdown counts calculated accurately.");
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 2 failed:", err);
     process.exitCode = 1;
   }
@@ -42,7 +42,7 @@ async function runDashboardTests() {
     const unresolvedCount = await prisma.alert.count({ where: { resolved: false } });
     console.log(` - Unresolved Alerts: ${unresolvedCount}`);
     console.log("✅ Test 3 PASSED: Unresolved alerts count retrieved.");
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 3 failed:", err);
     process.exitCode = 1;
   }
@@ -63,7 +63,7 @@ async function runDashboardTests() {
     } else {
       console.log("✅ Test 4 PASSED: Zero raw vector floats in activity payload.");
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 4 failed:", err);
     process.exitCode = 1;
   }
@@ -73,7 +73,7 @@ async function runDashboardTests() {
   try {
     // Database check
     await prisma.$queryRaw`SELECT 1 as alive`;
-    const vectorExt: any = await prisma.$queryRaw`SELECT extname::text FROM pg_extension WHERE extname = 'vector'`;
+    const vectorExt = await prisma.$queryRaw<Array<{ extname: string }>>`SELECT extname::text FROM pg_extension WHERE extname = 'vector'`;
     const isPgVectorAvailable = Array.isArray(vectorExt) && vectorExt.length > 0;
 
     console.log(` - PostgreSQL Connected: true`);
@@ -84,7 +84,7 @@ async function runDashboardTests() {
       console.error("❌ Test 5 failed: pgvector extension not found.");
       process.exitCode = 1;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 5 failed:", err);
     process.exitCode = 1;
   }

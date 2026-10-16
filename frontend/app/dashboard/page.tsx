@@ -146,7 +146,7 @@ export default async function AdminDashboardPage() {
     alertType: alt.alertType,
     title: alt.title,
     message: alt.message,
-    severity: alt.severity as any,
+    severity: alt.severity,
     resolved: alt.resolved,
     createdAt: alt.createdAt.toISOString(),
     person: alt.person,

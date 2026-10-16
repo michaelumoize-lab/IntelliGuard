@@ -24,7 +24,7 @@ async function runTests() {
     console.log(` - Quality score: ${result.qualityScore}`);
     console.log(` - Model: ${result.model}`);
     console.log(` - Latency: ${result.executionTimeMs} ms`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 1 failed:", err);
     process.exitCode = 1;
   }
@@ -36,7 +36,7 @@ async function runTests() {
     await generateEmbedding(multiBuf, "test.jpg");
     console.error("❌ Test 2 failed: Expected MULTIPLE_FACES error but succeeded!");
     process.exitCode = 1;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof FastAPIError && err.code === "MULTIPLE_FACES") {
       console.log("✅ Test 2 PASSED: Multiple faces correctly rejected with MULTIPLE_FACES code.");
     } else {
@@ -64,7 +64,7 @@ async function runTests() {
     await generateEmbedding(noFaceJpeg, "noface.jpg");
     console.error("❌ Test 3 failed: Expected NO_FACE_DETECTED error but succeeded!");
     process.exitCode = 1;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof FastAPIError && err.code === "NO_FACE_DETECTED") {
       console.log(`✅ Test 3 PASSED: Non-face image correctly rejected with error code '${err.code}'.`);
     } else {

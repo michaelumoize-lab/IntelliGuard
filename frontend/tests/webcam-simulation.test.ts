@@ -58,14 +58,14 @@ async function runWebcamSimulationTests() {
       console.error("❌ Test 2 failed: Missing decision values.");
       process.exitCode = 1;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 2 failed:", err);
     process.exitCode = 1;
   }
 
   // 3. Test Scan History Capping (Max 10 Items)
   console.log("\n[Test 3] Verifying Scan History Capping Limit (Max 10)...");
-  let historyList: any[] = [];
+  let historyList: Array<{ id: number; name: string }> = [];
   for (let i = 1; i <= 15; i++) {
     const item = { id: i, name: `User ${i}` };
     historyList = [item, ...historyList].slice(0, 10);

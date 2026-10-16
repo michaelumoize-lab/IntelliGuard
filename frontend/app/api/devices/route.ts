@@ -2,9 +2,19 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
-import { DeviceType, DeviceStatus } from "@prisma/client";
+import { DeviceType, DeviceStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
+
+interface CreateDeviceBody {
+  deviceName?: string;
+  serialNumber?: string;
+  location?: string;
+  ipAddress?: string;
+  firmwareVersion?: string;
+  deviceType?: string;
+  status?: string;
+}
 
 const VALID_DEVICE_TYPES = Object.values(DeviceType);
 const VALID_DEVICE_STATUSES = Object.values(DeviceStatus);
@@ -33,7 +43,7 @@ export async function GET(req: NextRequest) {
   const statusParam = url.searchParams.get("status") || "";
   const typeParam = url.searchParams.get("deviceType") || "";
 
-  const whereClause: any = {};
+  const whereClause: Prisma.DeviceWhereInput = {};
 
   if (search) {
     whereClause.OR = [
@@ -96,7 +106,7 @@ export async function GET(req: NextRequest) {
         totalPages,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in GET /api/devices:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to fetch devices." },
@@ -110,9 +120,9 @@ export async function POST(req: NextRequest) {
   if (authCheck.error) return authCheck.error;
 
   try {
-    let body: any;
+    let body: Partial<CreateDeviceBody> = {};
     try {
-      body = await req.json();
+      body = (await req.json()) as Partial<CreateDeviceBody>;
     } catch (_) {
       return NextResponse.json(
         { success: false, error: "VALIDATION_ERROR", message: "Invalid JSON request body." },
@@ -178,8 +188,8 @@ export async function POST(req: NextRequest) {
           apiKeyHash,
         },
       });
-    } catch (err: any) {
-      if (err?.code === "P2002") {
+    } catch (err: unknown) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
         return NextResponse.json(
           { success: false, error: "VALIDATION_ERROR", message: `Serial number '${serialNumber}' is already registered.` },
           { status: 409 }
@@ -198,7 +208,7 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in POST /api/devices:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to create device." },

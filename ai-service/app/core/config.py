@@ -13,6 +13,17 @@ class Settings:
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s")
     MAX_CONCURRENT_INFERENCE: int = int(os.getenv("MAX_CONCURRENT_INFERENCE", "2"))
+    YOLO_MODEL_NAME: str = os.getenv("YOLO_MODEL_NAME", "yolov8n")
+    YOLO_MODEL_URL: str = os.getenv(
+        "YOLO_MODEL_URL",
+        "https://huggingface.co/Xuban/yolo_weights_database/resolve/main/yolov8n.onnx",
+    )
+    YOLO_CHECKSUM: str = os.getenv(
+        "YOLO_CHECKSUM",
+        "a7e5de35f0e094653cabcd67b4fa850a42693b2e9f251edc2a0931b937e7810e",
+    )
+    YOLO_CONFIDENCE_THRESHOLD: float = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.40"))
+    YOLO_IOU_THRESHOLD: float = float(os.getenv("YOLO_IOU_THRESHOLD", "0.45"))
 
     def __init__(self) -> None:
         if self.MAX_CONCURRENT_INFERENCE < 1:

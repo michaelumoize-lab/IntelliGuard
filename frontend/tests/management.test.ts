@@ -288,7 +288,7 @@ async function runMilestone5Tests() {
 
     createdPersonId = null;
     createdFileId = null;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test suite encountered error:", err);
     process.exitCode = 1;
   } finally {

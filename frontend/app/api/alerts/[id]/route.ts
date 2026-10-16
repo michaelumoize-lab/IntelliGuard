@@ -44,7 +44,7 @@ export async function PATCH(
       message: resolvedValue ? "Alert resolved successfully." : "Alert status updated.",
       alert: updatedAlert,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to update alert:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to update alert status." },

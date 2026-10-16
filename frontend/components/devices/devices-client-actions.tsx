@@ -306,8 +306,8 @@ export function DevicesTableInteractive({
         setApiKeyDialogOpen(true);
         toast.success(`New API Key generated for ${device.deviceName}`);
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred while regenerating API key.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "An error occurred while regenerating API key.");
     }
   };
 
@@ -356,10 +356,24 @@ export function DevicesTableInteractive({
   );
 }
 
+export interface DeviceDetailItem {
+  id: number;
+  deviceName: string;
+  serialNumber: string;
+  location: string;
+  ipAddress?: string | null;
+  firmwareVersion?: string | null;
+  deviceType: string;
+  status: string;
+  lastSeen?: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export function DeviceDetailHeaderActions({
   device,
 }: {
-  device: any;
+  device: DeviceDetailItem;
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -407,8 +421,8 @@ export function DeviceDetailHeaderActions({
         setApiKeyDialogOpen(true);
         toast.success("New API key generated.");
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred while regenerating API key.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "An error occurred while regenerating API key.");
     }
   };
 
@@ -417,7 +431,16 @@ export function DeviceDetailHeaderActions({
       <DeviceDetailsCard
         device={device}
         onEdit={() => {
-          setEditingDevice(device);
+          setEditingDevice({
+            id: device.id,
+            deviceName: device.deviceName,
+            serialNumber: device.serialNumber,
+            location: device.location,
+            ipAddress: device.ipAddress || undefined,
+            firmwareVersion: device.firmwareVersion || undefined,
+            deviceType: device.deviceType,
+            status: device.status,
+          });
           setFormOpen(true);
         }}
         onRegenerateKey={handleRegenerateKey}

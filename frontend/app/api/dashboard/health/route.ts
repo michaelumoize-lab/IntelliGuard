@@ -47,11 +47,11 @@ async function runHealthCheckProbe(): Promise<HealthCheckResponse> {
       } catch (_) {}
       fastApiStatus = { status: "offline", message: errDetail };
     }
-  } catch (err: any) {
-    const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+  } catch (err: unknown) {
+    const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
     console.warn(
       "FastAPI health check probe:",
-      isTimeout ? "Request timed out (cold start or unreachable)" : err?.message || "Service unreachable"
+      isTimeout ? "Request timed out (cold start or unreachable)" : (err instanceof Error ? err.message : "Service unreachable")
     );
     fastApiStatus = {
       status: "offline",
@@ -70,13 +70,13 @@ async function runHealthCheckProbe(): Promise<HealthCheckResponse> {
     postgresStatus = { status: "connected", latencyMs: pgLatency };
 
     // Verify pgvector extension
-    const vectorExt: any = await prisma.$queryRaw`SELECT extname::text FROM pg_extension WHERE extname = 'vector'`;
+    const vectorExt = await prisma.$queryRaw<Array<{ extname: string }>>`SELECT extname::text FROM pg_extension WHERE extname = 'vector'`;
     if (vectorExt && Array.isArray(vectorExt) && vectorExt.length > 0) {
       pgvectorStatus = { status: "available" };
     } else {
       pgvectorStatus = { status: "unavailable", message: "Extension 'vector' not found in database" };
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Database health check probe failed:", err);
     postgresStatus = { status: "disconnected" };
     pgvectorStatus = { status: "unavailable", message: "Database query failed" };

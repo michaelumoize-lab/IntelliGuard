@@ -1,6 +1,6 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
-import { DeviceType, DeviceStatus } from "@prisma/client";
+import { DeviceType, DeviceStatus, Prisma } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   AddDeviceButton,
@@ -36,7 +36,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
   const status = (resolvedParams.status || "").trim().toLowerCase();
   const deviceType = (resolvedParams.deviceType || "").trim().toLowerCase();
 
-  const whereClause: any = {};
+  const whereClause: Prisma.DeviceWhereInput = {};
 
   if (search) {
     whereClause.OR = [

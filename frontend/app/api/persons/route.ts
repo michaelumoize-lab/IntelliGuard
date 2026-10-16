@@ -5,6 +5,7 @@ import { generateEmbedding, FastAPIError } from "@/lib/ai/fastapi";
 import { checkForDuplicateFace } from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
+import { PersonCategory, PersonStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
             lastName,
             email,
             phone,
-            category: categoryInput as any,
+            category: categoryInput as PersonCategory,
             department,
             status: "active",
             faceImageUrl: ikResult.url,
@@ -164,7 +165,7 @@ export async function POST(req: NextRequest) {
         },
         { status: 201 }
       );
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
       console.error("Database creation failed after ImageKit upload. Initiating cleanup:", dbError);
       
       // Cleanup: Delete newly uploaded ImageKit asset so no orphaned images remain
@@ -172,7 +173,7 @@ export async function POST(req: NextRequest) {
         await deleteFaceImage(uploadedFileId);
       }
 
-      if (dbError.code === "P2002") {
+      if (dbError instanceof Prisma.PrismaClientKnownRequestError && dbError.code === "P2002") {
         const target = dbError.meta?.target;
         const targetStr = Array.isArray(target) ? target.join(", ") : String(target || "");
         if (targetStr.includes("email")) {
@@ -202,7 +203,7 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle specific FastAPI errors
     if (error instanceof FastAPIError) {
       return NextResponse.json(
@@ -245,7 +246,7 @@ export async function GET(req: NextRequest) {
     const category = (searchParams.get("category") || "").trim().toLowerCase();
 
     // Construct Prisma WHERE conditions
-    const where: any = {};
+    const where: Prisma.PersonWhereInput = {};
 
     if (search) {
       const terms = search.split(/\s+/).filter(Boolean);
@@ -264,11 +265,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (status && ["active", "inactive", "suspended"].includes(status)) {
-      where.status = status;
+      where.status = status as PersonStatus;
     }
 
     if (category && VALID_CATEGORIES.includes(category)) {
-      where.category = category;
+      where.category = category as PersonCategory;
     }
 
     // Count total matching records
@@ -352,7 +353,7 @@ export async function GET(req: NextRequest) {
         totalPages,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to list persons:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to retrieve persons list." },

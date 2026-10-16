@@ -101,7 +101,7 @@ export async function GET(
         ? "Hardware is actively connected and reporting real-time telemetry."
         : "Hardware is currently offline or unreachable. No recent heartbeat received.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in GET /api/devices/[id]/health:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to fetch device health." },
@@ -152,9 +152,20 @@ export async function POST(
   }
 
   try {
-    let body: any = {};
+    let body: {
+      firmware_version?: unknown;
+      firmwareVersion?: unknown;
+      wifi_rssi?: unknown;
+      wifiRssi?: unknown;
+      free_heap_bytes?: unknown;
+      freeHeapBytes?: unknown;
+      uptime_seconds?: unknown;
+      uptimeSeconds?: unknown;
+      door_state?: unknown;
+      doorState?: unknown;
+    } = {};
     try {
-      body = await req.json();
+      body = (await req.json()) as typeof body;
     } catch {
       // Body may be empty on simple ping
     }
@@ -204,7 +215,7 @@ export async function POST(
       status: "online",
       serverTime: new Date().toISOString(),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error processing device heartbeat:", err);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to record device heartbeat." },

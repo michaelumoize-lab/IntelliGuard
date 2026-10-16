@@ -31,22 +31,22 @@ export function LiveScanControls({
   onToggleSound,
 }: LiveScanControlsProps) {
   return (
-    <div className="w-full bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
-      {/* Control Buttons */}
-      <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full xl:w-auto">
+    <div className="w-full bg-card/80 backdrop-blur-sm text-card-foreground border border-border/80 rounded-2xl p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 transition-all">
+      {/* Control Buttons Group */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
         {/* Camera Toggle Button */}
         <button
           onClick={onToggleCamera}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+          className={`px-3.5 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border cursor-pointer select-none active:scale-[0.98] ${
             isCameraOn
-              ? "bg-secondary hover:bg-muted border-border text-foreground"
-              : "bg-primary hover:bg-primary/90 text-primary-foreground border-primary"
+              ? "bg-muted/70 hover:bg-muted border-border text-foreground hover:text-destructive"
+              : "bg-primary hover:bg-primary/90 text-primary-foreground border-primary shadow-primary/20"
           }`}
         >
           {isCameraOn ? (
             <>
-              <VideoOff className="w-4 h-4 text-destructive shrink-0" />
-              <span>Turn Off Camera</span>
+              <VideoOff className="w-4 h-4 text-destructive/80 shrink-0" />
+              <span>Turn Off</span>
             </>
           ) : (
             <>
@@ -60,7 +60,7 @@ export function LiveScanControls({
         <button
           onClick={onScan}
           disabled={!isCameraOn || !isCameraReady || isScanning || isMonitoring}
-          className="px-4 py-2.5 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border border-primary/20 cursor-pointer disabled:cursor-not-allowed"
+          className="px-4 py-2.5 bg-primary hover:bg-primary/90 disabled:bg-muted/60 disabled:text-muted-foreground text-primary-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border border-primary/30 cursor-pointer disabled:cursor-not-allowed select-none active:scale-[0.98]"
         >
           {isScanning && !isMonitoring ? (
             <Loader2 className="w-4 h-4 animate-spin text-primary-foreground shrink-0" />
@@ -74,21 +74,21 @@ export function LiveScanControls({
         <button
           onClick={onToggleMonitoring}
           disabled={!isCameraOn || !isCameraReady}
-          className={`px-4 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border cursor-pointer disabled:cursor-not-allowed ${
+          className={`px-3.5 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 border cursor-pointer disabled:cursor-not-allowed select-none active:scale-[0.98] ${
             isMonitoring
-              ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20"
-              : "bg-emerald-600 hover:bg-emerald-500 border-emerald-500 text-white"
-          } disabled:bg-muted disabled:border-border disabled:text-muted-foreground`}
+              ? "bg-destructive/15 border-destructive/40 text-destructive hover:bg-destructive/25 ring-2 ring-destructive/20 animate-pulse"
+              : "bg-emerald-600/90 hover:bg-emerald-600 border-emerald-500 text-white"
+          } disabled:bg-muted/60 disabled:border-border disabled:text-muted-foreground`}
         >
           {isMonitoring ? (
             <>
-              <Square className="w-4 h-4 fill-current shrink-0" />
-              <span>Stop Monitoring</span>
+              <Square className="w-3.5 h-3.5 fill-current shrink-0" />
+              <span>Stop Auto</span>
             </>
           ) : (
             <>
-              <Play className="w-4 h-4 fill-current shrink-0" />
-              <span>Start Monitoring</span>
+              <Play className="w-3.5 h-3.5 fill-current shrink-0" />
+              <span>Live Auto</span>
             </>
           )}
         </button>
@@ -98,34 +98,34 @@ export function LiveScanControls({
           <button
             type="button"
             onClick={onToggleSound}
-            className={`px-3 py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+            className={`p-2.5 sm:px-3 sm:py-2.5 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 border cursor-pointer select-none active:scale-[0.98] ${
               soundEnabled
-                ? "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
-                : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                ? "bg-primary/10 border-primary/25 text-primary hover:bg-primary/20"
+                : "bg-muted/60 border-border text-muted-foreground hover:bg-muted"
             }`}
             title={soundEnabled ? "Audio Chime: Active" : "Audio Chime: Muted"}
           >
             {soundEnabled ? (
               <Volume2 className="w-4 h-4 text-primary shrink-0" />
             ) : (
-              <VolumeX className="w-4 h-4 shrink-0" />
+              <VolumeX className="w-4 h-4 text-muted-foreground/70 shrink-0" />
             )}
-            <span className="hidden sm:inline">{soundEnabled ? "Audio On" : "Muted"}</span>
+            <span className="hidden sm:inline text-[11px]">{soundEnabled ? "Audio" : "Mute"}</span>
           </button>
         )}
       </div>
 
-      {/* Telemetry Stats Bar */}
-      <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 sm:gap-6 w-full xl:w-auto text-xs text-muted-foreground pt-3 xl:pt-0 border-t xl:border-t-0 border-border">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-muted-foreground shrink-0" />
-          <span>Scans Executed:</span>
+      {/* Telemetry Stats Pills */}
+      <div className="flex items-center justify-between md:justify-end gap-2 text-xs text-muted-foreground pt-2.5 md:pt-0 border-t md:border-t-0 border-border/60">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/60 text-[11px]">
+          <Activity className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
+          <span>Scans:</span>
           <span className="font-mono font-bold text-foreground">{scanCount}</span>
         </div>
 
         {lastScanTime && (
-          <div className="flex items-center gap-2">
-            <span>Last Scan:</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/60 text-[11px]">
+            <span>Last:</span>
             <span className="font-mono text-foreground font-medium">{lastScanTime}</span>
           </div>
         )}

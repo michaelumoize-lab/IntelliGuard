@@ -9,7 +9,7 @@ async function runImageKitUrlTests() {
   let testsPassed = 0;
   let testsFailed = 0;
 
-  function assertEqual(actual: any, expected: any, testName: string) {
+  function assertEqual<T>(actual: T, expected: T, testName: string) {
     if (actual === expected) {
       console.log(`✅ [PASS] ${testName}`);
       testsPassed++;
@@ -78,8 +78,8 @@ async function runImageKitUrlTests() {
       const deleted = await deleteFaceImage(result.fileId);
       assertEqual(deleted, true, "Test 5: deleteFaceImage succeeds using fileId");
     }
-  } catch (err: any) {
-    console.warn("⚠️ Skipping live ImageKit upload/delete test (missing network/credentials or API error):", err.message || err);
+  } catch (err: unknown) {
+    console.warn("⚠️ Skipping live ImageKit upload/delete test (missing network/credentials or API error):", err instanceof Error ? err.message : err);
   }
 
   console.log("\n==================================================");

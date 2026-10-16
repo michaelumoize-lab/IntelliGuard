@@ -107,11 +107,53 @@ function runAccessControlUnitTests() {
 
   // Test 7: Fail Closed on Invalid Input
   console.log("\n[Test 7] Null Input Fail Closed...");
-  const res7 = evaluateAccess(null as any);
+  const res7 = evaluateAccess(null as unknown as Parameters<typeof evaluateAccess>[0]);
   if (res7.accessStatus === "denied" && res7.doorAction === "lock") {
     console.log("✅ PASSED: Null input safely failed closed.");
   } else {
     console.error("❌ FAILED: Null input did not fail closed:", res7);
+    process.exitCode = 1;
+  }
+
+  // Test 8: No Person Detected (Hardware Non-Action)
+  console.log("\n[Test 8] No Person Detected...");
+  const res8 = evaluateAccess({
+    status: "no_person",
+    similarity: 0,
+    distance: 1,
+  });
+  if (res8.accessStatus === "denied" && res8.reason === "no_person_detected" && res8.doorAction === "no_action") {
+    console.log("✅ PASSED: No person detected correctly resulted in non-action door state.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for no person detected:", res8);
+    process.exitCode = 1;
+  }
+
+  // Test 9: Person Detected, No Face Detected (Hardware Non-Action)
+  console.log("\n[Test 9] Person Detected, No Face Detected...");
+  const res9 = evaluateAccess({
+    status: "person_no_face",
+    similarity: 0,
+    distance: 1,
+  });
+  if (res9.accessStatus === "denied" && res9.reason === "no_face_detected" && res9.doorAction === "no_action") {
+    console.log("✅ PASSED: Person without face correctly resulted in non-action door state.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for person without face:", res9);
+    process.exitCode = 1;
+  }
+
+  // Test 10: Face Detected, Low Quality (Hardware Non-Action)
+  console.log("\n[Test 10] Face Detected, Low Quality...");
+  const res10 = evaluateAccess({
+    status: "face_low_quality",
+    similarity: 0,
+    distance: 1,
+  });
+  if (res10.accessStatus === "denied" && res10.reason === "poor_quality_face" && res10.doorAction === "no_action") {
+    console.log("✅ PASSED: Low quality face correctly resulted in non-action door state.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for low quality face:", res10);
     process.exitCode = 1;
   }
 

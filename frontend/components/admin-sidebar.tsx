@@ -45,6 +45,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type UserRole = "CUSTOMER" | "CRAFTSMAN" | "ADMIN" | string;
 
@@ -295,41 +303,81 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Fixed Sticky Footer */}
-      <SidebarFooter className="shrink-0 border-t border-sidebar-border">
+      {/* Fixed Sticky Footer with User Profile Dropdown */}
+      <SidebarFooter className="shrink-0 border-t border-sidebar-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
-              <UserAvatar user={user} className="h-8 w-8 shrink-0" />
-              <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate font-medium">
-                  {user.name || user.email}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {user.email}
-                </span>
-                <span className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground/70">
-                  {user.role
-                    ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
-                    : "Admin"}
-                </span>
-              </div>
-              <SidebarMenuButton
-                size="default"
-                variant="outline"
-                className="h-8 w-8 shrink-0 hover:text-destructive cursor-pointer"
-                onClick={handleLogout}
-                disabled={isLoading}
-                tooltip="Logout"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  className="w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center hover:bg-sidebar-accent"
+                  tooltip={user.name || user.email}
+                >
+                  <UserAvatar user={user} className="h-8 w-8 shrink-0 rounded-lg" />
+                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                    <span className="truncate font-semibold text-xs text-foreground">
+                      {user.name || user.email}
+                    </span>
+                    <span className="truncate text-[10px] text-muted-foreground">
+                      {user.email}
+                    </span>
+                    <span className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground/70">
+                      {user.role
+                        ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
+                        : "Admin"}
+                    </span>
+                  </div>
+                  <ChevronDown className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden shrink-0" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-56 rounded-xl shadow-lg border border-border"
+                side={isMobile ? "bottom" : "right"}
+                align="end"
+                sideOffset={8}
               >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <LogOut className="h-4 w-4" />
-                )}
-                <span className="sr-only">Logout</span>
-              </SidebarMenuButton>
-            </div>
+                <DropdownMenuLabel className="p-0 font-normal">
+                  <div className="flex items-center gap-2.5 px-2.5 py-2 text-left text-sm">
+                    <UserAvatar user={user} className="h-8 w-8 rounded-lg shrink-0" />
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-semibold text-xs text-foreground">
+                        {user.name || user.email}
+                      </span>
+                      <span className="truncate text-[10px] text-muted-foreground">
+                        {user.email}
+                      </span>
+                      <span className="mt-0.5 text-[10px] font-medium text-primary">
+                        {user.role
+                          ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
+                          : "Admin"}
+                      </span>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link href="/settings/account" className="flex items-center gap-2">
+                    <Settings className="size-4 text-muted-foreground" />
+                    <span>Account Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={handleLogout}
+                  disabled={isLoading}
+                  className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10 font-medium"
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <LogOut className="mr-2 size-4" />
+                  )}
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
