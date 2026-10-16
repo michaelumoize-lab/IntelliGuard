@@ -346,9 +346,14 @@ export default function WebcamSimulationPage() {
   // Continuous monitoring timer loop (2.5s interval)
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
+    let initialTimer: NodeJS.Timeout | null = null;
 
     if (isCameraOn && isMonitoring && isCameraReady) {
-      executeScan();
+      initialTimer = setTimeout(() => {
+        if (isMonitoringRef.current && isCameraOnRef.current && !inFlightRef.current) {
+          executeScan();
+        }
+      }, 50);
 
       intervalId = setInterval(() => {
         if (isMonitoringRef.current && isCameraOnRef.current && !inFlightRef.current) {
@@ -358,6 +363,7 @@ export default function WebcamSimulationPage() {
     }
 
     return () => {
+      if (initialTimer) clearTimeout(initialTimer);
       if (intervalId) clearInterval(intervalId);
     };
   }, [isCameraOn, isMonitoring, isCameraReady, executeScan]);
@@ -367,26 +373,94 @@ export default function WebcamSimulationPage() {
     setIsMonitoring((prev) => !prev);
   };
 
+  const renderDecisionBadge = (item: ScanHistoryItem) => {
+    if (item.status === "granted") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+          <CheckCircle2 className="w-3.5 h-3.5" /> GRANTED
+        </span>
+      );
+    }
+    if (item.matchStatus === "deactivated") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/15 border border-destructive/30 text-destructive font-semibold text-[11px]">
+          <ShieldAlert className="w-3.5 h-3.5" /> DEACTIVATED
+        </span>
+      );
+    }
+    if (item.matchStatus === "ambiguous") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold text-[11px]">
+          <AlertTriangle className="w-3.5 h-3.5" /> AMBIGUOUS
+        </span>
+      );
+    }
+    if (item.matchStatus === "no_person") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-500/10 border border-slate-500/20 text-slate-400 font-semibold text-[11px]">
+          <Users className="w-3.5 h-3.5" /> NO PERSON
+        </span>
+      );
+    }
+    if (item.matchStatus === "person_no_face") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-semibold text-[11px]">
+          <User className="w-3.5 h-3.5" /> NO FACE
+        </span>
+      );
+    }
+    if (item.matchStatus === "face_low_quality") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-semibold text-[11px]">
+          <AlertTriangle className="w-3.5 h-3.5" /> LOW QUALITY
+        </span>
+      );
+    }
+    if (item.matchStatus === "unknown") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold text-[11px] border border-border">
+          <HelpCircle className="w-3.5 h-3.5" /> UNKNOWN
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive font-semibold text-[11px]">
+        <XCircle className="w-3.5 h-3.5" /> DENIED
+      </span>
+    );
+  };
+
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-7xl mx-auto space-y-6 sm:space-y-8 bg-background text-foreground">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-6">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1.5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/70 pb-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-[10px] tracking-wider uppercase font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              Terminal Gateway #1
+            </span>
+            <span className="text-xs text-muted-foreground">• Fail-Closed Secured</span>
+          </div>
+          <div className="flex items-center gap-2.5 pt-0.5">
             <span className="p-2 bg-primary/10 border border-primary/25 text-primary rounded-xl shrink-0 shadow-sm">
               <Camera className="w-5 h-5" />
             </span>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Biometric Terminal Simulation</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Biometric Simulation</h1>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-            Real-time human body & facial recognition access gateway with instant hardware decision mapping.
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-2xl">
+            Real-time human body & facial recognition access gateway with sub-500ms edge decision mapping and automated turnstile control.
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/70 text-xs font-mono text-muted-foreground shadow-sm">
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-card border border-border/80 text-xs font-mono text-muted-foreground shadow-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-foreground">AI Pipeline:</span>
+            <span className="font-semibold text-foreground">AI Engine:</span>
             <span>YOLOv8n + Buffalo_S</span>
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border/80 text-xs font-mono text-muted-foreground shadow-sm">
+            <span className="text-foreground font-semibold">Relay:</span>
+            <span className="text-emerald-500 font-semibold">READY</span>
           </div>
         </div>
       </div>
@@ -450,70 +524,70 @@ export default function WebcamSimulationPage() {
             No scans executed during this session yet. Turn on camera and click &quot;Scan Face&quot;.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider">
-                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Time</th>
-                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Decision</th>
-                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Individual</th>
-                  <th className="pb-3 font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Person Code</th>
-                  <th className="pb-3 text-right font-semibold font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Similarity</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {scanHistory.map((item) => (
-                  <tr key={item.id} className="hover:bg-muted/40 transition-colors">
-                    <td className="py-3 font-mono text-muted-foreground">{item.time}</td>
-                    <td className="py-3">
-                      {item.status === "granted" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> GRANTED
-                        </span>
-                      ) : item.matchStatus === "deactivated" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/15 border border-destructive/30 text-destructive font-semibold text-[11px]">
-                          <ShieldAlert className="w-3.5 h-3.5" /> USER DEACTIVATED
-                        </span>
-                      ) : item.matchStatus === "ambiguous" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold text-[11px]">
-                          <AlertTriangle className="w-3.5 h-3.5" /> AMBIGUOUS
-                        </span>
-                      ) : item.matchStatus === "no_person" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-500/10 border border-slate-500/20 text-slate-400 font-semibold text-[11px]">
-                          <Users className="w-3.5 h-3.5" /> NO PERSON
-                        </span>
-                      ) : item.matchStatus === "person_no_face" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-semibold text-[11px]">
-                          <User className="w-3.5 h-3.5" /> NO FACE
-                        </span>
-                      ) : item.matchStatus === "face_low_quality" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-semibold text-[11px]">
-                          <AlertTriangle className="w-3.5 h-3.5" /> LOW QUALITY
-                        </span>
-                      ) : item.matchStatus === "unknown" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold text-[11px] border border-border">
-                          <HelpCircle className="w-3.5 h-3.5" /> UNKNOWN
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive font-semibold text-[11px]">
-                          <XCircle className="w-3.5 h-3.5" /> DENIED
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 font-medium text-foreground">{item.name}</td>
-                    <td className="py-3 font-mono text-muted-foreground">{item.code}</td>
-                    <td className="py-3 font-mono text-right font-semibold text-foreground">
+          <>
+            {/* Mobile Cards View (< sm) */}
+            <div className="space-y-3 sm:hidden">
+              {scanHistory.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3.5 rounded-xl border border-border/70 bg-muted/20 space-y-2 hover:bg-muted/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] text-muted-foreground">{item.time}</span>
+                    {renderDecisionBadge(item)}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <span className="font-semibold text-sm text-foreground truncate">{item.name}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground bg-muted/60 px-2 py-0.5 rounded border border-border/50 shrink-0">
+                      {item.code}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40 font-mono text-muted-foreground">
+                    <span className="text-[11px]">Similarity</span>
+                    <span className="font-semibold text-foreground">
                       {item.matchStatus === "no_person" || item.matchStatus === "person_no_face"
                         ? "—"
                         : item.similarity < 0
                         ? "< 0%"
                         : `${(item.similarity * 100).toFixed(1)}%`}
-                    </td>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View (>= sm) */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider">
+                    <th className="pb-3 font-semibold">Time</th>
+                    <th className="pb-3 font-semibold">Decision</th>
+                    <th className="pb-3 font-semibold">Individual</th>
+                    <th className="pb-3 font-semibold">Person Code</th>
+                    <th className="pb-3 text-right font-semibold">Similarity</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {scanHistory.map((item) => (
+                    <tr key={item.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="py-3 font-mono text-muted-foreground">{item.time}</td>
+                      <td className="py-3">{renderDecisionBadge(item)}</td>
+                      <td className="py-3 font-medium text-foreground">{item.name}</td>
+                      <td className="py-3 font-mono text-muted-foreground">{item.code}</td>
+                      <td className="py-3 font-mono text-right font-semibold text-foreground">
+                        {item.matchStatus === "no_person" || item.matchStatus === "person_no_face"
+                          ? "—"
+                          : item.similarity < 0
+                          ? "< 0%"
+                          : `${(item.similarity * 100).toFixed(1)}%`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

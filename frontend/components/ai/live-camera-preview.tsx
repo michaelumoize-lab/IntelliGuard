@@ -176,7 +176,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     return (
       <div
         className={cn(
-          "relative w-full aspect-[3/4] max-h-[72vh] bg-black/95 rounded-2xl overflow-hidden border border-border shadow-md flex flex-col items-center justify-center transition-all duration-300 select-none",
+          "relative w-full aspect-[3/4] max-h-[62dvh] sm:max-h-[70dvh] lg:max-h-[74dvh] bg-black/95 rounded-2xl overflow-hidden border border-border shadow-md flex flex-col items-center justify-center transition-all duration-300 select-none",
           className
         )}
       >
@@ -349,10 +349,10 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
         {isCameraOn && isCameraReady && !isLoading && !isError && showHud && (
           <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 sm:p-5 select-none">
             {/* Top HUD Bar: Decision / Status Banner */}
-            <div className="flex items-center justify-between w-full z-10">
+            <div className="flex items-center justify-between w-full z-10 gap-2">
               {overlayResult ? (
                 <div
-                  className={`px-3 py-1.5 rounded-full border bg-black/90 backdrop-blur-md text-xs shadow-2xl flex items-center gap-2 transition-all animate-in fade-in zoom-in-95 duration-200 select-none ${
+                  className={`px-3 py-1.5 rounded-full border bg-black/90 backdrop-blur-xl text-xs shadow-2xl flex items-center gap-2 transition-all animate-in fade-in zoom-in-95 duration-200 select-none max-w-[calc(100%-48px)] sm:max-w-none ${
                     overlayResult.status === "granted"
                       ? "border-emerald-400/90 shadow-[0_0_16px_rgba(16,185,129,0.4)]"
                       : overlayResult.status === "deactivated"
@@ -419,7 +419,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   )}
 
                   {/* High-Contrast Individual Name or Primary Message */}
-                  <span className="font-bold text-white text-xs tracking-wide truncate max-w-[160px] sm:max-w-xs drop-shadow-sm">
+                  <span className="font-bold text-white text-xs tracking-wide truncate max-w-[110px] sm:max-w-xs drop-shadow-sm">
                     {overlayResult.status === "granted"
                       ? overlayResult.name || "Access Allowed"
                       : overlayResult.status === "deactivated"
@@ -469,7 +469,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                 className={`relative ${
                   circleOnly
                     ? "w-[68%] h-[82%] max-w-[240px] max-h-[300px]"
-                    : "w-52 sm:w-64 md:w-72 h-68 sm:h-80 md:h-88 max-w-[85vw] max-h-[60vh]"
+                    : "w-48 sm:w-60 md:w-68 h-60 sm:h-72 md:h-80 max-w-[85vw] max-h-[56vh]"
                 } flex flex-col items-center justify-between transition-all duration-300`}
               >
                 {!circleOnly && (
