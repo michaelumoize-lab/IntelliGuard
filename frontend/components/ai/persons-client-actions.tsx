@@ -140,7 +140,21 @@ export function RegisterPersonButton() {
   );
 }
 
-export function PersonRowActions({ person }: { person: any }) {
+export interface PersonRowData {
+  id: number;
+  personCode: string;
+  firstName: string;
+  lastName: string;
+  category: string;
+  department?: string | null;
+  status: string;
+  faceImageUrl?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+}
+
+export function PersonRowActions({ person }: { person: PersonRowData }) {
   const router = useRouter();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -166,7 +180,7 @@ export function PersonRowActions({ person }: { person: any }) {
       } else {
         toast.error(data.message || "Failed to update status.");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to update status.");
     } finally {
       setIsUpdatingStatus(false);
@@ -191,7 +205,7 @@ export function PersonRowActions({ person }: { person: any }) {
       } else {
         toast.error(data.message || "Failed to delete person.");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete person.");
     } finally {
       setIsDeleting(false);

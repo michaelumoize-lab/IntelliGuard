@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     let aiResult;
     try {
       aiResult = await generateEmbedding(imageBuffer, imageFile.name || "recognition.jpg");
-    } catch (aiErr: any) {
+    } catch (aiErr: unknown) {
       if (aiErr instanceof FastAPIError) {
         let code = aiErr.code as string;
         if (code === "FASTAPI_UNAVAILABLE") code = "AI_SERVICE_UNAVAILABLE";
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       },
       processing_time_ms: processingTimeMs,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Unexpected error during face recognition:", error);
     return NextResponse.json(
       {

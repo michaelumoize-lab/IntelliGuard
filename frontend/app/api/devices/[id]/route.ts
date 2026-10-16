@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
-import { DeviceType, DeviceStatus } from "@prisma/client";
+import { DeviceType, DeviceStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
+
+interface UpdateDeviceBody {
+  id?: unknown;
+  serialNumber?: unknown;
+  apiKeyHash?: unknown;
+  createdAt?: unknown;
+  deviceName?: string;
+  location?: string;
+  ipAddress?: string | null;
+  firmwareVersion?: string | null;
+  deviceType?: string;
+  status?: string;
+}
 
 const VALID_DEVICE_TYPES = Object.values(DeviceType);
 const VALID_DEVICE_STATUSES = Object.values(DeviceStatus);
@@ -136,7 +149,7 @@ export async function GET(
       recentLogs,
       recentAlerts,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in GET /api/devices/[id]:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to fetch device details." },
@@ -170,9 +183,9 @@ export async function PATCH(
       );
     }
 
-    let body: any;
+    let body: Partial<UpdateDeviceBody> = {};
     try {
-      body = await req.json();
+      body = (await req.json()) as Partial<UpdateDeviceBody>;
     } catch (_) {
       return NextResponse.json(
         { success: false, error: "VALIDATION_ERROR", message: "Invalid JSON body." },
@@ -188,7 +201,7 @@ export async function PATCH(
       );
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.DeviceUpdateInput = {};
 
     if (body.deviceName !== undefined) {
       const name = (body.deviceName || "").trim();
@@ -253,7 +266,7 @@ export async function PATCH(
       success: true,
       device: safeDevice,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in PATCH /api/devices/[id]:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to update device." },
@@ -296,7 +309,7 @@ export async function DELETE(
       success: true,
       message: "Device deleted successfully. Historical access logs and alerts have been preserved.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in DELETE /api/devices/[id]:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to delete device." },

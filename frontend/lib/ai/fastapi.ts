@@ -54,7 +54,7 @@ export async function generateEmbedding(
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("FastAPI service connection error:", err);
     throw new FastAPIError(
       "FASTAPI_UNAVAILABLE",
@@ -170,14 +170,14 @@ export async function detectFaces(
     return {
       success: !!data.success,
       faceCount: typeof data.face_count === "number" ? data.face_count : (data.faces || []).length,
-      faces: (data.faces || []).map((f: any) => ({
+      faces: (data.faces || []).map((f: { bbox?: number[]; confidence?: number; landmarks?: number[][] }) => ({
         bbox: f.bbox || [],
         confidence: typeof f.confidence === "number" ? f.confidence : 0,
         landmarks: f.landmarks || undefined,
       })),
       executionTimeMs: data.execution_time_ms || 0,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("FastAPI detectFaces error:", err);
     throw err;
   }
@@ -246,7 +246,7 @@ export async function analyzeImage(
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("FastAPI analyzeImage connection error:", err);
     throw new FastAPIError(
       "FASTAPI_UNAVAILABLE",
@@ -270,7 +270,9 @@ export async function analyzeImage(
       if (errJson.detail) {
         errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
       }
-    } catch (_) {}
+    } catch {
+      // Ignore JSON parse errors for non-JSON response bodies
+    }
     throw new FastAPIError("AI_SERVICE_ERROR", errorDetail, response.status);
   }
 
@@ -283,12 +285,12 @@ export async function analyzeImage(
     faceDetected: !!data.face_detected,
     personCount: typeof data.person_count === "number" ? data.person_count : 0,
     faceCount: typeof data.face_count === "number" ? data.face_count : 0,
-    persons: (data.persons || []).map((p: any) => ({
+    persons: (data.persons || []).map((p: { bbox?: number[]; confidence?: number; is_primary?: boolean }) => ({
       bbox: p.bbox || [],
       confidence: typeof p.confidence === "number" ? p.confidence : 0,
       is_primary: !!p.is_primary,
     })),
-    faces: (data.faces || []).map((f: any) => ({
+    faces: (data.faces || []).map((f: { bbox?: number[]; confidence?: number; landmarks?: number[][] }) => ({
       bbox: f.bbox || [],
       confidence: typeof f.confidence === "number" ? f.confidence : 0,
       landmarks: f.landmarks || undefined,

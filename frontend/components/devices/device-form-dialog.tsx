@@ -101,8 +101,8 @@ export function DeviceFormDialog({
         status,
       });
       onOpenChange(false);
-    } catch (err: any) {
-      setError(err.message || "Failed to save device.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save device.");
     } finally {
       setLoading(false);
     }

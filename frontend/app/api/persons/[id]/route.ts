@@ -2,8 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
+import { Prisma, PersonCategory, PersonStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
+
+interface UpdatePersonBody {
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
+  phone?: string | null;
+  department?: string | null;
+  notes?: string | null;
+  category?: string;
+  status?: string;
+}
 
 const VALID_CATEGORIES = ["employee", "student", "visitor", "contractor"];
 const VALID_STATUSES = ["active", "inactive", "suspended"];
@@ -84,7 +96,7 @@ export async function GET(
         embeddingHistory: person.faceEmbeddings,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to retrieve person:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to retrieve person record." },
@@ -126,8 +138,17 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
-    const updateData: any = {};
+    let body: Partial<UpdatePersonBody> = {};
+    try {
+      body = (await req.json()) as Partial<UpdatePersonBody>;
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid JSON body." },
+        { status: 400 }
+      );
+    }
+
+    const updateData: Prisma.PersonUpdateInput = {};
 
     if (body.firstName !== undefined) {
       const firstName = String(body.firstName).trim();
@@ -179,7 +200,7 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      updateData.category = cat;
+      updateData.category = cat as PersonCategory;
     }
 
     if (body.status !== undefined) {
@@ -190,7 +211,7 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      updateData.status = stat;
+      updateData.status = stat as PersonStatus;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -211,10 +232,10 @@ export async function PATCH(
       message: "Person updated successfully",
       person: updatedPerson,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to update person:", error);
 
-    if (error.code === "P2002") {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const target = error.meta?.target;
       const targetStr = Array.isArray(target) ? target.join(", ") : String(target || "");
       if (targetStr.includes("email")) {
@@ -307,7 +328,7 @@ export async function DELETE(
       success: true,
       message: "Person and associated biometric data deleted successfully.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to delete person:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to delete person record." },

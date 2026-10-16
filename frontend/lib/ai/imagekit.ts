@@ -77,18 +77,18 @@ export async function getImageFileDetails(
   if (!fileId) return null;
   try {
     const client = getImageKitClient();
-    const details = await new Promise<any>((resolve, reject) => {
+    const details = await new Promise<{ fileId?: string; url?: string; filePath?: string } | null>((resolve, reject) => {
       client.getFileDetails(fileId, (err, result) => {
         if (err) reject(err);
-        else resolve(result);
+        else resolve(result as { fileId?: string; url?: string; filePath?: string } | null);
       });
     });
 
-    if (!details || !details.url) return null;
+    if (!details || !details.url || !details.fileId) return null;
     return {
       fileId: details.fileId,
       url: details.url,
-      filePath: details.filePath,
+      filePath: details.filePath || "",
     };
   } catch (error) {
     console.error(`Failed to fetch ImageKit asset details (fileId: ${fileId}):`, error);

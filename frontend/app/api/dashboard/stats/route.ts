@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
         low: lowAlerts,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to calculate dashboard statistics:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to calculate dashboard statistics." },

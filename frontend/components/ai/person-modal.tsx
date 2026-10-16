@@ -18,11 +18,24 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UploadIcon, InfoIcon, Loader2Icon, Camera } from "lucide-react";
 import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
+export interface PersonModalInitialData {
+  id?: number;
+  firstName?: string;
+  lastName?: string;
+  category?: string;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  status?: string;
+  faceImageUrl?: string | null;
+}
+
 interface PersonModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  initialData?: any;
+  initialData?: PersonModalInitialData | null;
 }
 
 export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonModalProps) {
@@ -86,7 +99,7 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
         const trimmedEmail = email.trim();
         const trimmedNotes = notes.trim();
 
-        if (isEditing) {
+        if (isEditing && initialData?.id) {
           // Edit Person Metadata
           const res = await fetch(`/api/persons/${initialData.id}`, {
             method: "PATCH",
@@ -138,9 +151,9 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
         onSuccess();
         onClose();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Form error:", err);
-      toast.error(err.message || "An unexpected error occurred.");
+      toast.error(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setIsLoading(false);
     }

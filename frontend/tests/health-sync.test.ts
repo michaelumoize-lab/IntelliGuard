@@ -62,7 +62,7 @@ async function runHealthSyncTests() {
     console.log("\n==================================================");
     console.log("  Health Sync Tests Completed Successfully!");
     console.log("==================================================");
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test failed:", err);
     process.exit(1);
   }

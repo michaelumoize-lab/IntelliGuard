@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { analyzeImage, FastAPIError } from "@/lib/ai/fastapi";
 import { findTopFaceMatches } from "@/lib/ai/face-recognition";
 import { evaluateAccess } from "@/lib/access/access-control";
-import { authenticateDevice } from "@/lib/access/device-auth";
+import { authenticateDevice, DeviceAuthResult } from "@/lib/access/device-auth";
 import { getServerSession } from "@/lib/get-session";
+import { AccessReason, AccessStatus, DoorAction, MatchStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Step 2: Authenticate caller (Admin session for simulation / Device credentials for hardware)
-    let deviceAuth: { isValid: boolean; device?: any; reason?: string } = { isValid: false };
+    let deviceAuth: DeviceAuthResult = { isValid: false };
 
     if (!deviceIdInput && !apiKeyInput) {
       const session = await getServerSession();
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
     let aiResult;
     try {
       aiResult = await analyzeImage(imageBuffer, imageFile.name || "access.jpg");
-    } catch (aiErr: any) {
+    } catch (aiErr: unknown) {
       const processingTimeMs = Date.now() - startTime;
 
       if (aiErr instanceof FastAPIError) {
@@ -309,10 +310,10 @@ export async function POST(req: NextRequest) {
         deviceId: deviceAuth.device?.id || null,
         personId: matchedPersonId,
         embeddingId: matchedEmbeddingId,
-        matchStatus: recognition.matchStatus as any,
-        accessStatus: decision.accessStatus as any,
-        reason: decision.reason as any,
-        doorAction: decision.doorAction as any,
+        matchStatus: recognition.matchStatus as MatchStatus,
+        accessStatus: decision.accessStatus as AccessStatus,
+        reason: decision.reason as AccessReason,
+        doorAction: decision.doorAction as DoorAction,
         confidenceScore: recognition.face.similarity,
         embeddingDistance: recognition.face.distance,
         processingTimeMs,
@@ -409,7 +410,7 @@ export async function POST(req: NextRequest) {
       candidates: recognition.candidates,
       processing_time_ms: processingTimeMs,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Unexpected error in access decision route:", error);
     const processingTimeMs = Date.now() - startTime;
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma, AccessStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,9 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(50, Math.max(1, isNaN(rawLimit) ? 10 : rawLimit));
     const status = (searchParams.get("status") || "").trim().toLowerCase();
 
-    const where: any = {};
+    const where: Prisma.AccessLogWhereInput = {};
     if (status && ["granted", "denied"].includes(status)) {
-      where.accessStatus = status;
+      where.accessStatus = status as AccessStatus;
     }
 
     const events = await prisma.accessLog.findMany({
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
       success: true,
       events,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to retrieve dashboard activity events:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to retrieve dashboard activity events." },

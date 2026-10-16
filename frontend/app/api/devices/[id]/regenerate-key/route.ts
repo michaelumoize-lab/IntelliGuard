@@ -54,7 +54,7 @@ export async function POST(
       message: "API key regenerated successfully. Previous API key has been invalidated.",
       apiKey: rawApiKey,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in POST /api/devices/[id]/regenerate-key:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to regenerate API key." },

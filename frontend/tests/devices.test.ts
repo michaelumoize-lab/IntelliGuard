@@ -320,7 +320,7 @@ async function runMilestone10Tests() {
     await prisma.accessLog.delete({ where: { id: mockLog.id } });
     await prisma.alert.delete({ where: { id: mockAlert.id } });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test suite encountered unhandled exception:", err);
     testsFailed++;
     process.exitCode = 1;

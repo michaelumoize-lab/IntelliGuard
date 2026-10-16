@@ -107,7 +107,7 @@ function runAccessControlUnitTests() {
 
   // Test 7: Fail Closed on Invalid Input
   console.log("\n[Test 7] Null Input Fail Closed...");
-  const res7 = evaluateAccess(null as any);
+  const res7 = evaluateAccess(null as unknown as Parameters<typeof evaluateAccess>[0]);
   if (res7.accessStatus === "denied" && res7.doorAction === "lock") {
     console.log("✅ PASSED: Null input safely failed closed.");
   } else {

@@ -75,10 +75,10 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
     body: formData,
   });
 
-  let data: any = {};
+  let data: Partial<AccessScanResponse> = {};
   try {
-    data = await response.json();
-  } catch (_) {
+    data = (await response.json()) as Partial<AccessScanResponse>;
+  } catch {
     // Non-JSON error body fallback
   }
 

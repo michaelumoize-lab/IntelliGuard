@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import type { Prisma, PersonStatus, PersonCategory } from "@prisma/client";
 import {
   Table,
   TableHeader,
@@ -42,7 +43,7 @@ export default async function PersonsPage({
   const category = (resolvedSearchParams.category || "").trim().toLowerCase();
 
   // Construct Prisma WHERE query for server-side filtering
-  const where: any = {};
+  const where: Prisma.PersonWhereInput = {};
 
   if (search) {
     const terms = search.split(/\s+/).filter(Boolean);
@@ -61,11 +62,11 @@ export default async function PersonsPage({
   }
 
   if (status && ["active", "inactive", "suspended"].includes(status)) {
-    where.status = status;
+    where.status = status as PersonStatus;
   }
 
   if (category && VALID_CATEGORIES.includes(category)) {
-    where.category = category;
+    where.category = category as PersonCategory;
   }
 
   // Count total matching records directly on PostgreSQL via Prisma

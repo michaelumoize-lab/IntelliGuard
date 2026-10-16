@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import type { Prisma, Severity, AlertType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -49,14 +50,14 @@ export async function GET(
       );
     }
 
-    const whereClause: any = { deviceId };
+    const whereClause: Prisma.AlertWhereInput = { deviceId };
 
     if (severity) {
-      whereClause.severity = severity;
+      whereClause.severity = severity as Severity;
     }
 
     if (alertType) {
-      whereClause.alertType = alertType;
+      whereClause.alertType = alertType as AlertType;
     }
 
     if (resolvedParam !== null && resolvedParam !== undefined && resolvedParam !== "") {
@@ -107,7 +108,7 @@ export async function GET(
         totalPages,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in GET /api/devices/[id]/alerts:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to fetch device alerts." },

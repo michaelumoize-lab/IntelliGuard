@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma, AlertType, Severity } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +15,14 @@ export async function GET(req: NextRequest) {
     const severity = (searchParams.get("severity") || "").trim().toLowerCase();
     const resolvedParam = searchParams.get("resolved");
 
-    const where: any = {};
+    const where: Prisma.AlertWhereInput = {};
 
     if (type) {
-      where.alertType = type;
+      where.alertType = type as AlertType;
     }
 
     if (severity && ["low", "medium", "high", "critical"].includes(severity)) {
-      where.severity = severity;
+      where.severity = severity as Severity;
     }
 
     if (resolvedParam === "true") {
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
         totalPages,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to retrieve alerts:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to retrieve security alerts." },

@@ -82,7 +82,7 @@ async function runMilestone6Tests() {
       console.error(`❌ Test 1 FAILED: Expected matchStatus='matched' but got '${recognition.matchStatus}'`);
       process.exitCode = 1;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 1 failed:", err);
     process.exitCode = 1;
   } finally {
@@ -99,7 +99,7 @@ async function runMilestone6Tests() {
     await generateEmbedding(multiBuf, "multi_face.jpg");
     console.error("❌ Test 2 failed: Expected MULTIPLE_FACES error!");
     process.exitCode = 1;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof FastAPIError && err.code === "MULTIPLE_FACES") {
       console.log("✅ Test 2 PASSED: Multiple faces correctly rejected with MULTIPLE_FACES.");
     } else {
@@ -126,7 +126,7 @@ async function runMilestone6Tests() {
     await generateEmbedding(noFaceJpeg, "noface.jpg");
     console.error("❌ Test 3 failed: Expected NO_FACE_DETECTED error!");
     process.exitCode = 1;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof FastAPIError && err.code === "NO_FACE_DETECTED") {
       console.log(`✅ Test 3 PASSED: Non-face input rejected with error code '${err.code}'.`);
     } else {
@@ -142,14 +142,14 @@ async function runMilestone6Tests() {
     const aiResult = await generateEmbedding(singleBuf, "single_face.jpg");
     const recognition = await findTopFaceMatches(aiResult.embedding);
 
-    const hasRawEmbedding = "embedding" in recognition || ("face" in recognition && "embedding" in (recognition.face as any));
+    const hasRawEmbedding = "embedding" in recognition || ("face" in recognition && recognition.face !== null && typeof recognition.face === "object" && "embedding" in recognition.face);
     if (hasRawEmbedding) {
       console.error("❌ Test 4 failed: Raw embedding property exposed in response!");
       process.exitCode = 1;
     } else {
       console.log("✅ Test 4 PASSED: Zero raw 512D embedding arrays in response payload.");
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Test 4 failed:", err);
     process.exitCode = 1;
   }

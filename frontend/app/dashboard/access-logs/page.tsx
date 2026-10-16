@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import type { Prisma, AccessStatus, MatchStatus } from "@prisma/client";
 import { DataTableSearch } from "@/components/dashboard/data-table-search";
 import { DataTablePagination } from "@/components/dashboard/data-table-pagination";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,14 +35,14 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
   const statusFilter = (params.status || "").trim().toLowerCase();
   const matchFilter = (params.matchStatus || "").trim().toLowerCase();
 
-  const where: any = {};
+  const where: Prisma.AccessLogWhereInput = {};
 
   if (statusFilter && ["granted", "denied"].includes(statusFilter)) {
-    where.accessStatus = statusFilter;
+    where.accessStatus = statusFilter as AccessStatus;
   }
 
   if (matchFilter && ["matched", "unknown", "ambiguous", "rejected"].includes(matchFilter)) {
-    where.matchStatus = matchFilter;
+    where.matchStatus = matchFilter as MatchStatus;
   }
 
   if (search) {

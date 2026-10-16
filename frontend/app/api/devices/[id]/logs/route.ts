@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { Prisma, AccessStatus, AccessReason, MatchStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -50,20 +51,25 @@ export async function GET(
       );
     }
 
-    const whereClause: any = { deviceId };
+    const whereClause: Prisma.AccessLogWhereInput = { deviceId };
 
     if (statusParam) {
-      whereClause.accessStatus = statusParam;
+      whereClause.accessStatus = statusParam as AccessStatus;
     }
 
     if (search) {
-      whereClause.OR = [
-        { reason: { contains: search, mode: "insensitive" } },
-        { matchStatus: { contains: search, mode: "insensitive" } },
+      const orConditions: Prisma.AccessLogWhereInput[] = [
         { person: { firstName: { contains: search, mode: "insensitive" } } },
         { person: { lastName: { contains: search, mode: "insensitive" } } },
         { person: { personCode: { contains: search, mode: "insensitive" } } },
       ];
+      if (Object.values(AccessReason).includes(search as AccessReason)) {
+        orConditions.push({ reason: search as AccessReason });
+      }
+      if (Object.values(MatchStatus).includes(search as MatchStatus)) {
+        orConditions.push({ matchStatus: search as MatchStatus });
+      }
+      whereClause.OR = orConditions;
     }
 
     if (dateFrom || dateTo) {
@@ -137,7 +143,7 @@ export async function GET(
         totalPages,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in GET /api/devices/[id]/logs:", error);
     return NextResponse.json(
       { success: false, error: "INTERNAL_ERROR", message: "Failed to fetch device access logs." },

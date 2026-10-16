@@ -266,7 +266,7 @@ export default async function PersonDetailsPage({
 
                 <TableBody>
                   {person.faceEmbeddings && person.faceEmbeddings.length > 0 ? (
-                    person.faceEmbeddings.map((emb: any) => (
+                    person.faceEmbeddings.map((emb) => (
                       <TableRow key={emb.id} className="text-xs">
                         <TableCell className="font-mono">#{emb.id}</TableCell>
                         <TableCell className="font-medium">{emb.embeddingModel}</TableCell>

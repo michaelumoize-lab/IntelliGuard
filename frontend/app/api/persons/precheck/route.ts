@@ -69,13 +69,13 @@ export async function POST(req: NextRequest) {
       faces: result.faces,
       executionTimeMs: result.executionTimeMs,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Face precheck error:", err);
     return NextResponse.json(
       {
         success: false,
         error: "PRECHECK_FAILED",
-        message: err.message || "Failed to analyze photo quality.",
+        message: err instanceof Error ? err.message : "Failed to analyze photo quality.",
       },
       { status: 500 }
     );
