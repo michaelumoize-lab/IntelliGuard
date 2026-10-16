@@ -77,7 +77,12 @@ export default function WebcamSimulationPage() {
   const handleToggleCamera = useCallback(() => {
     setIsCameraOn((prev) => {
       const next = !prev;
-      if (!next) {
+      if (next) {
+        if (autoOffTimerRef.current) {
+          clearTimeout(autoOffTimerRef.current);
+          autoOffTimerRef.current = null;
+        }
+      } else {
         setIsMonitoring(false);
         setIsCameraReady(false);
         setCameraOverlay(null);
@@ -128,6 +133,11 @@ export default function WebcamSimulationPage() {
   const executeScan = useCallback(async () => {
     if (!isCameraOnRef.current || !cameraRef.current || inFlightRef.current) return;
 
+    if (autoOffTimerRef.current) {
+      clearTimeout(autoOffTimerRef.current);
+      autoOffTimerRef.current = null;
+    }
+
     const requestSeq = ++requestSequenceRef.current;
     inFlightRef.current = true;
     setIsScanning(true);
@@ -143,6 +153,9 @@ export default function WebcamSimulationPage() {
       if (!imageBlob || !isCameraOnRef.current || requestSeq !== requestSequenceRef.current) {
         inFlightRef.current = false;
         setIsScanning(false);
+        if (isCameraOnRef.current && requestSeq === requestSequenceRef.current) {
+          setCameraOverlay(null);
+        }
         return;
       }
 
@@ -349,6 +362,19 @@ export default function WebcamSimulationPage() {
       setScanHistory((prev) => [historyEntry, ...prev].slice(0, 10));
     } catch (err) {
       console.error("Error executing webcam face scan:", err);
+      if (isCameraOnRef.current && requestSeq === requestSequenceRef.current) {
+        setCameraOverlay({
+          status: "error",
+          message: "Scan failed. Please try again.",
+        });
+        if (overlayTimerRef.current) {
+          clearTimeout(overlayTimerRef.current);
+        }
+        overlayTimerRef.current = setTimeout(() => {
+          setCameraOverlay(null);
+          overlayTimerRef.current = null;
+        }, 3500);
+      }
     } finally {
       inFlightRef.current = false;
       setIsScanning(false);
@@ -382,7 +408,14 @@ export default function WebcamSimulationPage() {
 
   const handleToggleMonitoring = () => {
     if (!isCameraOn || !isCameraReady) return;
-    setIsMonitoring((prev) => !prev);
+    setIsMonitoring((prev) => {
+      const next = !prev;
+      if (next && autoOffTimerRef.current) {
+        clearTimeout(autoOffTimerRef.current);
+        autoOffTimerRef.current = null;
+      }
+      return next;
+    });
   };
 
   const renderDecisionBadge = (item: ScanHistoryItem) => {

@@ -537,17 +537,18 @@ LIMIT $2;
 ### 14.2 Security Analysis
 * **Biometric Privacy:** Enrolled raw images are stored in ImageKit; biometric vectors are stored in PostgreSQL; raw floats are never transmitted to client browsers.
 * **Fail-Closed Architecture:** Any network timeout, AI microservice error, or database exception defaults directly to `accessStatus: "denied"` and `doorAction: "lock"`.
-* **Device Authentication:** Edge hardware must present an API key matching a stored SHA-256 hash.
-* **Current Security Gaps:**
-  * **No Liveness Detection / Anti-Spoofing:** The system cannot detect whether a captured frame is a live human or a printed photograph / mobile screen.
-  * **No Replay Attack Protection:** Hardware HTTP requests do not currently validate nonces or request timestamps.
+* **Device Authentication & Replay Protection:** Edge hardware requests are verified via SHA-256 hashed API key validation, 5-minute timestamp freshness windows, sliding nonce deduplication, and HMAC-SHA256 request payload signature verification.
+* **Passive Liveness Verification:** Passive anti-spoofing is integrated via a quantized MiniFASNetV2-SE ONNX model that evaluates facial texture and presentation attack cues before identity matching, returning `spoof_detected` to lock doors against common printed paper and screen replays.
+* **Security Considerations & Future Hardening:**
+  * **Passive Single-Frame Liveness Limitations:** While passive MiniFASNet filters common 2D print and screen attacks, it is not calibrated to defeat all sophisticated replay attacks, high-resolution curved video replays, or 3D masks without active challenge-response or hardware depth/IR sensors.
+  * **Replay Attack Surface:** Network-level HTTP request replay is blocked via nonce tracking and timestamps; optical presentation replay attacks (re-playing recorded video to the lens) require multi-frame temporal analysis.
 
 ---
 
 ## 15. Current Limitations and Incomplete Features
 
 1. **Physical ESP32 Firmware Not in Repository:** The physical ESP32-S3 Arduino/C++ firmware is not yet committed to this repository. The system currently relies on the browser webcam simulation terminal.
-2. **Absence of Anti-Spoofing (Liveness Verification):** Presenting an authorized person's printed portrait or high-resolution tablet screen will match the vector and unlock the door.
+2. **Single-Frame Passive Liveness Constraints:** While passive anti-spoofing is active via MiniFASNet, single-frame passive inference cannot provide the mathematical certainty of multi-frame challenge-response (e.g., randomized prompt-directed blinking or head turns) or dedicated structured-light/ToF hardware depth cameras.
 3. **HTTP Polling vs. Event-Driven Messaging:** All device interactions use standard HTTP REST requests. An ESP32 must make an HTTP POST request per capture, which adds TCP/TLS handshake overhead compared to MQTT or persistent WebSockets.
 4. **Single-Threaded AI Concurrency Bottleneck:** `asyncio.Semaphore(1)` ensures stability on memory-constrained containers, but limits the AI microservice to processing one face at a time. Simultaneous door requests will queue up sequentially.
 5. **Unindexed Vector Similarity:** PostgreSQL `pgvector` queries perform exact flat scans without an approximate nearest neighbor index (HNSW/IVFFlat).

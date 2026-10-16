@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Request, Response, status
 from app.schemas.health import HealthResponse
 from app.core.config import settings
 
 router = APIRouter()
 
-
-from fastapi import APIRouter, Request, Response, status
 
 @router.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def get_health_status(request: Request, response: Response) -> HealthResponse:
@@ -17,11 +15,13 @@ async def get_health_status(request: Request, response: Response) -> HealthRespo
     # Prefer application state set during lifespan, fallback to manager instance
     manager = getattr(request.app.state, "insightface_manager", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
+    liveness = getattr(request.app.state, "liveness_detector", None)
     
     insightface_ready = manager is not None and manager.is_loaded
     yolo_ready = yolo is not None and yolo.is_loaded
+    liveness_ready = liveness is not None and liveness.is_initialized
 
-    if insightface_ready and yolo_ready:
+    if insightface_ready and yolo_ready and liveness_ready:
         return HealthResponse(
             status="healthy",
             service="intelliguard-ai",
@@ -33,13 +33,15 @@ async def get_health_status(request: Request, response: Response) -> HealthRespo
             error=None,
         )
     
-    # Degraded status if either model failed to load during startup
+    # Degraded status if any model failed to load during startup
     response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     errors = []
     if not insightface_ready:
         errors.append(manager.error_message if manager else "InsightFace manager not initialized")
     if not yolo_ready:
         errors.append(yolo.error_message if yolo else "YOLO detector not initialized")
+    if not liveness_ready:
+        errors.append("Liveness detector not initialized")
     error_msg = "; ".join(errors)
 
     return HealthResponse(

@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -12,6 +12,12 @@ class Settings:
     APP_NAME: str = os.getenv("APP_NAME", "IntelliGuard AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s")
+    INSIGHTFACE_CHECKSUM: Optional[str] = os.getenv(
+        "INSIGHTFACE_CHECKSUM", os.getenv("INSIGHTFACE_ZIP_CHECKSUM", None)
+    )
+    INSIGHTFACE_ZIP_CHECKSUM: Optional[str] = os.getenv(
+        "INSIGHTFACE_ZIP_CHECKSUM", os.getenv("INSIGHTFACE_CHECKSUM", None)
+    )
     MAX_CONCURRENT_INFERENCE: int = int(os.getenv("MAX_CONCURRENT_INFERENCE", "2"))
     YOLO_MODEL_NAME: str = os.getenv("YOLO_MODEL_NAME", "yolov8n")
     YOLO_MODEL_URL: str = os.getenv(

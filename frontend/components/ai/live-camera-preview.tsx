@@ -242,7 +242,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               const widthPct = ((x2 - x1) / visibleW) * 100;
               const heightPct = ((y2 - y1) / visibleH) * 100;
 
-              const finalLeftPct = shouldMirror ? 100 - leftPct - widthPct : leftPct;
+              const finalLeftPct = leftPct;
 
               return (
                 <div
@@ -301,7 +301,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               const widthPct = ((x2 - x1) / visibleW) * 100;
               const heightPct = ((y2 - y1) / visibleH) * 100;
 
-              const finalLeftPct = shouldMirror ? 100 - leftPct - widthPct : leftPct;
+              const finalLeftPct = leftPct;
 
               const faceBoxColor =
                 overlayResult?.status === "granted"
@@ -339,7 +339,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                     face.landmarks.map((pt, pIdx) => {
                       if (!pt || pt.length < 2) return null;
                       const rawPtX = ((pt[0] - x1) / (x2 - x1)) * 100;
-                      const ptX = shouldMirror ? 100 - rawPtX : rawPtX;
+                      const ptX = rawPtX;
                       const ptY = ((pt[1] - y1) / (y2 - y1)) * 100;
                       return (
                         <div

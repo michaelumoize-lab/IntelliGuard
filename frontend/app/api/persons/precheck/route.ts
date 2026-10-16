@@ -15,14 +15,23 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData();
-    const imageFile = formData.get("image") as File | null;
+    const rawImage = formData.get("image");
 
-    if (!imageFile || imageFile.size === 0) {
+    if (!rawImage || !(rawImage instanceof File) || rawImage.size === 0) {
       return NextResponse.json(
         { success: false, error: "VALIDATION_ERROR", message: "No image file provided." },
         { status: 400 }
       );
     }
+
+    if (!rawImage.type || !rawImage.type.startsWith("image/")) {
+      return NextResponse.json(
+        { success: false, error: "VALIDATION_ERROR", message: "Provided file is not a valid image format." },
+        { status: 400 }
+      );
+    }
+
+    const imageFile = rawImage;
 
     if (imageFile.size > 10 * 1024 * 1024) {
       return NextResponse.json(
@@ -50,13 +59,13 @@ export async function POST(req: NextRequest) {
       message = `Multiple faces (${result.faceCount}) detected. Exactly 1 face is required for registration.`;
     } else if (primaryFace.confidence < 0.60) {
       qualityStatus = "warning";
-      message = `Low confidence (${confidence}%). Portrait may be blurry or obstructed.`;
+      message = `Low face detection confidence (${confidence}%). Portrait may be blurry or obstructed.`;
     } else if (primaryFace.confidence < 0.80) {
       qualityStatus = "acceptable";
-      message = `Good quality face detected (${confidence}% confidence).`;
+      message = `Moderate face detection confidence (${confidence}%).`;
     } else {
       qualityStatus = "optimal";
-      message = `Optimal biometric quality (${confidence}% confidence). Ready for enrollment.`;
+      message = `High face detection confidence (${confidence}%).`;
     }
 
     return NextResponse.json({

@@ -5,6 +5,7 @@ export interface DeviceAuthOptions {
   timestamp?: string | number | null;
   nonce?: string | null;
   signature?: string | null;
+  bodyHash?: string | null;
 }
 
 export interface DeviceAuthResult {
@@ -16,7 +17,8 @@ export interface DeviceAuthResult {
     | "device_error"
     | "timestamp_expired"
     | "invalid_timestamp"
-    | "replay_detected";
+    | "replay_detected"
+    | "invalid_signature";
   device?: {
     id: number;
     deviceName: string;
@@ -31,12 +33,18 @@ interface NonceEntry {
   expiresAt: number;
 }
 
-// In-memory sliding window cache of recent nonces: nonceKey -> NonceEntry
-const recentNonces = new Map<string, NonceEntry>();
+// Shared sliding window cache of recent nonces across hot reloads and worker cycles: nonceKey -> NonceEntry
+const globalForAuth = globalThis as unknown as {
+  deviceRecentNonces?: Map<string, NonceEntry>;
+  deviceNonceCleanupTimer?: NodeJS.Timeout;
+};
+
+const recentNonces = globalForAuth.deviceRecentNonces ?? new Map<string, NonceEntry>();
+globalForAuth.deviceRecentNonces = recentNonces;
 
 // Clean up expired nonces every 60 seconds
-if (typeof setInterval !== "undefined") {
-  const cleanupTimer = setInterval(() => {
+if (!globalForAuth.deviceNonceCleanupTimer && typeof setInterval !== "undefined") {
+  globalForAuth.deviceNonceCleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [nonceKey, entry] of recentNonces.entries()) {
       if (entry.expiresAt <= now) {
@@ -44,8 +52,8 @@ if (typeof setInterval !== "undefined") {
       }
     }
   }, 60000);
-  if (cleanupTimer && typeof cleanupTimer.unref === "function") {
-    cleanupTimer.unref();
+  if (globalForAuth.deviceNonceCleanupTimer && typeof globalForAuth.deviceNonceCleanupTimer.unref === "function") {
+    globalForAuth.deviceNonceCleanupTimer.unref();
   }
 }
 
@@ -127,15 +135,55 @@ export async function authenticateDevice(
       return { isValid: false, reason: "timestamp_expired", device };
     }
 
-    // 2. Replay Protection: Nonce uniqueness check (gated on authenticated device credentials)
+    // 2. Replay Protection: Nonce uniqueness check (atomic check-and-set with sliding window TTL)
     const nonceKey = `${deviceId}:${options.nonce.trim()}`;
-    if (recentNonces.has(nonceKey)) {
+    const now = Date.now();
+    const existingNonce = recentNonces.get(nonceKey);
+    if (existingNonce && existingNonce.expiresAt > now) {
       return { isValid: false, reason: "replay_detected", device };
     }
     recentNonces.set(nonceKey, {
       deviceId,
-      expiresAt: Date.now() + MAX_TIMESTAMP_SKEW_MS,
+      expiresAt: now + MAX_TIMESTAMP_SKEW_MS,
     });
+
+    // 3. HMAC-SHA256 Signature Verification over deviceId, timestamp, nonce, and bodyHash
+    const isEnforceHmac = process.env.ENFORCE_DEVICE_HMAC === "true";
+    if (options?.signature || isEnforceHmac) {
+      if (!options?.signature) {
+        return { isValid: false, reason: "invalid_signature", device };
+      }
+
+      const canonicalPayloadWithHash = `${deviceId}:${options.timestamp}:${options.nonce.trim()}${
+        options.bodyHash ? `:${options.bodyHash}` : ""
+      }`;
+      const canonicalPayloadWithoutHash = `${deviceId}:${options.timestamp}:${options.nonce.trim()}`;
+
+      const expectedWithHash = crypto
+        .createHmac("sha256", apiKeyInput)
+        .update(canonicalPayloadWithHash)
+        .digest("hex");
+      const expectedWithoutHash = crypto
+        .createHmac("sha256", apiKeyInput)
+        .update(canonicalPayloadWithoutHash)
+        .digest("hex");
+
+      const sigClean = options.signature.trim().toLowerCase();
+      const sigBuf = Buffer.from(sigClean, "utf8");
+      const expBufWith = Buffer.from(expectedWithHash.toLowerCase(), "utf8");
+      const expBufWithout = Buffer.from(expectedWithoutHash.toLowerCase(), "utf8");
+
+      const matchWith =
+        sigBuf.length === expBufWith.length &&
+        crypto.timingSafeEqual(sigBuf, expBufWith);
+      const matchWithout =
+        sigBuf.length === expBufWithout.length &&
+        crypto.timingSafeEqual(sigBuf, expBufWithout);
+
+      if (!matchWith && !matchWithout) {
+        return { isValid: false, reason: "invalid_signature", device };
+      }
+    }
 
     // Update lastSeen timestamp and ensure status is online
     const updatedDevice = await prisma.device.update({

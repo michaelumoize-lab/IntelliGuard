@@ -10,8 +10,8 @@ This document tracks upcoming engineering enhancements for **IntelliGuard**, foc
 - [ ] **Create Firmware Subdirectory (`/firmware/esp32-s3-cam/`)**:
   - Implement Arduino C++ or ESP-IDF firmware for the **Freenove / AI-Thinker ESP32-S3 CAM (OV5640/OV2640)**.
 - [ ] **Hardware Sensors & Actuators Integration**:
-  - **PIR Motion Sensor (HC-SR501):** Configure external GPIO interrupt to wake the ESP32 from Deep Sleep ($\sim 10\,\mu\text{A}$) only when motion is detected.
-  - **5V Relay Module:** Trigger GPIO high/low to pulse power to a 12V solenoid door strike or magnetic lock upon receipt of `{"door_action": "unlock"}`.
+  - **PIR Motion Sensor (HC-SR501 / AM312):** Configure external GPIO interrupt to wake the ESP32 from Deep Sleep when motion is detected. *(Note: ~10 µA is bare ESP32-S3 silicon deep sleep; assembled dev boards typically draw 1–3 mA due to LDO regulators and camera sleep leakage, with the PIR sensor itself adding ~15–65 µA).*
+  - **5V Relay Module:** Control power to physical locking mechanisms upon receipt of `{"door_action": "unlock"}`. Configure relay logic according to lock mechanism: pulse power ON for fail-secure solenoid door strikes (Normally Open / NO), or cut power OFF to release fail-safe electromagnetic locks (Normally Closed / NC).
   - **Auditory & Visual Feedback:** Drive status RGB LED (Green for granted, Red for denied, Blue for scanning) and active buzzer chimes.
 - [ ] **Secure Microcontroller HTTP Client**:
   - Transmit multipart JPEG frame uploads over Wi-Fi with cryptographic replay headers:
@@ -19,6 +19,7 @@ This document tracks upcoming engineering enhancements for **IntelliGuard**, foc
     - `x-api-key`: Raw cryptographic API key (`ig_dev_...`).
     - `x-timestamp`: Device Unix epoch seconds.
     - `x-nonce`: UUIDv4 or random 16-byte hex nonce per capture.
+    - `x-signature`: Optional HMAC-SHA256 request payload signature.
 - [ ] **Periodic Telemetry & Heartbeat Loop**:
   - Schedule background pings every 30–60 seconds to `POST /api/devices/{id}/health` sending live Wi-Fi RSSI (dBm), free heap RAM, and uptime seconds.
 - [ ] **Optional: MQTT / TLS Micro-Broker**:
@@ -27,14 +28,16 @@ This document tracks upcoming engineering enhancements for **IntelliGuard**, foc
 ---
 
 ### 2. Face Anti-Spoofing & Liveness Detection Pipeline
-- [ ] **Passive Software Liveness Detection**:
-  - Integrate a dedicated anti-spoofing neural network (e.g., **Silent-Face-Anti-Spoofing** / **MiniFASNet**) into the FastAPI AI service.
-  - Inspect texture patterns, specular reflections, and moiré screen distortion to distinguish physical 3D human faces from printed photographs or smartphone/tablet screens.
-- [ ] **Hardware-Assisted Active Challenge-Response**:
-  - Have the backend challenge the ESP32 to illuminate its onboard RGB LED in a pseudo-random color sequence (e.g., Green $\rightarrow$ Blue).
+- [x] **Passive Software Liveness Detection (Implemented)**:
+  - Integrated quantized **MiniFASNetV2-SE** ONNX model into FastAPI `/analyze` pipeline.
+  - Preprocesses face crops, normalizes inputs, checks SHA256 integrity, and inspects high-frequency texture and moiré cues before embedding generation.
+- [x] **Access Engine & Schema Integration (Implemented)**:
+  - Added `liveness_status`, `liveness_score`, and `liveness_time_ms` to API schemas.
+  - Configured decision engine to immediately deny access (`spoof_detected`) on spoof confidence without querying pgvector, keeping doors locked.
+- [ ] **Hardware-Assisted Active Challenge-Response (Future Enhancement)**:
+  - Challenge the ESP32 to illuminate its onboard RGB LED in a pseudo-random color sequence (e.g., Green $\rightarrow$ Blue).
   - Verify matching chromatic illumination changes on the user's facial landmarks before authorizing entry.
-- [ ] **Access Engine Integration**:
-  - Add `liveness_score` to the evaluation engine; reject access with `LIVENESS_FAILED` if liveness confidence falls below configured threshold.
+  - Multi-frame challenge-response (interactive eye-blink and head-yaw tracking).
 
 ---
 

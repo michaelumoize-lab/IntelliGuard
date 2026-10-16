@@ -278,6 +278,9 @@ export async function analyzeImage(
     } catch {
       // Ignore JSON parse errors for non-JSON response bodies
     }
+    if (response.status === 400) {
+      throw new FastAPIError("INVALID_IMAGE", errorDetail, 400);
+    }
     throw new FastAPIError("AI_SERVICE_ERROR", errorDetail, response.status);
   }
 

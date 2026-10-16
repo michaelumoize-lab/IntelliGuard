@@ -1,7 +1,9 @@
+import io
 import base64
 import logging
 import numpy as np
 import cv2
+from PIL import Image
 from fastapi import HTTPException, status
 
 logger = logging.getLogger("intelliguard.image")
@@ -29,6 +31,21 @@ def read_image_bytes_to_cv2(image_bytes: bytes) -> np.ndarray:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Uploaded image payload size ({len(image_bytes)} bytes) exceeds the maximum allowed limit of {MAX_IMAGE_BYTES} bytes.",
         )
+
+    # Inspect image header with Pillow before allocating full uncompressed pixel buffer in cv2
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as pil_img:
+            w, h = pil_img.size
+            if h > MAX_IMAGE_DIMENSION or w > MAX_IMAGE_DIMENSION:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Decoded image dimensions ({w}x{h}) exceed maximum allowed limit of {MAX_IMAGE_DIMENSION}x{MAX_IMAGE_DIMENSION}.",
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        # If Pillow cannot parse the header, let cv2.imdecode attempt or fail with standard error
+        pass
 
     try:
         np_arr = np.frombuffer(image_bytes, np.uint8)

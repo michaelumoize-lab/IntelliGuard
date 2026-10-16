@@ -55,7 +55,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     whereClause.deviceType = deviceType as DeviceType;
   }
 
-  // Execute database queries directly on PostgreSQL via Prisma in parallel
+  // Execute database counts directly on PostgreSQL via Prisma in parallel
   const [
     totalCount,
     onlineCount,
@@ -63,7 +63,6 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     maintenanceCount,
     errorCount,
     totalMatching,
-    rawDevices,
   ] = await Promise.all([
     prisma.device.count(),
     prisma.device.count({ where: { status: "online" } }),
@@ -71,29 +70,31 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     prisma.device.count({ where: { status: "maintenance" } }),
     prisma.device.count({ where: { status: "error" } }),
     prisma.device.count({ where: whereClause }),
-    prisma.device.findMany({
-      where: whereClause,
-      skip: Math.max(0, (requestedPage - 1) * limit),
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: {
-          select: {
-            accessLogs: true,
-            alerts: true,
-          },
-        },
-        accessLogs: {
-          take: 1,
-          orderBy: { createdAt: "desc" },
-          select: { createdAt: true },
-        },
-      },
-    }),
   ]);
 
   const totalPages = Math.ceil(totalMatching / limit) || 1;
-  const effectivePage = Math.min(requestedPage, totalPages);
+  const effectivePage = Math.max(1, Math.min(requestedPage, totalPages));
+  const skip = (effectivePage - 1) * limit;
+
+  const rawDevices = await prisma.device.findMany({
+    where: whereClause,
+    skip,
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    include: {
+      _count: {
+        select: {
+          accessLogs: true,
+          alerts: true,
+        },
+      },
+      accessLogs: {
+        take: 1,
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      },
+    },
+  });
 
   // Map Prisma data to clean serializable items for client table
   const devices: DeviceTableItem[] = rawDevices.map((device) => ({

@@ -54,6 +54,12 @@ export async function GET(
     const whereClause: Prisma.AccessLogWhereInput = { deviceId };
 
     if (statusParam) {
+      if (!Object.values(AccessStatus).includes(statusParam as AccessStatus)) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: `Invalid access status: ${statusParam}` },
+          { status: 400 }
+        );
+      }
       whereClause.accessStatus = statusParam as AccessStatus;
     }
 

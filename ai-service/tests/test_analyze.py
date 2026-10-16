@@ -42,31 +42,51 @@ def test_analyze_no_person_blank_image(client: TestClient):
 
 def test_analyze_valid_face_image(client: TestClient):
     """Scenario 4/5: Valid human face image -> Face Detected with ArcFace Embedding."""
+    from app.core.liveness import LivenessResult
+
+    class MockLiveDetector:
+        def predict(self, img, bbox, threshold=0.60):
+            return LivenessResult(
+                is_live=True,
+                status="live",
+                score=0.95,
+                real_logit=2.8,
+                spoof_logit=-1.5,
+                execution_time_ms=10.0,
+            )
+
     test_image_path = os.path.join(os.path.dirname(__file__), "..", "test.jpg")
     assert os.path.exists(test_image_path), f"Test image not found at {test_image_path}"
 
-    with open(test_image_path, "rb") as f:
-        response = client.post(
-            "/api/v1/analyze",
-            files={"file": ("test.jpg", f.read(), "image/jpeg")},
-        )
+    orig_liveness = getattr(client.app.state, "liveness_detector", None)
+    try:
+        client.app.state.liveness_detector = MockLiveDetector()
+        with open(test_image_path, "rb") as f:
+            response = client.post(
+                "/api/v1/analyze",
+                files={"file": ("test.jpg", f.read(), "image/jpeg")},
+            )
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert data["person_detected"] is True
-    assert data["face_detected"] is True
-    assert data["status"] in ["face_detected_processing", "face_low_quality"]
-    assert data["person_count"] >= 1
-    assert data["face_count"] >= 1
-    assert data["primary_person_bbox"] is not None
-    assert len(data["primary_person_bbox"]) == 4
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["person_detected"] is True
+        assert data["face_detected"] is True
+        assert data["status"] in ["face_detected_processing", "face_low_quality"]
+        assert data["person_count"] >= 1
+        assert data["face_count"] >= 1
+        assert data["primary_person_bbox"] is not None
+        assert len(data["primary_person_bbox"]) == 4
 
-    if data["status"] == "face_detected_processing":
-        assert data["embedding"] is not None
-        assert len(data["embedding"]) == 512
-        assert data["quality_score"] is not None
-        assert data["quality_score"] >= 0.50
+        if data["status"] == "face_detected_processing":
+            assert data["embedding"] is not None
+            assert len(data["embedding"]) == 512
+            assert data["quality_score"] is not None
+            assert data["quality_score"] >= 0.50
+            assert data["liveness_status"] == "live"
+            assert data["liveness_score"] == 0.95
+    finally:
+        client.app.state.liveness_detector = orig_liveness
 
 
 def test_analyze_person_no_face(client: TestClient, monkeypatch):

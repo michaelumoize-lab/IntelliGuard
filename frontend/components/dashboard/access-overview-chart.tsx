@@ -48,16 +48,16 @@ export function AccessOverviewChart({
   const grantedPct = total > 0 ? (granted / total) * 100 : 0;
   const deniedPct = total > 0 ? (denied / total) * 100 : 0;
 
-  // Fallback demo buckets if no logs today
+  // Fallback zero-valued baseline buckets if no hourly data is available
   const chartData: HourlyAccessData[] =
     hourlyData && hourlyData.length > 0
       ? hourlyData
       : [
           { time: "00:00", granted: 0, denied: 0 },
           { time: "04:00", granted: 0, denied: 0 },
-          { time: "08:00", granted: Math.round(todayGranted * 0.3), denied: Math.round(todayDenied * 0.2) },
-          { time: "12:00", granted: Math.round(todayGranted * 0.5), denied: Math.round(todayDenied * 0.5) },
-          { time: "16:00", granted: Math.round(todayGranted * 0.2), denied: Math.round(todayDenied * 0.3) },
+          { time: "08:00", granted: 0, denied: 0 },
+          { time: "12:00", granted: 0, denied: 0 },
+          { time: "16:00", granted: 0, denied: 0 },
           { time: "20:00", granted: 0, denied: 0 },
         ];
 

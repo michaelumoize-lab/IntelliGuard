@@ -152,7 +152,7 @@ class YoloPersonDetector:
             self.session = None
             self.error_message = str(e)
             logger.error(f"Failed to initialize YOLO detector: {e}", exc_info=True)
-            raise RuntimeError(f"YOLO detector initialization failed: {e}") from e
+            return False
 
     def _letterbox(
         self,
