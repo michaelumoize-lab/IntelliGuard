@@ -1,4 +1,5 @@
 import os
+import hashlib
 import urllib.request
 import zipfile
 import logging
@@ -12,13 +13,19 @@ from app.core.config import settings
 logger = logging.getLogger("intelliguard.insightface")
 
 
-def ensure_minimal_models(model_name: str = "buffalo_s") -> str:
+def ensure_minimal_models(
+    model_name: str = "buffalo_s",
+    expected_checksum: Optional[str] = None,
+) -> str:
     """Ensure only required ONNX models (detection and recognition) exist in the model directory.
 
     Downloads the model archive if not present, extracts ONLY detection (det_*.onnx) and recognition
     (w600k_*.onnx) models, and discards heavy unused models (such as the 143MB 3D landmark model)
     to keep RAM footprint below 120MB on constrained cloud instances (e.g. Render 512MB tier).
     """
+    if expected_checksum is None:
+        expected_checksum = settings.INSIGHTFACE_CHECKSUM or settings.INSIGHTFACE_ZIP_CHECKSUM
+
     models_dir = os.path.expanduser(f"~/.insightface/models/{model_name}")
     os.makedirs(models_dir, exist_ok=True)
 
@@ -29,22 +36,46 @@ def ensure_minimal_models(model_name: str = "buffalo_s") -> str:
     if not (has_det and has_rec):
         logger.info(f"Downloading model archive for '{model_name}'...")
         zip_path = os.path.join(models_dir, f"{model_name}.zip")
+        temp_zip = f"{zip_path}.tmp"
         url = f"https://github.com/deepinsight/insightface/releases/download/model-zoo/{model_name}.zip"
 
-        urllib.request.urlretrieve(url, zip_path)
+        req = urllib.request.Request(url, headers={"User-Agent": "IntelliGuard/1.0"})
+        sha256 = hashlib.sha256()
 
-        logger.info(f"Extracting minimal models (detection and recognition) for '{model_name}'...")
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            for member in zf.namelist():
-                filename = os.path.basename(member)
-                if (filename.startswith("det_") or filename.startswith("w600k_")) and filename.endswith(".onnx"):
-                    zf.extract(member, models_dir)
+        try:
+            with urllib.request.urlopen(req, timeout=60) as response, open(temp_zip, "wb") as out_file:
+                while chunk := response.read(65536):
+                    out_file.write(chunk)
+                    if expected_checksum:
+                        sha256.update(chunk)
 
-        if os.path.exists(zip_path):
-            try:
-                os.remove(zip_path)
-            except OSError:
-                pass
+            if expected_checksum:
+                digest = sha256.hexdigest().lower()
+                if digest != expected_checksum.lower():
+                    if os.path.exists(temp_zip):
+                        os.remove(temp_zip)
+                    raise ValueError(
+                        f"Downloaded InsightFace model archive failed checksum verification. "
+                        f"Expected {expected_checksum}, got {digest}."
+                    )
+
+            logger.info(f"Extracting minimal models (detection and recognition) for '{model_name}'...")
+            with zipfile.ZipFile(temp_zip, "r") as zf:
+                for member in zf.namelist():
+                    filename = os.path.basename(member)
+                    if (filename.startswith("det_") or filename.startswith("w600k_")) and filename.endswith(".onnx"):
+                        zf.extract(member, models_dir)
+        finally:
+            if os.path.exists(temp_zip):
+                try:
+                    os.remove(temp_zip)
+                except OSError:
+                    pass
+            if os.path.exists(zip_path):
+                try:
+                    os.remove(zip_path)
+                except OSError:
+                    pass
 
     # Prune any unused models that might exist from previous downloads to prevent FaceAnalysis from loading them
     for unused in ["1k3d68.onnx", "2d106det.onnx", "genderage.onnx"]:

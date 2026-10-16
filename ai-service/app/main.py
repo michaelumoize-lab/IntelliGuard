@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.insightface import insightface_manager
 from app.core.yolo import yolo_detector
+from app.core.liveness import liveness_detector
 from app.api.v1.router import api_router
 
 # Configure logging
@@ -40,10 +41,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             f"YOLO detector initialization failed: {yolo_detector.error_message}. Service starting in degraded mode."
         )
 
+    # 3. Load MiniFASNet facial anti-spoofing detector into memory on startup
+    liveness_ok = liveness_detector.initialize()
+    if liveness_ok:
+        logger.info("MiniFASNet Liveness Detector initialization completed successfully.")
+    else:
+        logger.error(
+            f"Liveness detector initialization failed: {liveness_detector.error_message}. Service starting with liveness in fail-closed/degraded mode."
+        )
+
     # Attach model managers and app instances to FastAPI application state
     app.state.insightface_manager = insightface_manager
     app.state.insightface_app = insightface_manager.app
     app.state.yolo_detector = yolo_detector
+    app.state.liveness_detector = liveness_detector
 
     yield  # Serve requests
 

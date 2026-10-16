@@ -286,6 +286,8 @@ export function RegisterPersonForm() {
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100"
                       : precheckStatus === "acceptable"
                       ? "border-blue-500/30 bg-blue-500/10 text-blue-950 dark:text-blue-100"
+                      : precheckStatus === "error"
+                      ? "border-destructive/30 bg-destructive/10 text-destructive dark:text-destructive"
                       : "border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100"
                   }`}
                 >
@@ -294,6 +296,10 @@ export function RegisterPersonForm() {
                       {precheckStatus === "optimal" || precheckStatus === "acceptable" ? (
                         <div className="p-1 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                           <Sparkles className="w-3.5 h-3.5" />
+                        </div>
+                      ) : precheckStatus === "error" ? (
+                        <div className="p-1 rounded-md bg-destructive/20 text-destructive">
+                          <ShieldAlert className="w-3.5 h-3.5" />
                         </div>
                       ) : (
                         <div className="p-1 rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-400">
@@ -305,6 +311,8 @@ export function RegisterPersonForm() {
                           ? "Biometric Quality: Optimal"
                           : precheckStatus === "acceptable"
                           ? "Biometric Quality: Acceptable"
+                          : precheckStatus === "error"
+                          ? "Biometric Quality: Failed"
                           : "Biometric Quality Advisory"}
                       </span>
                     </div>

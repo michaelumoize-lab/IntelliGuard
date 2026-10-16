@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { analyzeImage, FastAPIError } from "@/lib/ai/fastapi";
 import { findTopFaceMatches } from "@/lib/ai/face-recognition";
@@ -63,6 +64,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const arrayBuffer = await imageFile.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+    const bodyHash = crypto.createHash("sha256").update(imageBuffer).digest("hex");
+
     // 2. Step 2: Authenticate caller (Admin session for simulation / Device credentials for hardware)
     let deviceAuth: DeviceAuthResult = { isValid: false };
 
@@ -88,23 +93,30 @@ export async function POST(req: NextRequest) {
         timestamp: timestampInput,
         nonce: nonceInput,
         signature: signatureInput,
+        bodyHash,
       });
       if (!deviceAuth.isValid) {
         const processingTimeMs = Date.now() - startTime;
-        const isReplay = deviceAuth.reason === "replay_detected" || deviceAuth.reason === "timestamp_expired";
-        const reasonMsg = deviceAuth.reason === "timestamp_expired"
-          ? "Request timestamp expired. Potential replay attack blocked."
-          : deviceAuth.reason === "replay_detected"
-          ? "Replay attack detected: unique nonce has already been consumed."
-          : `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`;
+        const isReplayOrTamper =
+          deviceAuth.reason === "replay_detected" ||
+          deviceAuth.reason === "timestamp_expired" ||
+          deviceAuth.reason === "invalid_signature";
+        const reasonMsg =
+          deviceAuth.reason === "timestamp_expired"
+            ? "Request timestamp expired. Potential replay attack blocked."
+            : deviceAuth.reason === "replay_detected"
+            ? "Replay attack detected: unique nonce has already been consumed."
+            : deviceAuth.reason === "invalid_signature"
+            ? "HMAC signature verification failed. Request payload was altered or unauthenticated."
+            : `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`;
 
-        if (isReplay && deviceAuth.device) {
+        if (isReplayOrTamper && deviceAuth.device) {
           await prisma.alert.create({
             data: {
               deviceId: deviceAuth.device.id,
               alertType: "unauthorized_access",
-              title: "Replay Attack Detected",
-              message: `Device #${deviceAuth.device.id} (${deviceAuth.device.deviceName}) submitted an invalid or repeated access request (${deviceAuth.reason}). Request blocked.`,
+              title: deviceAuth.reason === "invalid_signature" ? "HMAC Tamper Attempt" : "Replay Attack Detected",
+              message: `Device #${deviceAuth.device.id} (${deviceAuth.device.deviceName}) submitted an invalid access request (${deviceAuth.reason}). Request blocked.`,
               severity: "critical",
             },
           });
@@ -123,9 +135,6 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const imageBuffer = Buffer.from(arrayBuffer);
 
     // 3. Step 3: Run Unified YOLO Person Detection & InsightFace Biometric Pipeline
     let aiResult;
@@ -245,6 +254,152 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Handle Biometric Presentation Attack (Spoofing Attempt)
+    if (aiResult.status === "spoof_detected") {
+      // Create High-Severity Security Alert in PostgreSQL
+      await prisma.alert.create({
+        data: {
+          deviceId: deviceAuth.device?.id || null,
+          alertType: "unauthorized_access",
+          title: "Biometric Spoof Attempt Blocked",
+          message: `Presentation attack detected at terminal. MiniFASNet real-face confidence: ${
+            aiResult.livenessScore !== null && aiResult.livenessScore !== undefined
+              ? (aiResult.livenessScore * 100).toFixed(1) + "%"
+              : "N/A"
+          }. Access denied immediately.`,
+          severity: "critical",
+        },
+      });
+
+      // Log access attempt in database as rejected
+      await prisma.accessLog.create({
+        data: {
+          deviceId: deviceAuth.device?.id || null,
+          personId: null,
+          embeddingId: null,
+          matchStatus: "rejected",
+          accessStatus: "denied",
+          reason: "spoof_detected",
+          doorAction: "lock",
+          confidenceScore: null,
+          processingTimeMs,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        status: "spoof_detected",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "spoof_detected",
+        door_action: "lock",
+        match_status: "rejected",
+        liveness_status: "spoof",
+        liveness_score: aiResult.livenessScore,
+        liveness_time_ms: aiResult.livenessTimeMs,
+        message: "Presentation attack / spoof detected. Access denied and security alert logged.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    // Handle Inconclusive / Failed Liveness Verification (Fail-Safe, never mark as malicious spoof)
+    if (aiResult.status === "liveness_inconclusive") {
+      return NextResponse.json({
+        success: false,
+        status: "liveness_inconclusive",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "liveness_failed",
+        door_action: "lock",
+        match_status: "rejected",
+        liveness_status: "inconclusive",
+        liveness_score: aiResult.livenessScore,
+        liveness_time_ms: aiResult.livenessTimeMs,
+        message: aiResult.message || "Facial liveness verification inconclusive. Access denied for security.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    if (aiResult.status === "recognition_error") {
+      return NextResponse.json({
+        success: false,
+        status: "recognition_error",
+        person_detected: Boolean(aiResult.personDetected),
+        face_detected: Boolean(aiResult.faceDetected),
+        access_status: "denied",
+        reason: "system_error",
+        door_action: "lock",
+        match_status: null,
+        liveness_status: aiResult.livenessStatus,
+        liveness_score: aiResult.livenessScore,
+        liveness_time_ms: aiResult.livenessTimeMs,
+        message: aiResult.message || "Biometric recognition error encountered. Please check camera feed or try again.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
     if (aiResult.status === "face_low_quality" || !aiResult.embedding) {
       return NextResponse.json({
         success: true,
@@ -255,6 +410,9 @@ export async function POST(req: NextRequest) {
         reason: "poor_quality_face",
         door_action: "no_action",
         match_status: null,
+        liveness_status: aiResult.livenessStatus,
+        liveness_score: aiResult.livenessScore,
+        liveness_time_ms: aiResult.livenessTimeMs,
         message:
           aiResult.message ||
           "Face detected with low quality or obstruction. Please face the camera directly in good lighting.",
@@ -408,6 +566,9 @@ export async function POST(req: NextRequest) {
           }
         : null,
       candidates: recognition.candidates,
+      liveness_status: aiResult.livenessStatus || "live",
+      liveness_score: aiResult.livenessScore,
+      liveness_time_ms: aiResult.livenessTimeMs,
       processing_time_ms: processingTimeMs,
     });
   } catch (error: unknown) {

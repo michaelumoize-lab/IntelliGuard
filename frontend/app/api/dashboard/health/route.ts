@@ -127,19 +127,22 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // If a probe is currently in-flight and this is not a forced refresh, share its promise
-  if (!forceRefresh && activeProbePromise) {
+  // If a probe is currently in-flight, reuse it (including for force=true to prevent burst storms and overlapping probes)
+  if (activeProbePromise) {
     const data = await activeProbePromise;
     return NextResponse.json(data, { headers: noCacheHeaders });
   }
 
   // Execute a new probe and coordinate concurrent requests
-  const probePromise = runHealthCheckProbe()
+  let probePromise: Promise<HealthCheckResponse>;
+  probePromise = runHealthCheckProbe()
     .then((result) => {
-      cachedHealth = {
-        data: result,
-        timestamp: Date.now(),
-      };
+      if (activeProbePromise === probePromise) {
+        cachedHealth = {
+          data: result,
+          timestamp: Date.now(),
+        };
+      }
       return result;
     })
     .finally(() => {

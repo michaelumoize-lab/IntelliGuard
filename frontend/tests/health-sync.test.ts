@@ -42,7 +42,7 @@ async function runHealthSyncTests() {
     if (data2.cached === true) {
       console.log("✅ Test 2 PASSED: Repeated probe within TTL returned synchronized cached response.");
     } else {
-      console.warn("⚠️ Warning: Request did not hit in-memory cache as expected.");
+      throw new Error("Request did not hit in-memory cache as expected.");
     }
 
     // 3. Force Refresh Parameter

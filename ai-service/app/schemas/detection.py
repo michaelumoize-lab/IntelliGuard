@@ -63,7 +63,7 @@ class UnifiedAnalysisResponse(BaseModel):
     success: bool = Field(True, description="Whether the pipeline executed successfully")
     status: str = Field(
         ...,
-        description="Pipeline status: 'no_person', 'person_no_face', 'face_low_quality', 'face_detected_processing', 'known_individual', 'unknown_individual', or 'recognition_error'",
+        description="Pipeline status: 'no_person', 'person_no_face', 'face_low_quality', 'spoof_detected', 'liveness_inconclusive', 'face_detected_processing', 'known_individual', 'unknown_individual', or 'recognition_error'",
         examples=["person_no_face"],
     )
     person_detected: bool = Field(..., description="Whether at least one person was detected by YOLO")
@@ -93,6 +93,14 @@ class UnifiedAnalysisResponse(BaseModel):
         default=None,
         description="InsightFace face detection confidence (0.0 to 1.0)",
     )
+    liveness_status: Optional[str] = Field(
+        default=None,
+        description="Facial anti-spoofing status: 'live', 'spoof', 'inconclusive', or None",
+    )
+    liveness_score: Optional[float] = Field(
+        default=None,
+        description="MiniFASNet model confidence score for real face (0.0 to 1.0; uncalibrated model metric)",
+    )
     model: Optional[str] = Field(default=None, description="Active InsightFace recognition model name")
     image_width: int = Field(..., description="Source image width in pixels")
     image_height: int = Field(..., description="Source image height in pixels")
@@ -100,3 +108,4 @@ class UnifiedAnalysisResponse(BaseModel):
     execution_time_ms: float = Field(..., description="Total pipeline execution time in milliseconds")
     yolo_time_ms: Optional[float] = Field(default=None, description="YOLO person inference time in milliseconds")
     insightface_time_ms: Optional[float] = Field(default=None, description="InsightFace inference time in milliseconds")
+    liveness_time_ms: Optional[float] = Field(default=None, description="Liveness anti-spoofing inference time in milliseconds")

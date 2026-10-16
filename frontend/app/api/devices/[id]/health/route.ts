@@ -197,14 +197,20 @@ export async function POST(
       lastPing: Date.now(),
     });
 
-    // Update persistent database record
-    await prisma.device.update({
+    // Update persistent database record: set online only if current status is offline or online (preserving maintenance/error)
+    const currentDevice = authResult.device || (await prisma.device.findUnique({ where: { id: deviceId } }));
+    const shouldSetOnline = currentDevice?.status === "online" || currentDevice?.status === "offline";
+
+    const updatedDevice = await prisma.device.update({
       where: { id: deviceId },
       data: {
-        status: "online",
+        ...(shouldSetOnline ? { status: "online" } : {}),
         lastSeen: new Date(),
         ...(clientIp ? { ipAddress: clientIp } : {}),
         ...(firmwareVersion ? { firmwareVersion } : {}),
+      },
+      select: {
+        status: true,
       },
     });
 
@@ -212,7 +218,7 @@ export async function POST(
       success: true,
       acknowledged: true,
       deviceId,
-      status: "online",
+      status: updatedDevice.status,
       serverTime: new Date().toISOString(),
     });
   } catch (err: unknown) {

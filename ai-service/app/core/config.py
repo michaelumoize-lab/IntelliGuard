@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -12,6 +12,12 @@ class Settings:
     APP_NAME: str = os.getenv("APP_NAME", "IntelliGuard AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s")
+    INSIGHTFACE_CHECKSUM: Optional[str] = os.getenv(
+        "INSIGHTFACE_CHECKSUM", os.getenv("INSIGHTFACE_ZIP_CHECKSUM", None)
+    )
+    INSIGHTFACE_ZIP_CHECKSUM: Optional[str] = os.getenv(
+        "INSIGHTFACE_ZIP_CHECKSUM", os.getenv("INSIGHTFACE_CHECKSUM", None)
+    )
     MAX_CONCURRENT_INFERENCE: int = int(os.getenv("MAX_CONCURRENT_INFERENCE", "2"))
     YOLO_MODEL_NAME: str = os.getenv("YOLO_MODEL_NAME", "yolov8n")
     YOLO_MODEL_URL: str = os.getenv(
@@ -24,6 +30,17 @@ class Settings:
     )
     YOLO_CONFIDENCE_THRESHOLD: float = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.40"))
     YOLO_IOU_THRESHOLD: float = float(os.getenv("YOLO_IOU_THRESHOLD", "0.45"))
+    LIVENESS_MODEL_NAME: str = os.getenv("LIVENESS_MODEL_NAME", "minifasnet_quantized")
+    LIVENESS_MODEL_URL: str = os.getenv(
+        "LIVENESS_MODEL_URL",
+        "https://raw.githubusercontent.com/facenox/face-antispoof-onnx/main/models/best_model_quantized.onnx",
+    )
+    LIVENESS_CHECKSUM: str = os.getenv(
+        "LIVENESS_CHECKSUM",
+        "fde20585635cae62ed1d41796f76b6f8bc4b92cd91ec1cf0f1bc6485d2d587a9",
+    )
+    LIVENESS_THRESHOLD: float = float(os.getenv("LIVENESS_THRESHOLD", "0.60"))
+    LIVENESS_INPUT_SIZE: int = int(os.getenv("LIVENESS_INPUT_SIZE", "128"))
 
     def __init__(self) -> None:
         if self.MAX_CONCURRENT_INFERENCE < 1:

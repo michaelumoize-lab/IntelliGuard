@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
-import type { Prisma, Severity, AlertType } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { Severity, AlertType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -53,10 +54,22 @@ export async function GET(
     const whereClause: Prisma.AlertWhereInput = { deviceId };
 
     if (severity) {
+      if (!Object.values(Severity).includes(severity as Severity)) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: `Invalid severity: ${severity}` },
+          { status: 400 }
+        );
+      }
       whereClause.severity = severity as Severity;
     }
 
     if (alertType) {
+      if (!Object.values(AlertType).includes(alertType as AlertType)) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: `Invalid alert type: ${alertType}` },
+          { status: 400 }
+        );
+      }
       whereClause.alertType = alertType as AlertType;
     }
 

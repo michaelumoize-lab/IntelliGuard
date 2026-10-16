@@ -41,7 +41,7 @@ export default function HelpPage() {
     setTimeout(() => setCopiedSection(null), 2000);
   };
 
-  const localRunCommand = `cd backend
+  const localRunCommand = `cd ai-service
 .\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`;
 
   const renderEnvVars = `APP_NAME=IntelliGuard AI
@@ -134,7 +134,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]`;
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Terminal className="w-5 h-5 text-emerald-500" />
-                Running the AI Service Locally (`backend`)
+                Running the AI Service Locally (`ai-service`)
               </CardTitle>
               <CardDescription>
                 Follow these commands to start the FastAPI InsightFace inference service on your local Windows workstation.
@@ -151,6 +151,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]`;
                   <Button
                     size="sm"
                     variant="ghost"
+                    aria-label="Copy local start command to clipboard"
                     className="absolute top-3 right-3 h-8 w-8 p-0 text-slate-400 hover:text-slate-100 hover:bg-slate-800"
                     onClick={() => copyToClipboard(localRunCommand, "local")}
                   >
@@ -196,7 +197,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]`;
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 <AlertTitle className="font-semibold text-sm">Verified Local Performance</AlertTitle>
                 <AlertDescription className="text-xs">
-                  The local virtual environment (`backend/.venv`) is configured with `allowed_modules=['detection', 'recognition']`. All automated unit tests pass 100%.
+                  The local virtual environment (`ai-service/.venv`) is configured with `allowed_modules=['detection', 'recognition']`. All automated unit tests pass 100%.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -328,7 +329,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]`;
                   </div>
                   <h4 className="font-semibold text-sm">pgvector Cosine Similarity</h4>
                   <p className="text-xs text-muted-foreground">
-                    PostgreSQL `vector(512)` extension computes Cosine Similarity (`1 - cosine_distance`). Similarity &ge; 0.65 indicates a confirmed match.
+                    PostgreSQL `vector(512)` extension computes Cosine Similarity (`1 - cosine_distance`). Similarity &ge; 0.50 indicates a confirmed match.
                   </p>
                 </div>
               </div>
@@ -427,7 +428,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]`;
                     <p className="font-semibold text-foreground">Solution:</p>
                     <ol className="list-decimal pl-4 space-y-1">
                       <li>Verify the FastAPI server is running on <code className="bg-muted px-1">http://localhost:8000</code>.</li>
-                      <li>Check <code className="bg-muted px-1">NEXT_PUBLIC_FASTAPI_URL</code> in your <code className="bg-muted px-1">frontend/.env.local</code>.</li>
+                      <li>Check <code className="bg-muted px-1">FASTAPI_URL</code> in your <code className="bg-muted px-1">frontend/.env</code>.</li>
                     </ol>
                   </AccordionContent>
                 </AccordionItem>

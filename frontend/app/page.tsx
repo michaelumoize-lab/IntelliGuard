@@ -120,7 +120,7 @@ export default async function Home() {
                   </div>
                   <div className="flex items-center gap-2 text-xs font-mono text-emerald-500">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="font-semibold">ALL SYSTEMS OPERATIONAL</span>
+                    <span className="font-semibold">SAMPLE PREVIEW • DEMO DATA</span>
                   </div>
                 </div>
 
@@ -198,7 +198,7 @@ export default async function Home() {
                       <History className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="text-xs font-semibold text-foreground">Recent Access Events</span>
                     </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">Live Telemetry Feed</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">Sample Event Feed (Demo)</span>
                   </div>
 
                   <div className="overflow-x-auto">

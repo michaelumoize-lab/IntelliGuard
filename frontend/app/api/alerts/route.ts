@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma, AlertType, Severity } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { AlertType, Severity } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,12 @@ export async function GET(req: NextRequest) {
     const where: Prisma.AlertWhereInput = {};
 
     if (type) {
+      if (!Object.values(AlertType).includes(type as AlertType)) {
+        return NextResponse.json(
+          { error: "INVALID_ALERT_TYPE", message: `Invalid alert type: ${type}` },
+          { status: 400 }
+        );
+      }
       where.alertType = type as AlertType;
     }
 

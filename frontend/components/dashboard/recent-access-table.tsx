@@ -207,7 +207,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                     <div>
                       <span className="text-[10px] text-muted-foreground block font-sans">Reason / Gate</span>
                       <span className="capitalize truncate block">
-                        {evt.person && evt.person.status !== "active" && !isGranted ? (
+                        {evt.person && evt.person.status && evt.person.status !== "active" && !isGranted ? (
                           <span className="text-destructive font-semibold">User Deactivated</span>
                         ) : (
                           <span className="text-foreground">{evt.reason.replaceAll("_", " ")}</span>
@@ -303,7 +303,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                         )}
                       </td>
                       <td className="py-3.5 font-mono uppercase text-[11px]">
-                        {evt.person && evt.person.status !== "active" && !isGranted ? (
+                        {evt.person && evt.person.status && evt.person.status !== "active" && !isGranted ? (
                           <span className="text-destructive font-semibold">USER DEACTIVATED</span>
                         ) : (
                           <span className="text-muted-foreground">{evt.reason.replaceAll("_", " ")}</span>

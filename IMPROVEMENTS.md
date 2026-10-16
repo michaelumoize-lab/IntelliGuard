@@ -16,10 +16,10 @@ This document outlines architectural enhancements, engineering recommendations, 
 
 ### 1.2 PIR Motion-Triggered Deep Sleep Modes
 * **Current State:** Continuous streaming or manual capture trigger.
-* **Proposed Enhancement:** Configure the ESP32-S3 to operate in **Deep Sleep Mode** ($\sim \mu\text{A}$ current draw) until an external GPIO interrupt is triggered by the PIR motion sensor.
-* **Impact:**
-  * Dramatically reduces power consumption for battery/solar-powered edge deployments.
-  * Enables real-world battery life calculations and power profiling for capstone hardware documentation.
+* **Proposed Enhancement:** Configure the ESP32-S3 to operate in **Deep Sleep Mode** until an external GPIO interrupt is triggered by the PIR motion sensor.
+* **Impact & Engineering Caveats:**
+  * While bare-chip ESP32-S3 deep sleep draws $\sim 10\,\mu\text{A}$, complete assembled boards typically draw $1\text{--}3\,\text{mA}$ unless quiescent current through onboard LDO voltage regulators, USB-to-UART bridges, and camera sensor sleep leakage (OV2640/5640) is mitigated with high-side P-channel MOSFET power gating. PIR modules (HC-SR501/AM312) add another $\sim 15\text{--}65\,\mu\text{A}$ quiescent draw.
+  * Enables realistic battery life modeling and power profiling for capstone hardware documentation.
 
 ### 1.3 Offline Fail-Safe & Hardware Resilience
 * **Current State:** Relies on continuous network connectivity to the FastAPI/Next.js backend.
@@ -31,11 +31,11 @@ This document outlines architectural enhancements, engineering recommendations, 
 ## 2. Artificial Intelligence & Edge Vision Optimizations
 
 ### 2.1 Anti-Spoofing & Liveness Detection
-* **Current State:** 2D facial embedding recognition via InsightFace (`buffalo_l` / `buffalo_s`).
-* **Proposed Enhancement:** Add active/passive liveness verification before granting entry:
-  * **Passive Liveness:** Blinking detection, head pose variation tracking, or texture/specular reflection analysis in FastAPI.
-  * **Hardware-Assisted Liveness:** Flash the ESP32 RGB LED in a randomized color sequence during frame capture and verify facial illumination response in the AI pipeline.
-* **Impact:** Prevents unauthorized entry using printed photos or smartphone screens.
+* **Current State:** Passive single-frame anti-spoofing is active via a quantized MiniFASNetV2-SE ONNX model running before identity matching in FastAPI, classifying captures as real vs spoof and returning `spoof_detected`.
+* **Proposed Enhancement:** Add multi-frame active challenge-response and hardware-assisted verification:
+  * **Active Software Challenges:** Prompt the user for randomized movements (blink detection, head yaw/pitch variation) across sequential frames using dense facial landmarks.
+  * **Hardware-Assisted Active Liveness:** Flash the ESP32 RGB LED in a pseudo-random color sequence during frame capture and verify chromatic illumination changes on the user's facial landmarks before authorizing entry.
+* **Impact:** Elevates defense beyond single-frame passive neural heuristics to defeat high-resolution screen replays, 3D silicone masks, and presentation attacks.
 
 ### 2.2 On-Device Edge Pre-Filtering (ESP-WHO / TFLite Micro)
 * **Current State:** Raw camera frames transmitted directly over Wi-Fi for backend inference.

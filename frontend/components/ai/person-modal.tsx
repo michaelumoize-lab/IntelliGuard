@@ -99,7 +99,10 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
         const trimmedEmail = email.trim();
         const trimmedNotes = notes.trim();
 
-        if (isEditing && initialData?.id) {
+        if (isEditing) {
+          if (!initialData?.id) {
+            throw new Error("Unable to update: Person ID is missing.");
+          }
           // Edit Person Metadata
           const res = await fetch(`/api/persons/${initialData.id}`, {
             method: "PATCH",
