@@ -1,7 +1,8 @@
 import React from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "@/lib/get-session";
 import { Button } from "@/components/ui/button";
 import { DeviceHealthCard } from "@/components/devices/device-health-card";
 import { DeviceAccessSummary } from "@/components/devices/device-access-summary";
@@ -17,6 +18,15 @@ export default async function DeviceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
+  const session = await getServerSession();
+  if (!session?.user) {
+    redirect(`/auth/sign-in?redirectTo=${encodeURIComponent(`/dashboard/devices/${resolvedParams.id}`)}`);
+  }
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "admin") {
+    redirect("/dashboard");
+  }
+
   const deviceId = parseInt(resolvedParams.id, 10);
 
   if (isNaN(deviceId)) {

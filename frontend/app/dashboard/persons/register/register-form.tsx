@@ -29,13 +29,25 @@ const registerPersonSchema = z.object({
 
 type RegisterPersonFormValues = z.infer<typeof registerPersonSchema>;
 
+interface PrecheckMatchingPerson {
+  personCode: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  similarity: number;
+}
+
 interface PrecheckData {
   faceCount: number;
   confidence: number;
   message: string;
   executionTimeMs: number;
   hasLandmarks: boolean;
+  matchingPerson?: PrecheckMatchingPerson;
 }
+
+const DUPLICATE_REGISTRATION_MESSAGE =
+  "This face has already been registered. Please check the existing person records before proceeding.";
 
 export function RegisterPersonForm() {
   const router = useRouter();
@@ -44,7 +56,9 @@ export function RegisterPersonForm() {
   const [isWebcamOpen, setIsWebcamOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [precheckStatus, setPrecheckStatus] = useState<"idle" | "checking" | "optimal" | "acceptable" | "warning" | "error">("idle");
+  const [precheckStatus, setPrecheckStatus] = useState<
+    "idle" | "checking" | "optimal" | "acceptable" | "warning" | "duplicate" | "error"
+  >("idle");
   const [precheckData, setPrecheckData] = useState<PrecheckData | null>(null);
 
   const {
@@ -78,6 +92,7 @@ export function RegisterPersonForm() {
     const currentRequestId = ++precheckRequestIdRef.current;
     setPrecheckStatus("checking");
     setPrecheckData(null);
+    setPhotoError(null);
     try {
       const fd = new FormData();
       fd.append("image", file);
@@ -85,10 +100,22 @@ export function RegisterPersonForm() {
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (precheckRequestIdRef.current !== currentRequestId) return;
 
-      if (res.ok && data.success) {
+      if (data.isDuplicate || data.qualityStatus === "duplicate" || res.status === 409) {
+        const dupMsg = data.message || DUPLICATE_REGISTRATION_MESSAGE;
+        setPrecheckStatus("duplicate");
+        setPrecheckData({
+          faceCount: typeof data.faceCount === "number" ? data.faceCount : 1,
+          confidence: typeof data.confidence === "number" ? data.confidence : 0,
+          message: dupMsg,
+          executionTimeMs: data.executionTimeMs || 0,
+          hasLandmarks: Boolean(data.hasLandmarks),
+          matchingPerson: data.matchingPerson,
+        });
+        toast.error(dupMsg);
+      } else if (res.ok && data.success && data.canProceed !== false) {
         setPrecheckStatus(data.qualityStatus || "optimal");
         setPrecheckData({
           faceCount: data.faceCount,
@@ -98,19 +125,33 @@ export function RegisterPersonForm() {
           hasLandmarks: data.hasLandmarks,
         });
       } else {
-        setPrecheckStatus("warning");
+        const errMsg =
+          data.message ||
+          "Unable to complete biometric duplicate verification. Registration cannot proceed right now.";
+        setPrecheckStatus("error");
         setPrecheckData({
-          faceCount: data.faceCount || 0,
-          confidence: data.confidence || 0,
-          message: data.message || "Quality check could not verify photo.",
+          faceCount: typeof data.faceCount === "number" ? data.faceCount : 0,
+          confidence: typeof data.confidence === "number" ? data.confidence : 0,
+          message: errMsg,
           executionTimeMs: data.executionTimeMs || 0,
-          hasLandmarks: false,
+          hasLandmarks: Boolean(data.hasLandmarks),
         });
+        toast.error(errMsg);
       }
     } catch (err: unknown) {
       if (precheckRequestIdRef.current !== currentRequestId) return;
-      console.warn("Precheck non-blocking error:", err);
-      setPrecheckStatus("idle");
+      console.error("Precheck verification failed:", err);
+      const fallbackMsg =
+        "Unable to complete biometric duplicate verification. Registration cannot proceed right now.";
+      setPrecheckStatus("error");
+      setPrecheckData({
+        faceCount: 0,
+        confidence: 0,
+        message: fallbackMsg,
+        executionTimeMs: 0,
+        hasLandmarks: false,
+      });
+      toast.error(fallbackMsg);
     }
   };
 
@@ -150,6 +191,27 @@ export function RegisterPersonForm() {
       return;
     }
 
+    if (precheckStatus === "checking") {
+      toast.error("Please wait for the biometric duplicate and quality check to complete.");
+      return;
+    }
+
+    if (precheckStatus === "duplicate") {
+      const dupMsg = precheckData?.message || DUPLICATE_REGISTRATION_MESSAGE;
+      setPhotoError(dupMsg);
+      toast.error(dupMsg);
+      return;
+    }
+
+    if (precheckStatus === "error") {
+      const errMsg =
+        precheckData?.message ||
+        "Biometric precheck failed. Please provide a valid single-face photo before registering.";
+      setPhotoError(errMsg);
+      toast.error(errMsg);
+      return;
+    }
+
     setIsLoading(true);
     setPhotoError(null);
 
@@ -172,6 +234,26 @@ export function RegisterPersonForm() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        if (
+          res.status === 409 ||
+          data.isDuplicate ||
+          data.error === "DUPLICATE_FACE" ||
+          data.error === "DUPLICATE_FACE_DEACTIVATED"
+        ) {
+          const dupMsg = data.message || DUPLICATE_REGISTRATION_MESSAGE;
+          setPrecheckStatus("duplicate");
+          setPrecheckData((prev) => ({
+            faceCount: prev?.faceCount ?? 1,
+            confidence: prev?.confidence ?? 0,
+            message: dupMsg,
+            executionTimeMs: prev?.executionTimeMs ?? 0,
+            hasLandmarks: prev?.hasLandmarks ?? true,
+            matchingPerson: data.matchingPerson,
+          }));
+          setPhotoError(dupMsg);
+          toast.error(dupMsg);
+          return;
+        }
         throw new Error(data.message || "Failed to register person.");
       }
 
@@ -273,8 +355,10 @@ export function RegisterPersonForm() {
                 <div className="flex items-center gap-3 p-3.5 rounded-xl border border-primary/20 bg-primary/5 animate-pulse text-xs text-primary font-medium">
                   <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                   <div className="flex-1">
-                    <p className="font-semibold">AI Biometric Pre-Check Running...</p>
-                    <p className="text-[11px] text-muted-foreground">Checking facial boundary and key landmark alignment.</p>
+                    <p className="font-semibold">AI Biometric & Duplicate Pre-Check Running...</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Validating facial quality, landmarks, and checking existing registrations for duplicates.
+                    </p>
                   </div>
                 </div>
               )}
@@ -286,8 +370,8 @@ export function RegisterPersonForm() {
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100"
                       : precheckStatus === "acceptable"
                       ? "border-blue-500/30 bg-blue-500/10 text-blue-950 dark:text-blue-100"
-                      : precheckStatus === "error"
-                      ? "border-destructive/30 bg-destructive/10 text-destructive dark:text-destructive"
+                      : precheckStatus === "duplicate" || precheckStatus === "error"
+                      ? "border-destructive/40 bg-destructive/10 text-destructive dark:text-destructive"
                       : "border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100"
                   }`}
                 >
@@ -297,7 +381,7 @@ export function RegisterPersonForm() {
                         <div className="p-1 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                           <Sparkles className="w-3.5 h-3.5" />
                         </div>
-                      ) : precheckStatus === "error" ? (
+                      ) : precheckStatus === "duplicate" || precheckStatus === "error" ? (
                         <div className="p-1 rounded-md bg-destructive/20 text-destructive">
                           <ShieldAlert className="w-3.5 h-3.5" />
                         </div>
@@ -311,8 +395,10 @@ export function RegisterPersonForm() {
                           ? "Biometric Quality: Optimal"
                           : precheckStatus === "acceptable"
                           ? "Biometric Quality: Acceptable"
+                          : precheckStatus === "duplicate"
+                          ? "Duplicate Face Detected — Registration Blocked"
                           : precheckStatus === "error"
-                          ? "Biometric Quality: Failed"
+                          ? "Biometric Pre-Check Failed"
                           : "Biometric Quality Advisory"}
                       </span>
                     </div>
@@ -323,7 +409,24 @@ export function RegisterPersonForm() {
                     </div>
                   </div>
 
-                  <p className="text-[11px] opacity-90 leading-relaxed">{precheckData.message}</p>
+                  <p className="text-[11px] font-medium opacity-95 leading-relaxed">{precheckData.message}</p>
+
+                  {precheckStatus === "duplicate" && precheckData.matchingPerson && (
+                    <div className="p-2.5 rounded-lg bg-background/80 border border-destructive/30 text-[11px] text-foreground flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-muted-foreground">Matched Existing Record: </span>
+                        <span className="font-semibold">
+                          {precheckData.matchingPerson.firstName} {precheckData.matchingPerson.lastName}
+                        </span>{" "}
+                        <span className="font-mono text-muted-foreground">
+                          ({precheckData.matchingPerson.personCode})
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-muted border border-border">
+                        Status: {precheckData.matchingPerson.status}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border/40 text-[11px]">
                     <div className="bg-background/60 p-2 rounded-lg border border-border/30">
@@ -485,7 +588,16 @@ export function RegisterPersonForm() {
             Cancel
           </Button>
 
-          <Button type="submit" disabled={isLoading} className="h-9 text-xs font-semibold gap-1.5 w-full sm:w-auto">
+          <Button
+            type="submit"
+            disabled={
+              isLoading ||
+              precheckStatus === "checking" ||
+              precheckStatus === "duplicate" ||
+              precheckStatus === "error"
+            }
+            className="h-9 text-xs font-semibold gap-1.5 w-full sm:w-auto"
+          >
             {isLoading ? (
               <>
                 <Loader className="w-3.5 h-3.5 animate-spin" />

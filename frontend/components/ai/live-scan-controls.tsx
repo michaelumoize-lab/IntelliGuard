@@ -142,7 +142,7 @@ export function LiveScanControls({
 
         {/* Continuous mode badge indicator */}
         {isMonitoring && (
-          <div className="hidden xs:inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-medium">
+          <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
             <span>Continuous Polling</span>
           </div>

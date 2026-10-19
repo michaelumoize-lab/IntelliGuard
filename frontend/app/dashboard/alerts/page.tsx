@@ -16,6 +16,7 @@ interface AlertsPageProps {
     search?: string;
     severity?: string;
     resolved?: string;
+    deviceId?: string;
   }>;
 }
 
@@ -27,8 +28,15 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const search = (params.search || "").trim();
   const severityFilter = (params.severity || "").trim().toLowerCase();
   const resolvedFilter = params.resolved === undefined ? "false" : params.resolved;
+  const rawDeviceId = params.deviceId ? parseInt(params.deviceId, 10) : NaN;
+  const parsedDeviceId = !isNaN(rawDeviceId) && rawDeviceId > 0 ? rawDeviceId : undefined;
+  const deviceIdParam = parsedDeviceId ? `&deviceId=${parsedDeviceId}` : "";
 
   const where: Prisma.AlertWhereInput = {};
+
+  if (parsedDeviceId !== undefined) {
+    where.deviceId = parsedDeviceId;
+  }
 
   if (severityFilter && ["low", "medium", "high", "critical"].includes(severityFilter)) {
     where.severity = severityFilter as Severity;
@@ -112,7 +120,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {/* Resolution Filter Pills */}
             <Link
-              href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=false`}
+              href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=false${deviceIdParam}`}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 resolvedFilter === "false" ? "bg-amber-500/10 text-amber-500 border-amber-500/30 font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
@@ -120,7 +128,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
               Unresolved
             </Link>
             <Link
-              href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=true`}
+              href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=true${deviceIdParam}`}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 resolvedFilter === "true" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
@@ -128,7 +136,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
               Resolved
             </Link>
             <Link
-              href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=`}
+              href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=${deviceIdParam}`}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 resolvedFilter === "" ? "bg-primary text-primary-foreground border-primary font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}

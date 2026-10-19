@@ -23,6 +23,7 @@ interface AccessLogsPageProps {
     search?: string;
     status?: string;
     matchStatus?: string;
+    deviceId?: string;
   }>;
 }
 
@@ -34,8 +35,15 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
   const search = (params.search || "").trim();
   const statusFilter = (params.status || "").trim().toLowerCase();
   const matchFilter = (params.matchStatus || "").trim().toLowerCase();
+  const rawDeviceId = params.deviceId ? parseInt(params.deviceId, 10) : NaN;
+  const parsedDeviceId = !isNaN(rawDeviceId) && rawDeviceId > 0 ? rawDeviceId : undefined;
+  const deviceIdParam = parsedDeviceId ? `&deviceId=${parsedDeviceId}` : "";
 
   const where: Prisma.AccessLogWhereInput = {};
+
+  if (parsedDeviceId !== undefined) {
+    where.deviceId = parsedDeviceId;
+  }
 
   if (statusFilter && ["granted", "denied"].includes(statusFilter)) {
     where.accessStatus = statusFilter as AccessStatus;
@@ -116,7 +124,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
             {/* Access Status Filter */}
             <Link
-              href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=&matchStatus=${matchFilter}`}
+              href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=&matchStatus=${matchFilter}${deviceIdParam}`}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 !statusFilter ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
@@ -124,7 +132,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
               All Decisions
             </Link>
             <Link
-              href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=granted&matchStatus=${matchFilter}`}
+              href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=granted&matchStatus=${matchFilter}${deviceIdParam}`}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 statusFilter === "granted" ? "bg-emerald-600 text-white border-emerald-600" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
@@ -132,7 +140,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
               Granted
             </Link>
             <Link
-              href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=denied&matchStatus=${matchFilter}`}
+              href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=denied&matchStatus=${matchFilter}${deviceIdParam}`}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 statusFilter === "denied" ? "bg-destructive text-destructive-foreground border-destructive" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
@@ -198,7 +206,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                             <span className="font-mono text-[10px] text-muted-foreground">({log.person.personCode})</span>
                             {log.person.status && log.person.status !== "active" && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-destructive/15 text-destructive border border-destructive/30">
-                                DEACTIVATED
+                                {log.person.status === "suspended" ? "SUSPENDED" : "DEACTIVATED"}
                               </span>
                             )}
                           </Link>
@@ -223,11 +231,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                         )}
                       </TableCell>
                       <TableCell className="py-3.5 font-mono uppercase text-[11px]">
-                        {log.person && log.person.status !== "active" && !isGranted ? (
-                          <span className="text-destructive font-semibold">USER DEACTIVATED</span>
-                        ) : (
-                          <span className="text-muted-foreground">{log.reason.replaceAll("_", " ")}</span>
-                        )}
+                        <span className="text-muted-foreground">{log.reason.replaceAll("_", " ")}</span>
                       </TableCell>
                       <TableCell className="py-3.5 font-mono text-right font-semibold text-foreground">
                         {similarityDisplay}

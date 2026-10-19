@@ -95,7 +95,7 @@ async function runMilestone5Tests() {
         `,
         p.id,
         vectorLiteral,
-        aiResult.model || "Buffalo_L",
+        aiResult.model || "buffalo_s",
         ikResult.url,
         aiResult.qualityScore
       );
@@ -129,10 +129,10 @@ async function runMilestone5Tests() {
     // Test 3: Self-Exclusion Duplicate Check
     // ----------------------------------------------------
     console.log("\n[Test 3] Testing pgvector duplicate check with self-exclusion...");
-    const globalCheck = await checkForDuplicateFace(aiResult.embedding, 0.85);
+    const globalCheck = await checkForDuplicateFace(aiResult.embedding);
     assert(globalCheck.isDuplicate === true, "Test 3: Global check detects duplicate face");
 
-    const selfExcludedCheck = await checkForDuplicateFace(aiResult.embedding, 0.85, newPerson.id);
+    const selfExcludedCheck = await checkForDuplicateFace(aiResult.embedding, undefined, newPerson.id);
     assert(
       selfExcludedCheck.isDuplicate === false,
       "Test 3: Self-excluded check (excluding person.id) allows face replacement for same individual"
@@ -168,7 +168,7 @@ async function runMilestone5Tests() {
         `,
         newPerson.id,
         vectorLiteral,
-        replacementAiResult.model || "Buffalo_L",
+        replacementAiResult.model || "buffalo_s",
         replacementIkResult.url,
         replacementAiResult.qualityScore
       );

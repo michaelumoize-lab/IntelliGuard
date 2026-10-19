@@ -433,6 +433,11 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                       <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
                       <span>SCANNING</span>
                     </span>
+                  ) : overlayResult.status === "error" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
+                      <AlertTriangle className="w-3.5 h-3.5 text-destructive" />
+                      <span>SYSTEM ERROR</span>
+                    </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
                       <XCircle className="w-3.5 h-3.5 text-destructive" />
@@ -463,7 +468,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                       : overlayResult.status === "unknown"
                       ? "Unregistered Individual"
                       : overlayResult.status === "error"
-                      ? "Camera / System Error"
+                      ? overlayResult.message || "Camera / System Error"
                       : "Access Denied"}
                   </span>
 
@@ -576,6 +581,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                         ? "FACE NOT VISIBLE"
                         : overlayResult?.status === "face_low_quality"
                         ? "POOR BIOMETRIC QUALITY"
+                        : overlayResult?.status === "ambiguous"
+                        ? "AMBIGUOUS MATCH"
                         : overlayResult?.status === "unknown"
                         ? "UNKNOWN INDIVIDUAL"
                         : overlayResult?.status === "denied"

@@ -1,17 +1,24 @@
+import os
 import io
 import base64
 import logging
 import numpy as np
-import cv2
 from PIL import Image
 from fastapi import HTTPException, status
 
-logger = logging.getLogger("intelliguard.image")
-
-
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB maximum encoded payload size
 MAX_IMAGE_DIMENSION = 4096  # 4096px maximum width or height to prevent decompression bombs
+MAX_IMAGE_PIXELS = MAX_IMAGE_DIMENSION * MAX_IMAGE_DIMENSION
 MAX_BASE64_BYTES = ((MAX_IMAGE_BYTES + 2) // 3) * 4  # Encoded equivalent of MAX_IMAGE_BYTES
+
+# Configure OpenCV and Pillow image-pixel limits before importing cv2 so oversized images
+# are rejected before decoding allocates their pixel buffer.
+os.environ.setdefault("OPENCV_IO_MAX_IMAGE_PIXELS", str(MAX_IMAGE_PIXELS))
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+
+import cv2  # noqa: E402
+
+logger = logging.getLogger("intelliguard.image")
 
 
 def read_image_bytes_to_cv2(image_bytes: bytes) -> np.ndarray:
@@ -43,6 +50,12 @@ def read_image_bytes_to_cv2(image_bytes: bytes) -> np.ndarray:
                 )
     except HTTPException:
         raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as bomb_err:
+        logger.warning(f"Rejected image decompression bomb: {bomb_err}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Decoded image dimensions exceed maximum allowed limit of {MAX_IMAGE_DIMENSION}x{MAX_IMAGE_DIMENSION}.",
+        )
     except Exception:
         # If Pillow cannot parse the header, let cv2.imdecode attempt or fail with standard error
         pass

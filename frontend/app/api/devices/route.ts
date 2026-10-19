@@ -120,9 +120,9 @@ export async function POST(req: NextRequest) {
   if (authCheck.error) return authCheck.error;
 
   try {
-    let body: Partial<CreateDeviceBody> = {};
+    let rawBody: unknown;
     try {
-      body = (await req.json()) as Partial<CreateDeviceBody>;
+      rawBody = await req.json();
     } catch (_) {
       return NextResponse.json(
         { success: false, error: "VALIDATION_ERROR", message: "Invalid JSON request body." },
@@ -130,13 +130,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const deviceName = (body.deviceName || "").trim();
-    const serialNumber = (body.serialNumber || "").trim();
-    const location = (body.location || "").trim();
-    const ipAddress = body.ipAddress ? body.ipAddress.trim() : null;
-    const firmwareVersion = body.firmwareVersion ? body.firmwareVersion.trim() : null;
-    const deviceType = (body.deviceType || "camera").trim().toLowerCase();
-    const status = (body.status || "offline").trim().toLowerCase();
+    if (
+      !rawBody ||
+      typeof rawBody !== "object" ||
+      Array.isArray(rawBody) ||
+      Object.getPrototypeOf(rawBody) !== Object.prototype
+    ) {
+      return NextResponse.json(
+        { success: false, error: "VALIDATION_ERROR", message: "Request body must be a JSON object." },
+        { status: 400 }
+      );
+    }
+
+    const body = rawBody as Record<string, unknown>;
+    const requiredStringFields = ["deviceName", "serialNumber", "location"] as const;
+    for (const field of requiredStringFields) {
+      if (body[field] !== undefined && typeof body[field] !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: `Field '${field}' must be a string.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const optionalStringOrNullFields = ["ipAddress", "firmwareVersion"] as const;
+    for (const field of optionalStringOrNullFields) {
+      if (body[field] !== undefined && body[field] !== null && typeof body[field] !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: `Field '${field}' must be a string or null.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const optionalStringFields = ["deviceType", "status"] as const;
+    for (const field of optionalStringFields) {
+      if (body[field] !== undefined && typeof body[field] !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: `Field '${field}' must be a string.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const deviceName = (typeof body.deviceName === "string" ? body.deviceName : "").trim();
+    const serialNumber = (typeof body.serialNumber === "string" ? body.serialNumber : "").trim();
+    const location = (typeof body.location === "string" ? body.location : "").trim();
+    const ipAddress = typeof body.ipAddress === "string" && body.ipAddress.trim() ? body.ipAddress.trim() : null;
+    const firmwareVersion =
+      typeof body.firmwareVersion === "string" && body.firmwareVersion.trim() ? body.firmwareVersion.trim() : null;
+    const deviceType = (typeof body.deviceType === "string" ? body.deviceType : "camera").trim().toLowerCase();
+    const status = (typeof body.status === "string" ? body.status : "offline").trim().toLowerCase();
 
     if (!deviceName || !serialNumber || !location) {
       return NextResponse.json(

@@ -21,13 +21,17 @@ export function DashboardLiveRefresh({ initialTimestamp }: DashboardLiveRefreshP
   const [isPending, startTransition] = useTransition();
   const [selectedInterval, setSelectedInterval] = useState<number>(10);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(10);
-  const [lastRefreshedAt, setLastRefreshedAt] = useState<string>(() => {
-    return new Date(initialTimestamp || Date.now()).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  });
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string>("--:--:--");
+
+  useEffect(() => {
+    setLastRefreshedAt(
+      new Date(initialTimestamp || Date.now()).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    );
+  }, [initialTimestamp]);
 
   const remainingRef = React.useRef(selectedInterval);
 

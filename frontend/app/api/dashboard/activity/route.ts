@@ -1,10 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "@/lib/get-session";
 import type { Prisma, AccessStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
+async function checkAdminAuth() {
+  const session = await getServerSession();
+  if (!session || !session.user) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 }
+      ),
+    };
+  }
+  if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
+      ),
+    };
+  }
+  return { session };
+}
+
 export async function GET(req: NextRequest) {
+  const authCheck = await checkAdminAuth();
+  if (authCheck.error) return authCheck.error;
+
   try {
     const { searchParams } = new URL(req.url);
     const rawLimit = parseInt(searchParams.get("limit") || "10", 10);

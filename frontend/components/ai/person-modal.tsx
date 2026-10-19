@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UploadIcon, InfoIcon, Loader2Icon, Camera } from "lucide-react";
+import { UploadIcon, InfoIcon, Loader2Icon, Camera, ShieldAlert, Sparkles } from "lucide-react";
 import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
 export interface PersonModalInitialData {
@@ -38,12 +38,16 @@ interface PersonModalProps {
   initialData?: PersonModalInitialData | null;
 }
 
+const DUPLICATE_REGISTRATION_MESSAGE =
+  "This face has already been registered. Please check the existing person records before proceeding.";
+
 export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonModalProps) {
   const isEditing = Boolean(initialData);
 
   const [firstName, setFirstName] = useState(initialData?.firstName || "");
   const [lastName, setLastName] = useState(initialData?.lastName || "");
   const [category, setCategory] = useState(initialData?.category || "employee");
+  const [status, setStatus] = useState(initialData?.status || "active");
   const [department, setDepartment] = useState(initialData?.department || "");
   const [phone, setPhone] = useState(initialData?.phone || "");
   const [email, setEmail] = useState(initialData?.email || "");
@@ -53,6 +57,52 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
   const [imagePreview, setImagePreview] = useState<string | null>(initialData?.faceImageUrl || null);
   const [isWebcamOpen, setIsWebcamOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [precheckStatus, setPrecheckStatus] = useState<
+    "idle" | "checking" | "optimal" | "acceptable" | "warning" | "duplicate" | "error"
+  >("idle");
+  const [precheckMessage, setPrecheckMessage] = useState<string | null>(null);
+  const precheckRequestIdRef = useRef(0);
+
+  const runQualityPrecheck = async (file: File) => {
+    const currentRequestId = ++precheckRequestIdRef.current;
+    setPrecheckStatus("checking");
+    setPrecheckMessage(null);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/persons/precheck", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (precheckRequestIdRef.current !== currentRequestId) return;
+
+      if (data.isDuplicate || data.qualityStatus === "duplicate" || res.status === 409) {
+        const dupMsg = data.message || DUPLICATE_REGISTRATION_MESSAGE;
+        setPrecheckStatus("duplicate");
+        setPrecheckMessage(dupMsg);
+        toast.error(dupMsg);
+      } else if (res.ok && data.success && data.canProceed !== false) {
+        setPrecheckStatus(data.qualityStatus || "optimal");
+        setPrecheckMessage(data.message || "Verified unique biometric profile.");
+      } else {
+        const errMsg =
+          data.message ||
+          "Unable to complete biometric duplicate verification. Registration cannot proceed right now.";
+        setPrecheckStatus("error");
+        setPrecheckMessage(errMsg);
+        toast.error(errMsg);
+      }
+    } catch {
+      if (precheckRequestIdRef.current !== currentRequestId) return;
+      const fallbackMsg =
+        "Unable to complete biometric duplicate verification. Registration cannot proceed right now.";
+      setPrecheckStatus("error");
+      setPrecheckMessage(fallbackMsg);
+      toast.error(fallbackMsg);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,6 +116,9 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
         URL.revokeObjectURL(imagePreview);
       }
       setImagePreview(URL.createObjectURL(file));
+      if (!isEditing) {
+        runQualityPrecheck(file);
+      }
     }
   };
 
@@ -76,6 +129,9 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
     }
     setImagePreview(URL.createObjectURL(file));
     toast.success("Photo captured from webcam!");
+    if (!isEditing) {
+      runQualityPrecheck(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,59 +142,77 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
       return;
     }
 
-    if (!isEditing && !imageFile) {
-      toast.error("A valid face photo is required for registration.");
-      return;
+    if (!isEditing) {
+      if (!imageFile) {
+        toast.error("A valid face photo is required for registration.");
+        return;
+      }
+      if (precheckStatus === "checking") {
+        toast.error("Please wait for the biometric duplicate and quality check to complete.");
+        return;
+      }
+      if (precheckStatus === "duplicate") {
+        toast.error(precheckMessage || DUPLICATE_REGISTRATION_MESSAGE);
+        return;
+      }
+      if (precheckStatus === "error") {
+        toast.error(
+          precheckMessage ||
+            "Biometric precheck failed. Please provide a valid single-face photo before registering."
+        );
+        return;
+      }
     }
 
     setIsLoading(true);
 
     try {
-        const trimmedDept = department.trim();
-        const trimmedPhone = phone.trim();
-        const trimmedEmail = email.trim();
-        const trimmedNotes = notes.trim();
+      const trimmedDept = department.trim();
+      const trimmedPhone = phone.trim();
+      const trimmedEmail = email.trim();
+      const trimmedNotes = notes.trim();
 
-        if (isEditing) {
-          if (!initialData?.id) {
-            throw new Error("Unable to update: Person ID is missing.");
-          }
-          // Edit Person Metadata
-          const res = await fetch(`/api/persons/${initialData.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              firstName: firstName.trim(),
-              lastName: lastName.trim(),
-              category,
-              department: trimmedDept || null,
-              phone: trimmedPhone || null,
-              email: trimmedEmail || null,
-              notes: trimmedNotes || null,
-            }),
-          });
+      if (isEditing) {
+        if (!initialData?.id) {
+          throw new Error("Unable to update: Person ID is missing.");
+        }
+        // Edit Person Metadata
+        const res = await fetch(`/api/persons/${initialData.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            category,
+            status,
+            department: trimmedDept || null,
+            phone: trimmedPhone || null,
+            email: trimmedEmail || null,
+            notes: trimmedNotes || null,
+          }),
+        });
 
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            throw new Error(data.message || "Failed to update person.");
-          }
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || "Failed to update person.");
+        }
 
-          toast.success("Person metadata updated successfully!");
-          onSuccess();
-          onClose();
-        } else {
-          // Register New Person
-          const formData = new FormData();
-          formData.append("firstName", firstName.trim());
-          formData.append("lastName", lastName.trim());
-          formData.append("category", category);
-          if (trimmedDept) formData.append("department", trimmedDept);
-          if (trimmedPhone) formData.append("phone", trimmedPhone);
-          if (trimmedEmail) formData.append("email", trimmedEmail);
-          if (trimmedNotes) formData.append("notes", trimmedNotes);
-          if (imageFile) {
-            formData.append("image", imageFile);
-          }
+        toast.success("Person metadata updated successfully!");
+        onSuccess();
+        onClose();
+      } else {
+        // Register New Person
+        const formData = new FormData();
+        formData.append("firstName", firstName.trim());
+        formData.append("lastName", lastName.trim());
+        formData.append("category", category);
+        if (trimmedDept) formData.append("department", trimmedDept);
+        if (trimmedPhone) formData.append("phone", trimmedPhone);
+        if (trimmedEmail) formData.append("email", trimmedEmail);
+        if (trimmedNotes) formData.append("notes", trimmedNotes);
+        if (imageFile) {
+          formData.append("image", imageFile);
+        }
 
         const res = await fetch("/api/persons", {
           method: "POST",
@@ -147,6 +221,18 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
 
         const data = await res.json();
         if (!res.ok || !data.success) {
+          if (
+            res.status === 409 ||
+            data.isDuplicate ||
+            data.error === "DUPLICATE_FACE" ||
+            data.error === "DUPLICATE_FACE_DEACTIVATED"
+          ) {
+            const dupMsg = data.message || DUPLICATE_REGISTRATION_MESSAGE;
+            setPrecheckStatus("duplicate");
+            setPrecheckMessage(dupMsg);
+            toast.error(dupMsg);
+            return;
+          }
           throw new Error(data.message || "Registration failed.");
         }
 
@@ -169,7 +255,7 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
           <DialogTitle>{isEditing ? "Edit Person Details" : "Register New Person"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update administrative metadata. Facial identity remains unchanged."
+              ? "Update administrative metadata and authorization status. Facial identity remains unchanged."
               : "Register an individual and generate their biometric facial recognition profile."}
           </DialogDescription>
         </DialogHeader>
@@ -236,6 +322,22 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
             </div>
           </div>
 
+          {isEditing && (
+            <div className="space-y-1">
+              <Label htmlFor="status">Authorization Status *</Label>
+              <select
+                id="status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="active">Active (Authorized)</option>
+                <option value="inactive">Inactive (Deactivated)</option>
+                <option value="suspended">Suspended (Access Revoked)</option>
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="email">Email</Label>
@@ -297,6 +399,30 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
                   </p>
                 </div>
               </div>
+
+              {precheckStatus === "checking" && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 text-xs text-primary">
+                  <Loader2Icon className="h-4 w-4 animate-spin shrink-0" />
+                  <span>Running AI biometric quality and duplicate registration check...</span>
+                </div>
+              )}
+
+              {precheckStatus !== "idle" && precheckStatus !== "checking" && precheckMessage && (
+                <div
+                  className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs ${
+                    precheckStatus === "duplicate" || precheckStatus === "error"
+                      ? "border-destructive/40 bg-destructive/10 text-destructive"
+                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                  }`}
+                >
+                  {precheckStatus === "duplicate" || precheckStatus === "error" ? (
+                    <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 shrink-0 mt-0.5" />
+                  )}
+                  <span className="font-medium">{precheckMessage}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -315,7 +441,17 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                (!isEditing &&
+                  (precheckStatus === "checking" ||
+                    precheckStatus === "duplicate" ||
+                    precheckStatus === "error"))
+              }
+              className="w-full sm:w-auto"
+            >
               {isLoading ? (
                 <>
                   <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />

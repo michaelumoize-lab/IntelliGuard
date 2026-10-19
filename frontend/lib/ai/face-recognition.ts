@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { prisma } from "@/lib/prisma";
+import { validateEmbeddingVector } from "@/lib/ai/duplicate-check";
 
 export interface FaceMatchCandidate {
   embeddingId: number;
@@ -43,18 +44,20 @@ export interface RecognitionClassificationResult {
   }>;
 }
 
+export type FaceRecognitionDbClient = Pick<typeof prisma, "$queryRawUnsafe">;
+
 /**
  * Executes native PostgreSQL + pgvector cosine similarity search (<=> operator)
- * to find top matching active face embeddings and classify recognition confidence.
+ * to find top matching active face embeddings across DISTINCT registered people (person_id)
+ * and classify recognition confidence.
  */
 export async function findTopFaceMatches(
   embedding: number[],
   topN: number = 2,
-  modelName: string = "buffalo_s"
+  modelName: string = "buffalo_s",
+  dbClient: FaceRecognitionDbClient = prisma
 ): Promise<RecognitionClassificationResult> {
-  if (!embedding || embedding.length !== 512) {
-    throw new Error("Invalid embedding vector: expected 512 dimensions.");
-  }
+  validateEmbeddingVector(embedding);
 
   const matchThreshold = parseFloat(process.env.FACE_MATCH_THRESHOLD || "0.50");
   const ambiguityMargin = parseFloat(process.env.FACE_AMBIGUITY_MARGIN || "0.05");
@@ -62,7 +65,9 @@ export async function findTopFaceMatches(
   // Format 512D float array into pgvector literal format: '[v1,v2,...,v512]'
   const vectorString = `[${embedding.join(",")}]`;
 
-  // Query only active embeddings matching the exact model architecture
+  // Query only active embeddings matching the exact model architecture,
+  // selecting the single best (closest) embedding per distinct person_id
+  // so multiple embeddings belonging to the same person never compete against each other.
   const rawResults: Array<{
     embeddingId: number;
     personId: number;
@@ -78,28 +83,32 @@ export async function findTopFaceMatches(
     faceImageUrl: string | null;
     distance: number;
     similarity: number;
-  }> = await prisma.$queryRawUnsafe(
+  }> = await dbClient.$queryRawUnsafe(
     `
-    SELECT 
-      fe.id AS "embeddingId",
-      fe.person_id AS "personId",
-      fe.embedding_model AS "embeddingModel",
-      fe.quality_score AS "qualityScore",
-      fe.is_active AS "isActive",
-      p.person_code AS "personCode",
-      p.first_name AS "firstName",
-      p.last_name AS "lastName",
-      p.category AS "category",
-      p.department AS "department",
-      p.status AS "status",
-      p.face_image_url AS "faceImageUrl",
-      (fe.embedding <=> $1::vector) AS distance,
-      (1 - (fe.embedding <=> $1::vector)) AS similarity
-    FROM face_embeddings fe
-    JOIN persons p ON p.id = fe.person_id
-    WHERE fe.is_active = true
-      AND LOWER(fe.embedding_model) = LOWER($3)
-    ORDER BY fe.embedding <=> $1::vector ASC
+    SELECT *
+    FROM (
+      SELECT DISTINCT ON (fe.person_id)
+        fe.id AS "embeddingId",
+        fe.person_id AS "personId",
+        fe.embedding_model AS "embeddingModel",
+        fe.quality_score AS "qualityScore",
+        fe.is_active AS "isActive",
+        p.person_code AS "personCode",
+        p.first_name AS "firstName",
+        p.last_name AS "lastName",
+        p.category::text AS "category",
+        p.department AS "department",
+        p.status::text AS "status",
+        p.face_image_url AS "faceImageUrl",
+        (fe.embedding <=> $1::vector) AS distance,
+        (1 - (fe.embedding <=> $1::vector)) AS similarity
+      FROM face_embeddings fe
+      JOIN persons p ON p.id = fe.person_id
+      WHERE fe.is_active = true
+        AND LOWER(fe.embedding_model) = LOWER($3)
+      ORDER BY fe.person_id, (fe.embedding <=> $1::vector) ASC
+    ) distinct_person_matches
+    ORDER BY distance ASC
     LIMIT $2;
     `,
     vectorString,
@@ -119,7 +128,22 @@ export async function findTopFaceMatches(
     };
   }
 
-  const bestCandidate = rawResults[0];
+  // Also deduplicate by personId in application code (preserving best similarity per person)
+  // as defense-in-depth in case raw results contain multiple rows for the same personId.
+  const sortedRaw = [...rawResults].sort(
+    (a, b) => Number(b.similarity) - Number(a.similarity)
+  );
+  const distinctResults: typeof rawResults = [];
+  const seenPersonIds = new Set<number>();
+  for (const row of sortedRaw) {
+    const pid = Number(row.personId);
+    if (!seenPersonIds.has(pid)) {
+      seenPersonIds.add(pid);
+      distinctResults.push(row);
+    }
+  }
+
+  const bestCandidate = distinctResults[0];
   const bestSimilarity = roundFloat(Number(bestCandidate.similarity), 4);
   const bestDistance = roundFloat(Number(bestCandidate.distance), 4);
 
@@ -137,8 +161,8 @@ export async function findTopFaceMatches(
     };
   }
 
-  // If only 1 candidate exists and similarity >= matchThreshold -> MATCHED
-  if (rawResults.length === 1) {
+  // If only 1 distinct person candidate exists and similarity >= matchThreshold -> MATCHED
+  if (distinctResults.length === 1) {
     return {
       matchStatus: "matched",
       person: {
@@ -146,9 +170,9 @@ export async function findTopFaceMatches(
         personCode: bestCandidate.personCode,
         firstName: bestCandidate.firstName,
         lastName: bestCandidate.lastName,
-        category: bestCandidate.category,
+        category: String(bestCandidate.category),
         department: bestCandidate.department,
-        status: bestCandidate.status,
+        status: String(bestCandidate.status),
         faceImageUrl: bestCandidate.faceImageUrl,
       },
       face: {
@@ -161,13 +185,13 @@ export async function findTopFaceMatches(
     };
   }
 
-  // Multiple candidates exist: check ambiguity margin
-  const secondCandidate = rawResults[1];
+  // Multiple distinct person candidates exist: check ambiguity margin between top 2 distinct people
+  const secondCandidate = distinctResults[1];
   const secondSimilarity = roundFloat(Number(secondCandidate.similarity), 4);
   const similarityMargin = roundFloat(bestSimilarity - secondSimilarity, 4);
 
   if (similarityMargin < ambiguityMargin) {
-    // Candidates are too close -> AMBIGUOUS
+    // Two distinct registered people are too close in similarity -> AMBIGUOUS
     return {
       matchStatus: "ambiguous",
       person: null,
@@ -202,9 +226,9 @@ export async function findTopFaceMatches(
       personCode: bestCandidate.personCode,
       firstName: bestCandidate.firstName,
       lastName: bestCandidate.lastName,
-      category: bestCandidate.category,
+      category: String(bestCandidate.category),
       department: bestCandidate.department,
-      status: bestCandidate.status,
+      status: String(bestCandidate.status),
       faceImageUrl: bestCandidate.faceImageUrl,
     },
     face: {

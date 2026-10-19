@@ -27,6 +27,11 @@ export class FastAPIError extends Error {
   }
 }
 
+function getServiceHeaders(): Record<string, string> {
+  const apiKey = (process.env.AI_SERVICE_API_KEY || process.env.FASTAPI_API_KEY || "").trim();
+  return apiKey ? { "X-Service-Key": apiKey } : {};
+}
+
 /**
  * Server-side client function to request 512D facial embedding generation from FastAPI AI microservice.
  */
@@ -50,6 +55,7 @@ export async function generateEmbedding(
 
     response = await fetch(endpoint, {
       method: "POST",
+      headers: getServiceHeaders(),
       body: formData,
       signal: controller.signal,
     });
@@ -156,6 +162,7 @@ export async function detectFaces(
 
     const response = await fetch(endpoint, {
       method: "POST",
+      headers: getServiceHeaders(),
       body: formData,
       signal: controller.signal,
     });
@@ -247,6 +254,7 @@ export async function analyzeImage(
 
     response = await fetch(endpoint, {
       method: "POST",
+      headers: getServiceHeaders(),
       body: formData,
       signal: controller.signal,
     });

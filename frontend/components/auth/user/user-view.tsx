@@ -47,7 +47,7 @@ export function UserView({
     { enabled: user === undefined && !isPending }
   )
 
-  const resolvedUser = user ?? session?.user
+  const resolvedUser = user === undefined ? session?.user : user
 
   if ((isPending || sessionPending) && user === undefined) {
     return (

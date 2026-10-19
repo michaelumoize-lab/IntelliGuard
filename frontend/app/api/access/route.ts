@@ -22,30 +22,85 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
+          status: "recognition_error",
+          person_detected: false,
+          face_detected: false,
           access_status: "denied",
           reason: "system_error",
           door_action: "lock",
+          match_status: "rejected",
+          person: null,
+          face: null,
+          error: "INVALID_REQUEST",
           message: "No face photo provided. Please submit a multipart form-data request containing an 'image' file.",
+          processing_time_ms: Date.now() - startTime,
         },
         { status: 400 }
       );
     }
 
     const imageFile = formData.get("image") as File | null;
-    const deviceIdInput = (formData.get("deviceId") || req.headers.get("x-device-id")) as string | null;
-    const apiKeyInput = (formData.get("apiKey") || req.headers.get("x-api-key")) as string | null;
-    const timestampInput = (formData.get("timestamp") || req.headers.get("x-timestamp")) as string | null;
-    const nonceInput = (formData.get("nonce") || req.headers.get("x-nonce")) as string | null;
-    const signatureInput = (formData.get("signature") || req.headers.get("x-signature")) as string | null;
+    const rawDeviceIdForm = formData.get("deviceId");
+    const rawApiKeyForm = formData.get("apiKey");
+    const rawTimestampForm = formData.get("timestamp");
+    const rawNonceForm = formData.get("nonce");
+    const rawSignatureForm = formData.get("signature");
+
+    const hasDeviceFormFields =
+      formData.has("deviceId") ||
+      formData.has("apiKey") ||
+      formData.has("timestamp") ||
+      formData.has("nonce") ||
+      formData.has("signature");
+    const hasDeviceHeaders =
+      req.headers.has("x-device-id") ||
+      req.headers.has("x-api-key") ||
+      req.headers.has("x-device-serial") ||
+      req.headers.has("x-device-api-key") ||
+      req.headers.has("x-timestamp") ||
+      req.headers.has("x-nonce") ||
+      req.headers.has("x-signature");
+    const isDeviceRequest = hasDeviceFormFields || hasDeviceHeaders;
+
+    const deviceIdInput = (
+      (typeof rawDeviceIdForm === "string" ? rawDeviceIdForm : null) ??
+      req.headers.get("x-device-id") ??
+      req.headers.get("x-device-serial")
+    )?.trim() || null;
+    const apiKeyInput = (
+      (typeof rawApiKeyForm === "string" ? rawApiKeyForm : null) ??
+      req.headers.get("x-api-key") ??
+      req.headers.get("x-device-api-key")
+    )?.trim() || null;
+    const timestampInput = (
+      (typeof rawTimestampForm === "string" ? rawTimestampForm : null) ??
+      req.headers.get("x-timestamp")
+    )?.trim() || null;
+    const nonceInput = (
+      (typeof rawNonceForm === "string" ? rawNonceForm : null) ??
+      req.headers.get("x-nonce")
+    )?.trim() || null;
+    const signatureInput = (
+      (typeof rawSignatureForm === "string" ? rawSignatureForm : null) ??
+      req.headers.get("x-signature")
+    )?.trim() || null;
 
     if (!imageFile || imageFile.size === 0) {
       return NextResponse.json(
         {
           success: false,
+          status: "recognition_error",
+          person_detected: false,
+          face_detected: false,
           access_status: "denied",
           reason: "system_error",
           door_action: "lock",
+          match_status: "rejected",
+          person: null,
+          face: null,
+          error: "INVALID_IMAGE",
           message: "No face photo provided. Please select or attach an image file.",
+          processing_time_ms: Date.now() - startTime,
         },
         { status: 400 }
       );
@@ -55,10 +110,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
+          status: "recognition_error",
+          person_detected: false,
+          face_detected: false,
           access_status: "denied",
           reason: "system_error",
           door_action: "lock",
+          match_status: "rejected",
+          person: null,
+          face: null,
+          error: "IMAGE_TOO_LARGE",
           message: "Uploaded image file exceeds the 10MB size limit.",
+          processing_time_ms: Date.now() - startTime,
         },
         { status: 400 }
       );
@@ -69,22 +132,51 @@ export async function POST(req: NextRequest) {
     const bodyHash = crypto.createHash("sha256").update(imageBuffer).digest("hex");
 
     // 2. Step 2: Authenticate caller (Admin session for simulation / Device credentials for hardware)
+    // Never fall back to browser-session authentication if any device header or form field is present.
     let deviceAuth: DeviceAuthResult = { isValid: false };
 
-    if (!deviceIdInput && !apiKeyInput) {
+    if (!isDeviceRequest) {
       const session = await getServerSession();
-      if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+      if (!session || !session.user) {
         const processingTimeMs = Date.now() - startTime;
         return NextResponse.json(
           {
             success: false,
+            status: "recognition_error",
+            person_detected: false,
+            face_detected: false,
             access_status: "denied",
             reason: "system_error",
             door_action: "lock",
+            match_status: "rejected",
+            person: null,
+            face: null,
+            error: "UNAUTHORIZED",
             message: "Authentication required. Admin authorization or valid device credentials required.",
             processing_time_ms: processingTimeMs,
           },
           { status: 401 }
+        );
+      }
+      if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+        const processingTimeMs = Date.now() - startTime;
+        return NextResponse.json(
+          {
+            success: false,
+            status: "recognition_error",
+            person_detected: false,
+            face_detected: false,
+            access_status: "denied",
+            reason: "system_error",
+            door_action: "lock",
+            match_status: "rejected",
+            person: null,
+            face: null,
+            error: "FORBIDDEN",
+            message: "Admin authorization required.",
+            processing_time_ms: processingTimeMs,
+          },
+          { status: 403 }
         );
       }
       deviceAuth = { isValid: true, device: null };
@@ -101,6 +193,9 @@ export async function POST(req: NextRequest) {
           deviceAuth.reason === "replay_detected" ||
           deviceAuth.reason === "timestamp_expired" ||
           deviceAuth.reason === "invalid_signature";
+        const isStatusBlocked =
+          deviceAuth.reason === "device_in_maintenance" ||
+          deviceAuth.reason === "device_error";
         const reasonMsg =
           deviceAuth.reason === "timestamp_expired"
             ? "Request timestamp expired. Potential replay attack blocked."
@@ -108,30 +203,53 @@ export async function POST(req: NextRequest) {
             ? "Replay attack detected: unique nonce has already been consumed."
             : deviceAuth.reason === "invalid_signature"
             ? "HMAC signature verification failed. Request payload was altered or unauthenticated."
-            : `Device authentication failed: ${deviceAuth.reason || "invalid credentials"}.`;
+            : `Device authentication failed: ${deviceAuth.reason || "invalid_credentials"}.`;
 
-        if (isReplayOrTamper && deviceAuth.device) {
-          await prisma.alert.create({
-            data: {
-              deviceId: deviceAuth.device.id,
-              alertType: "unauthorized_access",
-              title: deviceAuth.reason === "invalid_signature" ? "HMAC Tamper Attempt" : "Replay Attack Detected",
-              message: `Device #${deviceAuth.device.id} (${deviceAuth.device.deviceName}) submitted an invalid access request (${deviceAuth.reason}). Request blocked.`,
-              severity: "critical",
-            },
-          });
+        if (deviceAuth.device) {
+          try {
+            if (isReplayOrTamper) {
+              await prisma.alert.create({
+                data: {
+                  deviceId: deviceAuth.device.id,
+                  alertType: "unauthorized_access",
+                  title: deviceAuth.reason === "invalid_signature" ? "HMAC Tamper Attempt" : "Replay Attack Detected",
+                  message: `Device #${deviceAuth.device.id} (${deviceAuth.device.deviceName}) submitted an invalid access request (${deviceAuth.reason}). Request blocked.`,
+                  severity: "critical",
+                },
+              });
+            } else {
+              await prisma.alert.create({
+                data: {
+                  deviceId: deviceAuth.device.id,
+                  alertType: "unauthorized_access",
+                  title: "Device Authentication Rejected",
+                  message: `Device #${deviceAuth.device.id} (${deviceAuth.device.deviceName}) failed authentication (${deviceAuth.reason || "invalid_credentials"}). Request blocked.`,
+                  severity: "high",
+                },
+              });
+            }
+          } catch (alertErr: unknown) {
+            console.error("Failed to record device authentication alert:", alertErr);
+          }
         }
 
         return NextResponse.json(
           {
             success: false,
+            status: "recognition_error",
+            person_detected: false,
+            face_detected: false,
             access_status: "denied",
             reason: "system_error",
             door_action: "lock",
+            match_status: "rejected",
+            person: null,
+            face: null,
+            error: isStatusBlocked ? "DEVICE_FORBIDDEN" : "DEVICE_UNAUTHORIZED",
             message: reasonMsg,
             processing_time_ms: processingTimeMs,
           },
-          { status: 401 }
+          { status: isStatusBlocked ? 403 : 401 }
         );
       }
     }
@@ -147,28 +265,30 @@ export async function POST(req: NextRequest) {
         let code = aiErr.code as string;
         if (code === "FASTAPI_UNAVAILABLE") code = "AI_SERVICE_UNAVAILABLE";
 
-        // Log system error access attempt
-        await prisma.accessLog.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            matchStatus: "rejected",
-            accessStatus: "denied",
-            reason: "system_error",
-            doorAction: "lock",
-            processingTimeMs,
-          },
-        });
+        try {
+          await prisma.accessLog.create({
+            data: {
+              deviceId: deviceAuth.device?.id || null,
+              matchStatus: "rejected",
+              accessStatus: "denied",
+              reason: "system_error",
+              doorAction: "lock",
+              processingTimeMs,
+            },
+          });
 
-        // Create high-severity system error Alert
-        await prisma.alert.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            alertType: "system_error",
-            title: "AI Service Unavailable",
-            message: "FastAPI AI microservice was unreachable during access attempt.",
-            severity: "high",
-          },
-        });
+          await prisma.alert.create({
+            data: {
+              deviceId: deviceAuth.device?.id || null,
+              alertType: "system_error",
+              title: "AI Service Unavailable",
+              message: "FastAPI AI microservice encountered an error or was unreachable during access attempt.",
+              severity: "high",
+            },
+          });
+        } catch (logErr: unknown) {
+          console.error("Failed to persist AI service error log/alert:", logErr);
+        }
 
         return NextResponse.json(
           {
@@ -179,6 +299,9 @@ export async function POST(req: NextRequest) {
             access_status: "denied",
             reason: "system_error",
             door_action: "lock",
+            match_status: "rejected",
+            person: null,
+            face: null,
             error: code,
             message: aiErr.message,
             processing_time_ms: processingTimeMs,
@@ -254,8 +377,154 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Handle Biometric Presentation Attack (Spoofing Attempt) strictly BEFORE identity matching
+    if (aiResult.status === "spoof_detected") {
+      try {
+        await prisma.accessLog.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            personId: null,
+            embeddingId: null,
+            matchStatus: "rejected",
+            accessStatus: "denied",
+            reason: "spoof_detected",
+            doorAction: "lock",
+            confidenceScore: null,
+            processingTimeMs,
+          },
+        });
+      } catch (logErr: unknown) {
+        console.error("Failed to record spoof_detected AccessLog:", logErr);
+      }
+
+      try {
+        await prisma.alert.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            alertType: "unauthorized_access",
+            title: "Biometric Spoof Attempt Blocked",
+            message: `Presentation attack detected at terminal. MiniFASNet real-face confidence: ${
+              aiResult.livenessScore !== null && aiResult.livenessScore !== undefined
+                ? (aiResult.livenessScore * 100).toFixed(1) + "%"
+                : "N/A"
+            }. Access denied immediately.`,
+            severity: "critical",
+          },
+        });
+      } catch (alertErr: unknown) {
+        console.error("Failed to record spoof_detected Alert:", alertErr);
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: "spoof_detected",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "spoof_detected",
+        door_action: "lock",
+        match_status: "rejected",
+        liveness_status: aiResult.livenessStatus ?? "spoof",
+        liveness_score: aiResult.livenessScore ?? null,
+        liveness_time_ms: aiResult.livenessTimeMs ?? null,
+        message: "Presentation attack / spoof detected. Access denied and security alert logged.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    // Handle Inconclusive / Failed Liveness Verification strictly BEFORE identity matching (Fail-Safe)
+    if (aiResult.status === "liveness_inconclusive") {
+      try {
+        await prisma.accessLog.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            personId: null,
+            embeddingId: null,
+            matchStatus: "rejected",
+            accessStatus: "denied",
+            reason: "system_error",
+            doorAction: "lock",
+            confidenceScore: null,
+            processingTimeMs,
+          },
+        });
+      } catch (logErr: unknown) {
+        console.error("Failed to record liveness_inconclusive AccessLog:", logErr);
+      }
+
+      return NextResponse.json({
+        success: false,
+        status: "liveness_inconclusive",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "liveness_failed",
+        door_action: "lock",
+        match_status: "rejected",
+        liveness_status: aiResult.livenessStatus ?? "inconclusive",
+        liveness_score: aiResult.livenessScore ?? null,
+        liveness_time_ms: aiResult.livenessTimeMs ?? null,
+        message: aiResult.message || "Facial liveness verification inconclusive. Access denied for security.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
 
     if (aiResult.status === "recognition_error") {
+      try {
+        await prisma.accessLog.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            matchStatus: "rejected",
+            accessStatus: "denied",
+            reason: "system_error",
+            doorAction: "lock",
+            processingTimeMs,
+          },
+        });
+      } catch (logErr: unknown) {
+        console.error("Failed to record recognition_error AccessLog:", logErr);
+      }
+
       return NextResponse.json({
         success: false,
         status: "recognition_error",
@@ -264,10 +533,10 @@ export async function POST(req: NextRequest) {
         access_status: "denied",
         reason: "system_error",
         door_action: "lock",
-        match_status: null,
-        liveness_status: null,
-        liveness_score: null,
-        liveness_time_ms: null,
+        match_status: "rejected",
+        liveness_status: aiResult.livenessStatus ?? null,
+        liveness_score: aiResult.livenessScore ?? null,
+        liveness_time_ms: aiResult.livenessTimeMs ?? null,
         message: aiResult.message || "Biometric recognition error encountered. Please check camera feed or try again.",
         person: null,
         face: {
@@ -293,7 +562,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (aiResult.status === "face_low_quality" || !aiResult.embedding) {
+    if (aiResult.status === "face_low_quality") {
       return NextResponse.json({
         success: true,
         status: "face_low_quality",
@@ -303,9 +572,9 @@ export async function POST(req: NextRequest) {
         reason: "poor_quality_face",
         door_action: "no_action",
         match_status: null,
-        liveness_status: null,
-        liveness_score: null,
-        liveness_time_ms: null,
+        liveness_status: aiResult.livenessStatus ?? null,
+        liveness_score: aiResult.livenessScore ?? null,
+        liveness_time_ms: aiResult.livenessTimeMs ?? null,
         message:
           aiResult.message ||
           "Face detected with low quality or obstruction. Please face the camera directly in good lighting.",
@@ -333,12 +602,140 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const hasValidEmbedding =
+      Array.isArray(aiResult.embedding) &&
+      aiResult.embedding.length === 512 &&
+      aiResult.embedding.every((val) => typeof val === "number" && Number.isFinite(val));
+
+    if (!hasValidEmbedding) {
+      try {
+        await prisma.accessLog.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            matchStatus: "rejected",
+            accessStatus: "denied",
+            reason: "system_error",
+            doorAction: "lock",
+            processingTimeMs,
+          },
+        });
+      } catch (logErr: unknown) {
+        console.error("Failed to record invalid embedding AccessLog:", logErr);
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          status: "recognition_error",
+          person_detected: Boolean(aiResult.personDetected),
+          face_detected: Boolean(aiResult.faceDetected),
+          access_status: "denied",
+          reason: "system_error",
+          door_action: "lock",
+          match_status: "rejected",
+          person: null,
+          face: null,
+          person_bbox: aiResult.primaryPersonBbox || null,
+          face_bbox: aiResult.primaryFaceBbox || null,
+          image_width: aiResult.imageWidth,
+          image_height: aiResult.imageHeight,
+          persons: aiResult.persons || [],
+          faces: aiResult.faces || [],
+          device: deviceAuth.device
+            ? {
+                id: deviceAuth.device.id,
+                serial_number: deviceAuth.device.serialNumber,
+                device_name: deviceAuth.device.deviceName,
+              }
+            : null,
+          liveness_status: aiResult.livenessStatus ?? null,
+          liveness_score: aiResult.livenessScore ?? null,
+          liveness_time_ms: aiResult.livenessTimeMs ?? null,
+          error: "INVALID_AI_RESPONSE",
+          message: "Processing failed: AI service returned an incomplete or malformed facial embedding.",
+          processing_time_ms: processingTimeMs,
+        },
+        { status: 502 }
+      );
+    }
+
     // Step 4: Face Detected & Evaluated -> Perform pgvector similarity search
-    const recognition = await findTopFaceMatches(aiResult.embedding, 2, aiResult.model || "buffalo_s");
+    let recognition;
+    try {
+      recognition = await findTopFaceMatches(aiResult.embedding!, 2, aiResult.model || "buffalo_s");
+    } catch (dbErr: unknown) {
+      console.error("Database / pgvector similarity search failed:", dbErr);
+      const errTimeMs = Date.now() - startTime;
+
+      try {
+        await prisma.accessLog.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            matchStatus: "rejected",
+            accessStatus: "denied",
+            reason: "system_error",
+            doorAction: "lock",
+            processingTimeMs: errTimeMs,
+          },
+        });
+
+        await prisma.alert.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            alertType: "system_error",
+            title: "Database Vector Search Failure",
+            message: "Database or pgvector similarity search failed during biometric verification.",
+            severity: "high",
+          },
+        });
+      } catch (_) {
+        // Ignore secondary logging failure when database is unreachable
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          status: "recognition_error",
+          person_detected: Boolean(aiResult.personDetected),
+          face_detected: Boolean(aiResult.faceDetected),
+          access_status: "denied",
+          reason: "system_error",
+          door_action: "lock",
+          match_status: "rejected",
+          person: null,
+          face: null,
+          person_bbox: aiResult.primaryPersonBbox || null,
+          face_bbox: aiResult.primaryFaceBbox || null,
+          image_width: aiResult.imageWidth,
+          image_height: aiResult.imageHeight,
+          persons: aiResult.persons || [],
+          faces: aiResult.faces || [],
+          device: deviceAuth.device
+            ? {
+                id: deviceAuth.device.id,
+                serial_number: deviceAuth.device.serialNumber,
+                device_name: deviceAuth.device.deviceName,
+              }
+            : null,
+          liveness_status: aiResult.livenessStatus ?? null,
+          liveness_score: aiResult.livenessScore ?? null,
+          liveness_time_ms: aiResult.livenessTimeMs ?? null,
+          error: "DATABASE_ERROR",
+          message: "Verification error: database or vector similarity search failed.",
+          processing_time_ms: errTimeMs,
+        },
+        { status: 500 }
+      );
+    }
 
     // Step 5: Evaluate Access Control Decision Rules
-    const decision = evaluateAccess({
-      status: recognition.matchStatus === "matched" ? "known_individual" : "unknown_individual",
+    const rawDecision = evaluateAccess({
+      status:
+        recognition.matchStatus === "matched"
+          ? "known_individual"
+          : recognition.matchStatus === "ambiguous"
+          ? "ambiguous_match"
+          : "unknown_individual",
       matchStatus: recognition.matchStatus,
       person: recognition.person,
       similarity: recognition.face.similarity,
@@ -346,10 +743,29 @@ export async function POST(req: NextRequest) {
       qualityScore: recognition.face.qualityScore,
     });
 
-    const isDeactivated = Boolean(
-      recognition.person &&
-      (recognition.person.status || "active").toLowerCase() !== "active"
-    );
+    const personStatus = recognition.person
+      ? (recognition.person.status || "active").toLowerCase()
+      : "active";
+    const isDeactivated = Boolean(recognition.person && personStatus !== "active");
+
+    // Fail-safe guard: never grant access or unlock unless matched to an active person
+    const safeAccessGranted =
+      rawDecision.accessStatus === "granted" &&
+      recognition.matchStatus === "matched" &&
+      Boolean(recognition.person) &&
+      !isDeactivated;
+
+    const decision = {
+      accessStatus: (safeAccessGranted ? "granted" : "denied") as "granted" | "denied",
+      reason: (isDeactivated && recognition.matchStatus === "matched"
+        ? "unauthorized"
+        : rawDecision.reason) as AccessReason,
+      doorAction: (safeAccessGranted && rawDecision.doorAction === "unlock"
+        ? "unlock"
+        : rawDecision.doorAction === "no_action"
+        ? "no_action"
+        : "lock") as "unlock" | "lock" | "no_action",
+    };
 
     // Step 6: Persist AccessLog and Security Alert in PostgreSQL ONLY for evaluated biometric events
     const matchedPersonId = recognition.person?.id || null;
@@ -363,7 +779,7 @@ export async function POST(req: NextRequest) {
         embeddingId: matchedEmbeddingId,
         matchStatus: recognition.matchStatus as MatchStatus,
         accessStatus: decision.accessStatus as AccessStatus,
-        reason: decision.reason as AccessReason,
+        reason: decision.reason,
         doorAction: decision.doorAction as DoorAction,
         confidenceScore: recognition.face.similarity,
         embeddingDistance: recognition.face.distance,
@@ -371,47 +787,59 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Create security Alert if attempt was denied
+    // Create security Alert if attempt was denied (wrapped in try/catch so alert failure never masks decision)
     if (decision.accessStatus === "denied") {
-      if (recognition.matchStatus === "unknown") {
-        await prisma.alert.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            personId: null,
-            alertType: "unknown_face",
-            title: "Unknown Face Detected",
-            message: "An unrecognized face attempted access.",
-            severity: "medium",
-          },
-        });
-      } else if (recognition.matchStatus === "ambiguous") {
-        await prisma.alert.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            personId: null,
-            alertType: "unauthorized_access",
-            title: "Ambiguous Face Recognition",
-            message: "Face recognition produced competing candidates with insufficient confidence margin.",
-            severity: "medium",
-          },
-        });
-      } else if (isDeactivated && recognition.person) {
-        const personStatus = recognition.person.status || "inactive";
-        await prisma.alert.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            personId: recognition.person.id,
-            alertType: "unauthorized_access",
-            title: "Access Denied - Deactivated User",
-            message: `${recognition.person.firstName} ${recognition.person.lastName} (${recognition.person.personCode}) attempted access while deactivated (${personStatus}). User is not allowed to access the system.`,
-            severity: "high",
-          },
-        });
+      try {
+        if (recognition.matchStatus === "unknown") {
+          await prisma.alert.create({
+            data: {
+              deviceId: deviceAuth.device?.id || null,
+              personId: null,
+              alertType: "unknown_face",
+              title: "Unknown Face Detected",
+              message: "An unrecognized face attempted access.",
+              severity: "medium",
+            },
+          });
+        } else if (recognition.matchStatus === "ambiguous") {
+          await prisma.alert.create({
+            data: {
+              deviceId: deviceAuth.device?.id || null,
+              personId: null,
+              alertType: "unauthorized_access",
+              title: "Ambiguous Face Recognition",
+              message: "Face recognition produced competing candidates with insufficient confidence margin.",
+              severity: "medium",
+            },
+          });
+        } else if (isDeactivated && recognition.person) {
+          const isSuspended = personStatus === "suspended";
+          await prisma.alert.create({
+            data: {
+              deviceId: deviceAuth.device?.id || null,
+              personId: recognition.person.id,
+              alertType: "unauthorized_access",
+              title: isSuspended
+                ? "Access Denied - Suspended User"
+                : "Access Denied - Deactivated User",
+              message: `${recognition.person.firstName} ${recognition.person.lastName} (${recognition.person.personCode}) attempted access while ${
+                isSuspended ? "suspended" : "deactivated"
+              } (${personStatus}). User is not allowed to access the system.`,
+              severity: "high",
+            },
+          });
+        }
+      } catch (alertErr) {
+        console.error("Failed to create security alert for denied access:", alertErr);
       }
     }
 
-    const finalStatus: "known_individual" | "unknown_individual" =
-      recognition.matchStatus === "matched" ? "known_individual" : "unknown_individual";
+    const finalStatus: "known_individual" | "unknown_individual" | "ambiguous_match" =
+      recognition.matchStatus === "matched"
+        ? "known_individual"
+        : recognition.matchStatus === "ambiguous"
+        ? "ambiguous_match"
+        : "unknown_individual";
 
     // Step 7: Return structured access response (including person and face bounding boxes)
     return NextResponse.json({
@@ -424,7 +852,11 @@ export async function POST(req: NextRequest) {
       door_action: decision.doorAction,
       match_status: recognition.matchStatus,
       message: isDeactivated
-        ? "User is deactivated and not allowed to access the system."
+        ? personStatus === "suspended"
+          ? "User account is suspended and not allowed to access the system."
+          : "User is deactivated and not allowed to access the system."
+        : recognition.matchStatus === "ambiguous"
+        ? "Ambiguous facial match across multiple registered individuals. Access denied."
         : undefined,
       person: recognition.person
         ? {
@@ -459,9 +891,9 @@ export async function POST(req: NextRequest) {
           }
         : null,
       candidates: recognition.candidates,
-      liveness_status: null,
-      liveness_score: null,
-      liveness_time_ms: null,
+      liveness_status: aiResult.livenessStatus ?? "live",
+      liveness_score: aiResult.livenessScore ?? null,
+      liveness_time_ms: aiResult.livenessTimeMs ?? null,
       processing_time_ms: processingTimeMs,
     });
   } catch (error: unknown) {
@@ -471,10 +903,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
+        status: "recognition_error",
+        person_detected: false,
+        face_detected: false,
         access_status: "denied",
         reason: "system_error",
         door_action: "lock",
-        message: "An unexpected error occurred during access decision evaluation.",
+        match_status: "rejected",
+        person: null,
+        face: null,
+        error: "INTERNAL_SERVER_ERROR",
+        message: "An unexpected technical error occurred during access decision evaluation.",
         processing_time_ms: processingTimeMs,
       },
       { status: 500 }

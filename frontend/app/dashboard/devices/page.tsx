@@ -1,5 +1,7 @@
 import React from "react";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "@/lib/get-session";
 import { DeviceType, DeviceStatus, Prisma } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -27,6 +29,15 @@ interface DevicesPageProps {
 }
 
 export default async function DevicesPage({ searchParams }: DevicesPageProps) {
+  const session = await getServerSession();
+  if (!session?.user) {
+    redirect("/auth/sign-in?redirectTo=/dashboard/devices");
+  }
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "admin") {
+    redirect("/dashboard");
+  }
+
   const resolvedParams = await searchParams;
   const rawPage = parseInt(resolvedParams.page || "1", 10);
   const requestedPage = Math.max(1, isNaN(rawPage) ? 1 : rawPage);

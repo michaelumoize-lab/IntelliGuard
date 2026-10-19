@@ -76,7 +76,7 @@ export function DeviceAccessSummary({ stats, recentLogs, deviceId }: DeviceAcces
             </CardDescription>
           </div>
           <Link
-            href={`/dashboard/access-logs?search=${deviceId}`}
+            href={`/dashboard/access-logs?deviceId=${deviceId}`}
             className="text-xs font-medium text-primary hover:underline flex items-center"
           >
             View All Logs

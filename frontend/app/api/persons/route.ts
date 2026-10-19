@@ -2,7 +2,12 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding, FastAPIError } from "@/lib/ai/fastapi";
-import { checkForDuplicateFace } from "@/lib/ai/duplicate-check";
+import {
+  checkForDuplicateFace,
+  DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+  DuplicateCheckResult,
+  REQUIRED_DUPLICATE_MESSAGE,
+} from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
 import { PersonCategory, PersonStatus, Prisma } from "@prisma/client";
@@ -12,15 +17,53 @@ export const dynamic = "force-dynamic";
 // Allowed PersonCategory enum values matching Prisma schema
 const VALID_CATEGORIES = ["employee", "student", "visitor", "contractor"];
 
+class DuplicateFaceConflictError extends Error {
+  matchingPerson: NonNullable<DuplicateCheckResult["matchingPerson"]>;
+  constructor(matchingPerson: NonNullable<DuplicateCheckResult["matchingPerson"]>) {
+    super(REQUIRED_DUPLICATE_MESSAGE);
+    this.name = "DuplicateFaceConflictError";
+    this.matchingPerson = matchingPerson;
+  }
+}
+
+function buildDuplicateFaceResponse(
+  match: NonNullable<DuplicateCheckResult["matchingPerson"]>
+) {
+  const isDeactivated = (match.status || "active").toLowerCase() !== "active";
+  return NextResponse.json(
+    {
+      success: false,
+      isDuplicate: true,
+      status: "duplicate_face",
+      error: isDeactivated ? "DUPLICATE_FACE_DEACTIVATED" : "DUPLICATE_FACE",
+      message: REQUIRED_DUPLICATE_MESSAGE,
+      matchingPerson: {
+        personCode: match.personCode,
+        firstName: match.firstName,
+        lastName: match.lastName,
+        status: match.status,
+        similarity: match.similarity,
+      },
+    },
+    { status: 409 }
+  );
+}
+
 export async function POST(req: NextRequest) {
   let uploadedFileId: string | null = null;
 
   try {
     const session = await getServerSession();
-    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
         { status: 401 }
+      );
+    }
+    if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
       );
     }
 
@@ -76,23 +119,17 @@ export async function POST(req: NextRequest) {
 
     // 3. Step A: Call FastAPI for face detection, quality check & 512D ArcFace embedding
     const aiResult = await generateEmbedding(imageBuffer, imageFile.name || "face.jpg");
+    const activeModel = aiResult.model || "buffalo_s";
 
     // 4. Step B: Check for duplicate face using native PostgreSQL + pgvector
-    const duplicateResult = await checkForDuplicateFace(aiResult.embedding, 0.85, undefined, aiResult.model || "buffalo_s");
+    const duplicateResult = await checkForDuplicateFace(
+      aiResult.embedding,
+      DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+      undefined,
+      activeModel
+    );
     if (duplicateResult.isDuplicate && duplicateResult.matchingPerson) {
-      const match = duplicateResult.matchingPerson;
-      const isDeactivated = (match.status || "active").toLowerCase() !== "active";
-      return NextResponse.json(
-        {
-          success: false,
-          error: isDeactivated ? "DUPLICATE_FACE_DEACTIVATED" : "DUPLICATE_FACE",
-          message: isDeactivated
-            ? `Duplicate face detected. This face matches deactivated/banned individual ${match.firstName} ${match.lastName} (${match.personCode}) with ${Math.round(match.similarity * 100)}% similarity match. Deactivated individuals cannot be re-enrolled.`
-            : `Duplicate face detected. This individual is already registered as ${match.firstName} ${match.lastName} (${match.personCode}) with ${Math.round(match.similarity * 100)}% similarity match.`,
-          matchingPerson: match,
-        },
-        { status: 400 }
-      );
+      return buildDuplicateFaceResponse(duplicateResult.matchingPerson);
     }
 
     // 5. Step C: Upload original face image to ImageKit cloud storage (/intelliguard/persons/)
@@ -105,6 +142,20 @@ export async function POST(req: NextRequest) {
     // Wrap database creation in a transaction and try-catch for ImageKit cleanup
     try {
       const newPerson = await prisma.$transaction(async (tx) => {
+        // Serialize concurrent facial registrations so two near-simultaneous requests for the same face cannot both insert
+        await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(20260419);");
+
+        const txDuplicateResult = await checkForDuplicateFace(
+          aiResult.embedding,
+          DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+          undefined,
+          activeModel,
+          tx
+        );
+        if (txDuplicateResult.isDuplicate && txDuplicateResult.matchingPerson) {
+          throw new DuplicateFaceConflictError(txDuplicateResult.matchingPerson);
+        }
+
         const createdPerson = await tx.person.create({
           data: {
             personCode,
@@ -132,7 +183,7 @@ export async function POST(req: NextRequest) {
           `,
           createdPerson.id,
           vectorLiteral,
-          aiResult.model || "buffalo_s",
+          activeModel,
           ikResult.url,
           aiResult.qualityScore
         );
@@ -171,6 +222,10 @@ export async function POST(req: NextRequest) {
       // Cleanup: Delete newly uploaded ImageKit asset so no orphaned images remain
       if (uploadedFileId) {
         await deleteFaceImage(uploadedFileId);
+      }
+
+      if (dbError instanceof DuplicateFaceConflictError) {
+        return buildDuplicateFaceResponse(dbError.matchingPerson);
       }
 
       if (dbError instanceof Prisma.PrismaClientKnownRequestError && dbError.code === "P2002") {
@@ -231,10 +286,16 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession();
-    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
         { status: 401 }
+      );
+    }
+    if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
       );
     }
 

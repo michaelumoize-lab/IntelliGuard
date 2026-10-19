@@ -45,11 +45,15 @@ export function useSystemHealth() {
   const isRefreshing = isFetchingCount > 0;
 
   const refresh = async () => {
-    return queryClient.fetchQuery({
-      queryKey: SYSTEM_HEALTH_QUERY_KEY,
-      queryFn: () => fetchSystemHealth(true),
-      staleTime: 0,
-    });
+    try {
+      return await queryClient.fetchQuery({
+        queryKey: SYSTEM_HEALTH_QUERY_KEY,
+        queryFn: () => fetchSystemHealth(true),
+        staleTime: 0,
+      });
+    } catch {
+      return null;
+    }
   };
 
   return {
