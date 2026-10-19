@@ -77,19 +77,13 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
   const formData = new FormData();
   formData.append("image", imageBlob, "webcam_frame.jpg");
 
-  const response = await fetch("/api/access", {
-    method: "POST",
-    body: formData,
-  });
-
-  let data: Partial<AccessScanResponse> = {};
+  let response: Response;
   try {
-    data = (await response.json()) as Partial<AccessScanResponse>;
+    response = await fetch("/api/access", {
+      method: "POST",
+      body: formData,
+    });
   } catch {
-    // Non-JSON error body fallback
-  }
-
-  if (!response.ok && !data.access_status) {
     return {
       success: false,
       status: "recognition_error",
@@ -101,6 +95,47 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
       match_status: "rejected",
       person: null,
       processing_time_ms: 0,
+      message: "Network or backend service unavailable. Please try again.",
+      error: "NETWORK_ERROR",
+    };
+  }
+
+  let data: Partial<AccessScanResponse> = {};
+  try {
+    data = (await response.json()) as Partial<AccessScanResponse>;
+  } catch {
+    // Non-JSON error body fallback
+  }
+
+  if (
+    !response.ok ||
+    data.success === false ||
+    data.status === "recognition_error" ||
+    data.reason === "system_error" ||
+    data.match_status === "rejected"
+  ) {
+    return {
+      success: false,
+      status: "recognition_error",
+      person_detected: Boolean(data.person_detected),
+      face_detected: Boolean(data.face_detected),
+      access_status: "denied",
+      reason: "system_error",
+      door_action: "lock",
+      match_status: "rejected",
+      person: null,
+      face: data.face ?? undefined,
+      person_bbox: data.person_bbox ?? null,
+      face_bbox: data.face_bbox ?? null,
+      image_width: data.image_width,
+      image_height: data.image_height,
+      persons: data.persons ?? [],
+      faces: data.faces ?? [],
+      device: data.device ?? null,
+      liveness_status: data.liveness_status ?? null,
+      liveness_score: data.liveness_score ?? null,
+      liveness_time_ms: data.liveness_time_ms ?? null,
+      processing_time_ms: typeof data.processing_time_ms === "number" ? data.processing_time_ms : 0,
       message: data.message || "Failed to process face scan request.",
       error: data.error || "SERVER_ERROR",
     };

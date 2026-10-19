@@ -1,9 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "@/lib/get-session";
 import type { HealthCheckResponse } from "@/types/health";
 
 export const dynamic = "force-dynamic";
 export type { HealthCheckResponse };
+
+async function checkAdminAuth() {
+  const session = await getServerSession();
+  if (!session || !session.user) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 }
+      ),
+    };
+  }
+  if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
+      ),
+    };
+  }
+  return { session };
+}
 
 // Server-side in-memory cache for health check probes (15-second TTL to avoid burst storms while staying responsive)
 let cachedHealth: { data: HealthCheckResponse; timestamp: number } | null = null;
@@ -35,17 +57,10 @@ async function runHealthCheckProbe(): Promise<HealthCheckResponse> {
       if (data.status === "ok" || data.status === "healthy" || data.model_loaded === true) {
         fastApiStatus = { status: "online", latencyMs: faLatency };
       } else {
-        fastApiStatus = { status: "error", latencyMs: faLatency, message: data.error || "AI service status degraded" };
+        fastApiStatus = { status: "error", latencyMs: faLatency, message: "AI service status degraded" };
       }
     } else {
-      let errDetail = "AI microservice HTTP error response";
-      try {
-        const errJson = await faRes.json();
-        if (errJson.status === "degraded" || errJson.error) {
-          errDetail = errJson.error || `AI status: ${errJson.status}`;
-        }
-      } catch (_) {}
-      fastApiStatus = { status: "offline", message: errDetail };
+      fastApiStatus = { status: "offline", message: "AI microservice HTTP error response" };
     }
   } catch (err: unknown) {
     const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
@@ -106,6 +121,9 @@ async function runHealthCheckProbe(): Promise<HealthCheckResponse> {
 }
 
 export async function GET(req: NextRequest) {
+  const authCheck = await checkAdminAuth();
+  if (authCheck.error) return authCheck.error;
+
   const forceRefresh = req.nextUrl.searchParams.get("force") === "true";
   const now = Date.now();
 

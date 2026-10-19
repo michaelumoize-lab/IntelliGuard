@@ -94,20 +94,24 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
     );
   }
 
-  const isGranted = result.access_status === "granted";
-  const isAmbiguous = result.match_status === "ambiguous";
-  const isUnknown = result.match_status === "unknown" || result.status === "unknown_individual";
-  const isNoPerson = result.status === "no_person" || result.reason === "no_person_detected";
-  const isPersonNoFace = result.status === "person_no_face" || result.reason === "no_face_detected";
-  const isLowQuality = result.status === "face_low_quality" || result.reason === "poor_quality_face";
-  const isSpoof = result.status === "spoof_detected" || result.reason === "spoof_detected" || result.liveness_status === "spoof";
-  const isInconclusive = result.status === "liveness_inconclusive" || result.reason === "liveness_failed" || result.liveness_status === "inconclusive";
-  const isError = result.status === "recognition_error" || result.reason === "system_error";
-  const isDeactivated = Boolean(
+  const isError =
+    result.success === false ||
+    result.status === "recognition_error" ||
+    result.reason === "system_error" ||
+    result.match_status === "rejected";
+  const isGranted = !isError && result.access_status === "granted";
+  const isAmbiguous = !isError && result.match_status === "ambiguous";
+  const isUnknown = !isError && (result.match_status === "unknown" || result.status === "unknown_individual");
+  const isNoPerson = !isError && (result.status === "no_person" || result.reason === "no_person_detected");
+  const isPersonNoFace = !isError && (result.status === "person_no_face" || result.reason === "no_face_detected");
+  const isLowQuality = !isError && (result.status === "face_low_quality" || result.reason === "poor_quality_face");
+  const isSpoof = !isError && (result.status === "spoof_detected" || result.reason === "spoof_detected" || result.liveness_status === "spoof");
+  const isInconclusive = !isError && (result.status === "liveness_inconclusive" || result.reason === "liveness_failed" || result.liveness_status === "inconclusive");
+  const isDeactivated = !isError && (Boolean(
     result.person &&
     result.person.status &&
     result.person.status.toLowerCase() !== "active"
-  ) || (result.message?.toLowerCase().includes("deactivated") ?? false);
+  ) || (result.message?.toLowerCase().includes("deactivated") ?? false));
 
   const getBadgeStyle = () => {
     if (isSpoof) {
@@ -462,7 +466,7 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
         )}
 
         {/* Vector Similarity Gauge */}
-        {!isNoPerson && !isPersonNoFace && !isSpoof && !isInconclusive ? (
+        {!isNoPerson && !isPersonNoFace && !isSpoof && !isInconclusive && !isError ? (
           <div className="mb-4 space-y-1.5">
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted-foreground font-medium flex items-center gap-1">
@@ -503,6 +507,8 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
                 ? "Attack Detected — Skipped"
                 : isInconclusive
                 ? "Inconclusive — Skipped"
+                : isError
+                ? "System Error — Skipped"
                 : "Skipped"}
             </span>
           </div>

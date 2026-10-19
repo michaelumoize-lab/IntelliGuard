@@ -1,8 +1,16 @@
 import { headers } from "next/headers";
-import { cache } from "react";
 import { auth } from "./auth";
 
-export const getServerSession = cache(async () => {
-  console.log("getServerSession");
-  return await auth.api.getSession({ headers: await headers() });
-});
+export async function getServerSession() {
+  try {
+    let reqHeaders: Headers;
+    try {
+      reqHeaders = await headers();
+    } catch {
+      reqHeaders = new Headers();
+    }
+    return await auth.api.getSession({ headers: reqHeaders });
+  } catch {
+    return null;
+  }
+}

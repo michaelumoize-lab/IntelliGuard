@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "@/lib/get-session";
 import type { Prisma } from "@prisma/client";
 import { AlertType, Severity } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
+async function checkAdminAuth() {
+  const session = await getServerSession();
+  if (!session || !session.user) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 }
+      ),
+    };
+  }
+  if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
+      ),
+    };
+  }
+  return { session };
+}
+
 export async function GET(req: NextRequest) {
+  const authCheck = await checkAdminAuth();
+  if (authCheck.error) return authCheck.error;
+
   try {
     const { searchParams } = new URL(req.url);
     const rawPage = parseInt(searchParams.get("page") || "1", 10);
@@ -21,7 +46,7 @@ export async function GET(req: NextRequest) {
     if (type) {
       if (!Object.values(AlertType).includes(type as AlertType)) {
         return NextResponse.json(
-          { error: "INVALID_ALERT_TYPE", message: `Invalid alert type: ${type}` },
+          { success: false, error: "INVALID_ALERT_TYPE", message: "Invalid alert type parameter." },
           { status: 400 }
         );
       }

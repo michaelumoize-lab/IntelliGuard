@@ -232,9 +232,15 @@ export default function WebcamSimulationPage() {
         (response.person.status || "active").toLowerCase() !== "active"
       );
 
+      const isTechnicalError =
+        !response.success ||
+        response.status === "recognition_error" ||
+        response.reason === "system_error" ||
+        response.match_status === "rejected";
+
       // Auditory Feedback Chime (reading stable ref so callback does not rebind)
-      // Only chime for authenticated pass or evaluated unauthorized intruder - NEVER for empty or faceless frames
-      if (soundEnabledRef.current) {
+      // Only chime for authenticated pass or evaluated unauthorized intruder - NEVER for empty, faceless, or technical error frames
+      if (soundEnabledRef.current && !isTechnicalError) {
         if (response.access_status === "granted") {
           playBiometricSound("granted");
         } else if (
@@ -253,7 +259,9 @@ export default function WebcamSimulationPage() {
         : undefined;
 
       let overlayStatus: CameraOverlayResult["status"] = "denied";
-      if (response.status === "spoof_detected") {
+      if (isTechnicalError) {
+        overlayStatus = "error";
+      } else if (response.status === "spoof_detected") {
         overlayStatus = "spoof_detected";
       } else if (response.status === "liveness_inconclusive") {
         overlayStatus = "liveness_inconclusive";
@@ -263,8 +271,6 @@ export default function WebcamSimulationPage() {
         overlayStatus = "person_no_face";
       } else if (response.status === "face_low_quality") {
         overlayStatus = "face_low_quality";
-      } else if (response.status === "recognition_error") {
-        overlayStatus = "error";
       } else if (isDeactivated) {
         overlayStatus = "deactivated";
       } else if (response.access_status === "granted") {
@@ -290,14 +296,14 @@ export default function WebcamSimulationPage() {
       }
 
       // Display HUD banner for 8s on access granted, or 3.5s for ephemeral/denied states
-      const overlayDisplayMs = response.access_status === "granted" ? 8000 : 3500;
+      const overlayDisplayMs = !isTechnicalError && response.access_status === "granted" ? 8000 : 3500;
       overlayTimerRef.current = setTimeout(() => {
         setCameraOverlay(null);
         overlayTimerRef.current = null;
       }, overlayDisplayMs);
 
       // If access is granted, stop continuous monitoring and auto-turn off the camera after 60 seconds
-      if (response.access_status === "granted") {
+      if (!isTechnicalError && response.access_status === "granted") {
         setIsMonitoring(false);
         if (autoOffTimerRef.current) {
           clearTimeout(autoOffTimerRef.current);
@@ -313,11 +319,14 @@ export default function WebcamSimulationPage() {
         }, 60000);
       }
 
-      // Map history entry using the 6-state taxonomy (never falsely reporting unknown individual)
-      let historyName = "Unknown Individual";
-      let historyMatchStatus: string = response.match_status || "denied";
+      // Map history entry using explicit state taxonomy (never falsely reporting unknown individual on technical errors)
+      let historyName = "Recognition Error";
+      let historyMatchStatus: string = "error";
 
-      if (response.status === "spoof_detected") {
+      if (isTechnicalError) {
+        historyName = "Recognition Error";
+        historyMatchStatus = "error";
+      } else if (response.status === "spoof_detected") {
         historyName = "Presentation Attack (Spoof)";
         historyMatchStatus = "spoof_detected";
       } else if (response.status === "liveness_inconclusive") {
@@ -338,9 +347,6 @@ export default function WebcamSimulationPage() {
       } else if (response.status === "face_low_quality") {
         historyName = "Low Quality Face";
         historyMatchStatus = "face_low_quality";
-      } else if (response.status === "recognition_error") {
-        historyName = "Recognition Error";
-        historyMatchStatus = "error";
       } else if (response.match_status === "ambiguous") {
         historyName = "Ambiguous Match";
         historyMatchStatus = "ambiguous";
@@ -354,19 +360,48 @@ export default function WebcamSimulationPage() {
         time: timeStr,
         name: historyName,
         code: response.person ? response.person.person_code : "N/A",
-        status: response.access_status,
+        status: isTechnicalError ? "denied" : response.access_status,
         matchStatus: historyMatchStatus,
-        similarity: response.face ? response.face.similarity : 0,
+        similarity: !isTechnicalError && response.face ? response.face.similarity : 0,
       };
 
       setScanHistory((prev) => [historyEntry, ...prev].slice(0, 10));
     } catch (err) {
       console.error("Error executing webcam face scan:", err);
       if (isCameraOnRef.current && requestSeq === requestSequenceRef.current) {
+        const timeStr = new Date().toLocaleTimeString();
+        setLastScanTime(timeStr);
+        setScanCount((prev) => prev + 1);
+        setDetectedPersons([]);
+        setDetectedFaces([]);
+        setLatestResult({
+          success: false,
+          status: "recognition_error",
+          person_detected: false,
+          face_detected: false,
+          access_status: "denied",
+          reason: "system_error",
+          door_action: "lock",
+          match_status: "rejected",
+          person: null,
+          processing_time_ms: 0,
+          message: "Technical error: scan failed due to network or system unavailability.",
+          error: "SCAN_EXCEPTION",
+        });
         setCameraOverlay({
           status: "error",
           message: "Scan failed. Please try again.",
         });
+        const errorHistoryEntry: ScanHistoryItem = {
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          time: timeStr,
+          name: "Recognition Error",
+          code: "N/A",
+          status: "denied",
+          matchStatus: "error",
+          similarity: 0,
+        };
+        setScanHistory((prev) => [errorHistoryEntry, ...prev].slice(0, 10));
         if (overlayTimerRef.current) {
           clearTimeout(overlayTimerRef.current);
         }
@@ -423,6 +458,13 @@ export default function WebcamSimulationPage() {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
           <CheckCircle2 className="w-3.5 h-3.5" /> GRANTED
+        </span>
+      );
+    }
+    if (item.matchStatus === "error" || item.matchStatus === "rejected") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/15 border border-destructive/30 text-destructive font-semibold text-[11px]">
+          <AlertTriangle className="w-3.5 h-3.5" /> ERROR
         </span>
       );
     }
@@ -604,7 +646,10 @@ export default function WebcamSimulationPage() {
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40 font-mono text-muted-foreground">
                     <span className="text-[11px]">Similarity</span>
                     <span className="font-semibold text-foreground">
-                      {item.matchStatus === "no_person" || item.matchStatus === "person_no_face"
+                      {item.matchStatus === "no_person" ||
+                      item.matchStatus === "person_no_face" ||
+                      item.matchStatus === "error" ||
+                      item.matchStatus === "rejected"
                         ? "—"
                         : item.similarity < 0
                         ? "< 0%"
@@ -635,7 +680,10 @@ export default function WebcamSimulationPage() {
                       <td className="py-3 font-medium text-foreground">{item.name}</td>
                       <td className="py-3 font-mono text-muted-foreground">{item.code}</td>
                       <td className="py-3 font-mono text-right font-semibold text-foreground">
-                        {item.matchStatus === "no_person" || item.matchStatus === "person_no_face"
+                        {item.matchStatus === "no_person" ||
+                        item.matchStatus === "person_no_face" ||
+                        item.matchStatus === "error" ||
+                        item.matchStatus === "rejected"
                           ? "—"
                           : item.similarity < 0
                           ? "< 0%"
