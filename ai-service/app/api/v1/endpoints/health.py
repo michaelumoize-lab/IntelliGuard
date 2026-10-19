@@ -15,13 +15,11 @@ async def get_health_status(request: Request, response: Response) -> HealthRespo
     # Prefer application state set during lifespan, fallback to manager instance
     manager = getattr(request.app.state, "insightface_manager", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
-    liveness = getattr(request.app.state, "liveness_detector", None)
     
     insightface_ready = manager is not None and manager.is_loaded
     yolo_ready = yolo is not None and yolo.is_loaded
-    liveness_ready = liveness is not None and liveness.is_initialized
 
-    if insightface_ready and yolo_ready and liveness_ready:
+    if insightface_ready and yolo_ready:
         return HealthResponse(
             status="healthy",
             service="intelliguard-ai",
@@ -40,8 +38,6 @@ async def get_health_status(request: Request, response: Response) -> HealthRespo
         errors.append(manager.error_message if manager else "InsightFace manager not initialized")
     if not yolo_ready:
         errors.append(yolo.error_message if yolo else "YOLO detector not initialized")
-    if not liveness_ready:
-        errors.append("Liveness detector not initialized")
     error_msg = "; ".join(errors)
 
     return HealthResponse(
