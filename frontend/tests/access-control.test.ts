@@ -68,10 +68,14 @@ function runAccessControlUnitTests() {
     similarity: 0.95,
     distance: 0.05,
   });
-  if (res4.accessStatus === "denied" && res4.doorAction === "lock") {
-    console.log("✅ PASSED: Denied access for inactive person.");
+  if (
+    res4.accessStatus === "denied" &&
+    res4.reason === "unauthorized" &&
+    res4.doorAction === "lock"
+  ) {
+    console.log("✅ PASSED: Denied access with reason='unauthorized' for inactive person.");
   } else {
-    console.error("❌ FAILED: Inactive person gained access:", res4);
+    console.error("❌ FAILED: Inactive person decision mismatch:", res4);
     process.exitCode = 1;
   }
 
@@ -83,10 +87,14 @@ function runAccessControlUnitTests() {
     similarity: 0.95,
     distance: 0.05,
   });
-  if (res5.accessStatus === "denied" && res5.doorAction === "lock") {
-    console.log("✅ PASSED: Denied access for suspended person.");
+  if (
+    res5.accessStatus === "denied" &&
+    res5.reason === "unauthorized" &&
+    res5.doorAction === "lock"
+  ) {
+    console.log("✅ PASSED: Denied access with reason='unauthorized' for suspended person.");
   } else {
-    console.error("❌ FAILED: Suspended person gained access:", res5);
+    console.error("❌ FAILED: Suspended person decision mismatch:", res5);
     process.exitCode = 1;
   }
 
@@ -184,6 +192,38 @@ function runAccessControlUnitTests() {
     console.log("✅ PASSED: Inconclusive liveness correctly failed closed with lock.");
   } else {
     console.error("❌ FAILED: Unexpected decision for inconclusive liveness:", res12);
+    process.exitCode = 1;
+  }
+
+  // Test 13: Explicit status="ambiguous_match" -> Lock & Deny with insufficient_confidence
+  console.log("\n[Test 13] Explicit status='ambiguous_match'...");
+  const res13 = evaluateAccess({
+    status: "ambiguous_match",
+    matchStatus: "ambiguous",
+    person: null,
+    similarity: 0.62,
+    distance: 0.38,
+  });
+  if (res13.accessStatus === "denied" && res13.reason === "insufficient_confidence" && res13.doorAction === "lock") {
+    console.log("✅ PASSED: Explicit status='ambiguous_match' denied with insufficient_confidence & lock.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for status='ambiguous_match':", res13);
+    process.exitCode = 1;
+  }
+
+  // Test 14: Explicit status="recognition_error" -> Lock & Deny with system_error
+  console.log("\n[Test 14] Explicit status='recognition_error'...");
+  const res14 = evaluateAccess({
+    status: "recognition_error",
+    matchStatus: "rejected",
+    person: null,
+    similarity: 0,
+    distance: 1,
+  });
+  if (res14.accessStatus === "denied" && res14.reason === "system_error" && res14.doorAction === "lock") {
+    console.log("✅ PASSED: Explicit status='recognition_error' denied with system_error & lock.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for status='recognition_error':", res14);
     process.exitCode = 1;
   }
 

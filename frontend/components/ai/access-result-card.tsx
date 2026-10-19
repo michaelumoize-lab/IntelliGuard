@@ -100,18 +100,26 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
     result.reason === "system_error" ||
     result.match_status === "rejected";
   const isGranted = !isError && result.access_status === "granted";
-  const isAmbiguous = !isError && result.match_status === "ambiguous";
+  const isAmbiguous = !isError && (result.match_status === "ambiguous" || result.status === "ambiguous_match");
   const isUnknown = !isError && (result.match_status === "unknown" || result.status === "unknown_individual");
   const isNoPerson = !isError && (result.status === "no_person" || result.reason === "no_person_detected");
   const isPersonNoFace = !isError && (result.status === "person_no_face" || result.reason === "no_face_detected");
   const isLowQuality = !isError && (result.status === "face_low_quality" || result.reason === "poor_quality_face");
   const isSpoof = !isError && (result.status === "spoof_detected" || result.reason === "spoof_detected" || result.liveness_status === "spoof");
   const isInconclusive = !isError && (result.status === "liveness_inconclusive" || result.reason === "liveness_failed" || result.liveness_status === "inconclusive");
-  const isDeactivated = !isError && (Boolean(
-    result.person &&
-    result.person.status &&
-    result.person.status.toLowerCase() !== "active"
-  ) || (result.message?.toLowerCase().includes("deactivated") ?? false));
+  const isSuspended = !isError && Boolean(
+    result.person?.status?.toLowerCase() === "suspended" ||
+    (result.reason === "unauthorized" && result.message?.toLowerCase().includes("suspended"))
+  );
+  const isDeactivated = !isError && (
+    result.reason === "unauthorized" ||
+    Boolean(
+      result.person &&
+      result.person.status &&
+      result.person.status.toLowerCase() !== "active"
+    ) ||
+    (result.message?.toLowerCase().includes("deactivated") ?? false)
+  );
 
   const getBadgeStyle = () => {
     if (isSpoof) {
@@ -167,7 +175,7 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
       return {
         bg: "bg-destructive/15 border-destructive/40 text-destructive",
         icon: <ShieldAlert className="w-4 h-4 text-destructive" />,
-        label: "USER DEACTIVATED - ACCESS DENIED",
+        label: isSuspended ? "USER SUSPENDED - ACCESS DENIED" : "USER DEACTIVATED - ACCESS DENIED",
       };
     }
     if (isAmbiguous) {
@@ -227,7 +235,7 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
             )}
 
             <span className="text-[11px] font-mono text-muted-foreground uppercase font-semibold">
-              {isDeactivated ? "DEACTIVATED" : result.reason?.replaceAll("_", " ")}
+              {result.reason ? result.reason.replaceAll("_", " ") : isDeactivated ? "UNAUTHORIZED" : ""}
             </span>
           </div>
         </div>
@@ -346,15 +354,17 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
           </div>
         )}
 
-        {/* Deactivated Notice Banner */}
+        {/* Deactivated / Suspended Notice Banner */}
         {isDeactivated && (
           <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-xl mb-4 text-center space-y-1">
             <div className="flex items-center justify-center gap-1.5 text-destructive font-bold text-xs uppercase tracking-wide">
               <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>Account Deactivated</span>
+              <span>{isSuspended ? "Account Suspended" : "Account Deactivated"}</span>
             </div>
             <p className="text-xs text-destructive/90 font-medium">
-              This user is deactivated and not allowed to access the system.
+              {isSuspended
+                ? "This user is suspended and not authorized to access the facility."
+                : "This user is deactivated and not allowed to access the system."}
             </p>
           </div>
         )}

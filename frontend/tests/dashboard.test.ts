@@ -92,21 +92,19 @@ async function runDashboardTests() {
   // 6. Test P0 Auth & Role Enforcement on All 5 Dashboard & Alerts Routes + resolvedBy Tracking
   console.log("\n[Test 6] Verifying P0 Authentication, Role Enforcement & Alert resolvedBy Tracking...");
   const { NextRequest } = await import("next/server");
-  const { auth } = await import("../lib/auth");
+  const { __setGetServerSessionMock } = await import("../lib/get-session");
   const { GET: GET_ALERTS } = await import("../app/api/alerts/route");
   const { PATCH: PATCH_ALERT } = await import("../app/api/alerts/[id]/route");
   const { GET: GET_ACTIVITY } = await import("../app/api/dashboard/activity/route");
   const { GET: GET_STATS } = await import("../app/api/dashboard/stats/route");
   const { GET: GET_HEALTH } = await import("../app/api/dashboard/health/route");
 
-  const originalGetSession = auth.api.getSession;
   let tempAlertId: number | null = null;
   let tempUserId: string | null = null;
 
   try {
     // 6a. Unauthenticated requests -> 401
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = (async () =>
-      null) as unknown as typeof auth.api.getSession;
+    __setGetServerSessionMock(async () => null);
 
     const rAlerts401 = await GET_ALERTS(new NextRequest("http://localhost:3000/api/alerts"));
     const rPatch401 = await PATCH_ALERT(new NextRequest("http://localhost:3000/api/alerts/1", { method: "PATCH" }), {
@@ -129,10 +127,13 @@ async function runDashboardTests() {
     }
 
     // 6b. Non-admin USER requests -> 403
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = (async () => ({
-      user: { id: "non-admin-user", email: "user@intelliguard.local", name: "Viewer", role: "USER" },
-      session: { id: "sess-viewer", userId: "non-admin-user", expiresAt: new Date(Date.now() + 60000) },
-    })) as unknown as typeof auth.api.getSession;
+    __setGetServerSessionMock(
+      async () =>
+        ({
+          user: { id: "non-admin-user", email: "user@intelliguard.local", name: "Viewer", role: "USER" },
+          session: { id: "sess-viewer", userId: "non-admin-user", expiresAt: new Date(Date.now() + 60000) },
+        }) as unknown as Awaited<ReturnType<typeof import("../lib/get-session").getServerSession>>
+    );
 
     const rAlerts403 = await GET_ALERTS(new NextRequest("http://localhost:3000/api/alerts"));
     const rPatch403 = await PATCH_ALERT(new NextRequest("http://localhost:3000/api/alerts/1", { method: "PATCH" }), {
@@ -171,10 +172,13 @@ async function runDashboardTests() {
       tempUserId = createdUser.id;
     }
 
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = (async () => ({
-      user: { id: tempUserId!, email: "admin@intelliguard.local", name: "Admin", role: "ADMIN" },
-      session: { id: "sess-admin", userId: tempUserId!, expiresAt: new Date(Date.now() + 60000) },
-    })) as unknown as typeof auth.api.getSession;
+    __setGetServerSessionMock(
+      async () =>
+        ({
+          user: { id: tempUserId!, email: "admin@intelliguard.local", name: "Admin", role: "ADMIN" },
+          session: { id: "sess-admin", userId: tempUserId!, expiresAt: new Date(Date.now() + 60000) },
+        }) as unknown as Awaited<ReturnType<typeof import("../lib/get-session").getServerSession>>
+    );
 
     const tempAlert = await prisma.alert.create({
       data: {
@@ -207,7 +211,7 @@ async function runDashboardTests() {
     console.error("❌ Test 6 failed:", err);
     process.exitCode = 1;
   } finally {
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = originalGetSession;
+    __setGetServerSessionMock(null);
     if (tempAlertId) {
       await prisma.alert.delete({ where: { id: tempAlertId } }).catch(() => {});
     }

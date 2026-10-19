@@ -9,6 +9,7 @@ export interface AccessScanResponse {
     | "face_detected_processing"
     | "known_individual"
     | "unknown_individual"
+    | "ambiguous_match"
     | "recognition_error";
   person_detected?: boolean;
   face_detected?: boolean;
@@ -16,6 +17,7 @@ export interface AccessScanResponse {
   reason:
     | "face_match"
     | "face_no_match"
+    | "unauthorized"
     | "spoof_detected"
     | "liveness_failed"
     | "no_person_detected"

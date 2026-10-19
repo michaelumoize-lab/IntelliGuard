@@ -41,6 +41,7 @@ class Settings:
     )
     LIVENESS_THRESHOLD: float = float(os.getenv("LIVENESS_THRESHOLD", "0.60"))
     LIVENESS_INPUT_SIZE: int = int(os.getenv("LIVENESS_INPUT_SIZE", "128"))
+    AI_SERVICE_API_KEY: str = os.getenv("AI_SERVICE_API_KEY", "").strip()
 
     def __init__(self) -> None:
         if self.MAX_CONCURRENT_INFERENCE < 1:

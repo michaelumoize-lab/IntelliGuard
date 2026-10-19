@@ -1,11 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding, FastAPIError } from "@/lib/ai/fastapi";
-import { checkForDuplicateFace } from "@/lib/ai/duplicate-check";
+import {
+  checkForDuplicateFace,
+  DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+  DuplicateCheckResult,
+  REQUIRED_DUPLICATE_MESSAGE,
+} from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
+
+class DuplicateFaceConflictError extends Error {
+  matchingPerson: NonNullable<DuplicateCheckResult["matchingPerson"]>;
+  constructor(matchingPerson: NonNullable<DuplicateCheckResult["matchingPerson"]>) {
+    super(REQUIRED_DUPLICATE_MESSAGE);
+    this.name = "DuplicateFaceConflictError";
+    this.matchingPerson = matchingPerson;
+  }
+}
+
+function buildDuplicateFaceResponse(
+  match: NonNullable<DuplicateCheckResult["matchingPerson"]>
+) {
+  const isDeactivated = (match.status || "active").toLowerCase() !== "active";
+  return NextResponse.json(
+    {
+      success: false,
+      isDuplicate: true,
+      status: "duplicate_face",
+      error: isDeactivated ? "DUPLICATE_FACE_DEACTIVATED" : "DUPLICATE_FACE",
+      message: REQUIRED_DUPLICATE_MESSAGE,
+      matchingPerson: {
+        personCode: match.personCode,
+        firstName: match.firstName,
+        lastName: match.lastName,
+        status: match.status,
+        similarity: match.similarity,
+      },
+    },
+    { status: 409 }
+  );
+}
 
 export async function POST(
   req: NextRequest,
@@ -15,10 +52,16 @@ export async function POST(
 
   try {
     const session = await getServerSession();
-    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
         { status: 401 }
+      );
+    }
+    if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
       );
     }
 
@@ -68,23 +111,17 @@ export async function POST(
 
     // 3. Step A: Call FastAPI for face detection & 512D ArcFace embedding
     const aiResult = await generateEmbedding(imageBuffer, imageFile.name || "face.jpg");
+    const activeModel = aiResult.model || "buffalo_s";
 
     // 4. Step B: Check for duplicate face using pgvector (excluding this personId)
-    const duplicateResult = await checkForDuplicateFace(aiResult.embedding, 0.85, personId, aiResult.model || "buffalo_s");
+    const duplicateResult = await checkForDuplicateFace(
+      aiResult.embedding,
+      DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+      personId,
+      activeModel
+    );
     if (duplicateResult.isDuplicate && duplicateResult.matchingPerson) {
-      const match = duplicateResult.matchingPerson;
-      const isDeactivated = (match.status || "active").toLowerCase() !== "active";
-      return NextResponse.json(
-        {
-          success: false,
-          error: isDeactivated ? "DUPLICATE_FACE_DEACTIVATED" : "DUPLICATE_FACE",
-          message: isDeactivated
-            ? `Duplicate face detected. This image matches deactivated/banned person ${match.firstName} ${match.lastName} (${match.personCode}) with ${Math.round(match.similarity * 100)}% similarity match.`
-            : `Duplicate face detected. This image matches registered person ${match.firstName} ${match.lastName} (${match.personCode}) with ${Math.round(match.similarity * 100)}% similarity match.`,
-          matchingPerson: match,
-        },
-        { status: 400 }
-      );
+      return buildDuplicateFaceResponse(duplicateResult.matchingPerson);
     }
 
     // 5. Step C: Upload NEW face image to ImageKit
@@ -94,6 +131,20 @@ export async function POST(
     // 6. Step D: Run Database Transaction
     try {
       const updatedPerson = await prisma.$transaction(async (tx) => {
+        // Serialize concurrent facial registrations/replacements
+        await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(20260419);");
+
+        const txDuplicateResult = await checkForDuplicateFace(
+          aiResult.embedding,
+          DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+          personId,
+          activeModel,
+          tx
+        );
+        if (txDuplicateResult.isDuplicate && txDuplicateResult.matchingPerson) {
+          throw new DuplicateFaceConflictError(txDuplicateResult.matchingPerson);
+        }
+
         // Deactivate all previous embeddings for this person
         await tx.faceEmbedding.updateMany({
           where: { personId, isActive: true },
@@ -112,7 +163,7 @@ export async function POST(
           `,
           personId,
           vectorLiteral,
-          aiResult.model || "buffalo_s",
+          activeModel,
           ikResult.url,
           aiResult.qualityScore
         );
@@ -161,6 +212,10 @@ export async function POST(
         } catch (cleanupErr) {
           console.error("Rollback image cleanup failed:", cleanupErr);
         }
+      }
+
+      if (dbError instanceof DuplicateFaceConflictError) {
+        return buildDuplicateFaceResponse(dbError.matchingPerson);
       }
 
       return NextResponse.json(

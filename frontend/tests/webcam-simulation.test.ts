@@ -145,25 +145,16 @@ async function runWebcamSimulationTests() {
       where: { title: "Device Authentication Rejected" },
     });
 
-    // Clean up created security alert
-    const latestRejectionAlert = await prisma.alert.findFirst({
-      where: { title: "Device Authentication Rejected" },
-      orderBy: { createdAt: "desc" },
-    });
-    if (latestRejectionAlert) {
-      await prisma.alert.delete({ where: { id: latestRejectionAlert.id } }).catch(() => {});
-    }
-
     if (
       malformedRes.status === 401 &&
       malformedData.access_status === "denied" &&
       malformedData.door_action === "lock" &&
       malformedData.status === "recognition_error" &&
       malformedData.match_status === "rejected" &&
-      afterAlerts === beforeAlerts + 1
+      afterAlerts === beforeAlerts
     ) {
       console.log(
-        "✅ Test 5 PASSED: Malformed device header rejected with 401 (no session fallback) and security alert recorded."
+        "✅ Test 5 PASSED: Malformed unresolved device header rejected with 401 (no session fallback, no unauthenticated DB alert spam)."
       );
     } else {
       console.error("❌ Test 5 failed:", {

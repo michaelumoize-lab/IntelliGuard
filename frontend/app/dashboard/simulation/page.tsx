@@ -228,8 +228,12 @@ export default function WebcamSimulationPage() {
       }
 
       const isDeactivated = Boolean(
-        response.person &&
-        (response.person.status || "active").toLowerCase() !== "active"
+        response.reason === "unauthorized" ||
+        (response.person &&
+          (response.person.status || "active").toLowerCase() !== "active")
+      );
+      const isSuspended = Boolean(
+        response.person?.status?.toLowerCase() === "suspended"
       );
 
       const isTechnicalError =
@@ -246,7 +250,9 @@ export default function WebcamSimulationPage() {
         } else if (
           response.status === "spoof_detected" ||
           response.status === "unknown_individual" ||
+          response.status === "ambiguous_match" ||
           response.match_status === "unknown" ||
+          response.match_status === "ambiguous" ||
           isDeactivated
         ) {
           playBiometricSound("denied");
@@ -275,7 +281,7 @@ export default function WebcamSimulationPage() {
         overlayStatus = "deactivated";
       } else if (response.access_status === "granted") {
         overlayStatus = "granted";
-      } else if (response.match_status === "ambiguous") {
+      } else if (response.match_status === "ambiguous" || response.status === "ambiguous_match") {
         overlayStatus = "ambiguous";
       } else if (response.match_status === "unknown" || response.status === "unknown_individual") {
         overlayStatus = "unknown";
@@ -283,9 +289,11 @@ export default function WebcamSimulationPage() {
         overlayStatus = "denied";
       }
 
+      const unauthorizedStatusTag = isSuspended ? "Suspended" : "Deactivated";
+
       setCameraOverlay({
         status: overlayStatus,
-        name: isDeactivated ? `${personName || "User"} (Deactivated)` : personName,
+        name: isDeactivated ? `${personName || "User"} (${unauthorizedStatusTag})` : personName,
         similarity: response.face?.similarity,
         liveness_score: response.liveness_score ?? undefined,
         message: response.message,
@@ -333,7 +341,7 @@ export default function WebcamSimulationPage() {
         historyName = "Liveness Inconclusive";
         historyMatchStatus = "liveness_inconclusive";
       } else if (isDeactivated) {
-        historyName = `${personName} (User is deactivated)`;
+        historyName = `${personName} (User is ${unauthorizedStatusTag.toLowerCase()})`;
         historyMatchStatus = "deactivated";
       } else if (response.person) {
         historyName = `${response.person.first_name} ${response.person.last_name}`;
@@ -347,7 +355,7 @@ export default function WebcamSimulationPage() {
       } else if (response.status === "face_low_quality") {
         historyName = "Low Quality Face";
         historyMatchStatus = "face_low_quality";
-      } else if (response.match_status === "ambiguous") {
+      } else if (response.match_status === "ambiguous" || response.status === "ambiguous_match") {
         historyName = "Ambiguous Match";
         historyMatchStatus = "ambiguous";
       } else if (response.status === "unknown_individual" || response.match_status === "unknown") {

@@ -43,8 +43,13 @@ export function DeviceApiKeyDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open}>
+      <DialogContent
+        className="sm:max-w-md"
+        showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
             <Key className="h-6 w-6" />

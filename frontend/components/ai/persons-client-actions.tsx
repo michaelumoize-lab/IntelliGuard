@@ -251,6 +251,12 @@ export function PersonRowActions({ person }: { person: PersonRowData }) {
             </DropdownMenuItem>
           )}
 
+          {person.status !== "suspended" && (
+            <DropdownMenuItem onClick={() => handleStatusToggle("suspended")} className="cursor-pointer text-rose-600">
+              <UserXIcon className="mr-2 h-4 w-4" /> Suspend Person
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuSeparator />
 
           <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)} className="cursor-pointer text-destructive focus:text-destructive">

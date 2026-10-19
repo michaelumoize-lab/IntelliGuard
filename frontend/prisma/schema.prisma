@@ -203,6 +203,7 @@ enum AccessReason {
   manual_override
   system_error
   spoof_detected
+  unauthorized
 }
 
 enum DoorAction {

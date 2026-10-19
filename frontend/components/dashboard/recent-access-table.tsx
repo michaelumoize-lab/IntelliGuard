@@ -71,6 +71,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
+      timeZone: "UTC",
     }).format(new Date(iso));
   };
 
@@ -175,7 +176,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                             </Link>
                             {evt.person.status && evt.person.status !== "active" && (
                               <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-destructive/15 text-destructive border border-destructive/30">
-                                DEACTIVATED
+                                {evt.person.status === "suspended" ? "SUSPENDED" : "DEACTIVATED"}
                               </span>
                             )}
                           </div>
@@ -207,11 +208,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                     <div>
                       <span className="text-[10px] text-muted-foreground block font-sans">Reason / Gate</span>
                       <span className="capitalize truncate block">
-                        {evt.person && evt.person.status && evt.person.status !== "active" && !isGranted ? (
-                          <span className="text-destructive font-semibold">User Deactivated</span>
-                        ) : (
-                          <span className="text-foreground">{evt.reason.replaceAll("_", " ")}</span>
-                        )}
+                        <span className="text-foreground">{evt.reason.replaceAll("_", " ")}</span>
                       </span>
                     </div>
                     <div className="text-right">
@@ -271,7 +268,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                             </span>
                             {evt.person.status && evt.person.status !== "active" && (
                               <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-destructive/15 text-destructive border border-destructive/30">
-                                DEACTIVATED
+                                {evt.person.status === "suspended" ? "SUSPENDED" : "DEACTIVATED"}
                               </span>
                             )}
                           </Link>
@@ -303,11 +300,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                         )}
                       </td>
                       <td className="py-3.5 font-mono uppercase text-[11px]">
-                        {evt.person && evt.person.status && evt.person.status !== "active" && !isGranted ? (
-                          <span className="text-destructive font-semibold">USER DEACTIVATED</span>
-                        ) : (
-                          <span className="text-muted-foreground">{evt.reason.replaceAll("_", " ")}</span>
-                        )}
+                        <span className="text-muted-foreground">{evt.reason.replaceAll("_", " ")}</span>
                       </td>
                       <td className="py-3.5 font-mono text-right font-semibold text-foreground">
                         {similarityDisplay}

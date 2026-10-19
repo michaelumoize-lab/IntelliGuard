@@ -40,7 +40,7 @@ export function DeviceAlerts({ alerts, deviceId }: DeviceAlertsProps) {
           </CardDescription>
         </div>
         <Link
-          href={`/dashboard/alerts?search=${deviceId}`}
+          href={`/dashboard/alerts?deviceId=${deviceId}`}
           className="text-xs font-medium text-primary hover:underline flex items-center"
         >
           View All Alerts

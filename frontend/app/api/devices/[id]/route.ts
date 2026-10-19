@@ -183,15 +183,29 @@ export async function PATCH(
       );
     }
 
-    let body: Partial<UpdateDeviceBody> = {};
+    let rawBody: unknown;
     try {
-      body = (await req.json()) as Partial<UpdateDeviceBody>;
+      rawBody = await req.json();
     } catch (_) {
       return NextResponse.json(
         { success: false, error: "VALIDATION_ERROR", message: "Invalid JSON body." },
         { status: 400 }
       );
     }
+
+    if (
+      !rawBody ||
+      typeof rawBody !== "object" ||
+      Array.isArray(rawBody) ||
+      Object.getPrototypeOf(rawBody) !== Object.prototype
+    ) {
+      return NextResponse.json(
+        { success: false, error: "VALIDATION_ERROR", message: "Request body must be a JSON object." },
+        { status: 400 }
+      );
+    }
+
+    const body = rawBody as Record<string, unknown>;
 
     // Explicitly disallow modifying id, serialNumber, apiKeyHash, createdAt
     if ("id" in body || "serialNumber" in body || "apiKeyHash" in body || "createdAt" in body) {
@@ -204,7 +218,13 @@ export async function PATCH(
     const updateData: Prisma.DeviceUpdateInput = {};
 
     if (body.deviceName !== undefined) {
-      const name = (body.deviceName || "").trim();
+      if (typeof body.deviceName !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Field 'deviceName' must be a string." },
+          { status: 400 }
+        );
+      }
+      const name = body.deviceName.trim();
       if (!name) {
         return NextResponse.json(
           { success: false, error: "VALIDATION_ERROR", message: "Device name cannot be empty." },
@@ -215,7 +235,13 @@ export async function PATCH(
     }
 
     if (body.location !== undefined) {
-      const loc = (body.location || "").trim();
+      if (typeof body.location !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Field 'location' must be a string." },
+          { status: 400 }
+        );
+      }
+      const loc = body.location.trim();
       if (!loc) {
         return NextResponse.json(
           { success: false, error: "VALIDATION_ERROR", message: "Location cannot be empty." },
@@ -226,15 +252,34 @@ export async function PATCH(
     }
 
     if (body.ipAddress !== undefined) {
-      updateData.ipAddress = body.ipAddress ? body.ipAddress.trim() : null;
+      if (body.ipAddress !== null && typeof body.ipAddress !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Field 'ipAddress' must be a string or null." },
+          { status: 400 }
+        );
+      }
+      updateData.ipAddress = typeof body.ipAddress === "string" && body.ipAddress.trim() ? body.ipAddress.trim() : null;
     }
 
     if (body.firmwareVersion !== undefined) {
-      updateData.firmwareVersion = body.firmwareVersion ? body.firmwareVersion.trim() : null;
+      if (body.firmwareVersion !== null && typeof body.firmwareVersion !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Field 'firmwareVersion' must be a string or null." },
+          { status: 400 }
+        );
+      }
+      updateData.firmwareVersion =
+        typeof body.firmwareVersion === "string" && body.firmwareVersion.trim() ? body.firmwareVersion.trim() : null;
     }
 
     if (body.deviceType !== undefined) {
-      const type = (body.deviceType || "").trim().toLowerCase();
+      if (typeof body.deviceType !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Field 'deviceType' must be a string." },
+          { status: 400 }
+        );
+      }
+      const type = body.deviceType.trim().toLowerCase();
       if (!VALID_DEVICE_TYPES.includes(type as DeviceType)) {
         return NextResponse.json(
           { success: false, error: "VALIDATION_ERROR", message: `Invalid deviceType '${type}'. Must be one of: ${VALID_DEVICE_TYPES.join(", ")}` },
@@ -245,7 +290,13 @@ export async function PATCH(
     }
 
     if (body.status !== undefined) {
-      const stat = (body.status || "").trim().toLowerCase();
+      if (typeof body.status !== "string") {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Field 'status' must be a string." },
+          { status: 400 }
+        );
+      }
+      const stat = body.status.trim().toLowerCase();
       if (!VALID_DEVICE_STATUSES.includes(stat as DeviceStatus)) {
         return NextResponse.json(
           { success: false, error: "VALIDATION_ERROR", message: `Invalid status '${stat}'. Must be one of: ${VALID_DEVICE_STATUSES.join(", ")}` },

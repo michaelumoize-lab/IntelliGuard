@@ -581,6 +581,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                         ? "FACE NOT VISIBLE"
                         : overlayResult?.status === "face_low_quality"
                         ? "POOR BIOMETRIC QUALITY"
+                        : overlayResult?.status === "ambiguous"
+                        ? "AMBIGUOUS MATCH"
                         : overlayResult?.status === "unknown"
                         ? "UNKNOWN INDIVIDUAL"
                         : overlayResult?.status === "denied"

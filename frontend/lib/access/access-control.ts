@@ -8,6 +8,7 @@ export interface RecognitionInput {
     | "face_detected_processing"
     | "known_individual"
     | "unknown_individual"
+    | "ambiguous_match"
     | "spoof_detected"
     | "liveness_inconclusive"
     | "recognition_error";
@@ -31,6 +32,7 @@ export interface AccessDecisionResult {
   reason:
     | "face_match"
     | "face_no_match"
+    | "unauthorized"
     | "spoof_detected"
     | "liveness_failed"
     | "no_person_detected"
@@ -55,7 +57,7 @@ export interface AccessDecisionResult {
  * - Rule 1: matched + active person + similarity >= FACE_MATCH_THRESHOLD -> GRANTED + face_match + unlock
  * - Rule 2: unknown face -> DENIED + face_no_match + lock
  * - Rule 3: ambiguous face -> DENIED + insufficient_confidence + lock
- * - Rule 4: inactive or suspended person -> DENIED + face_no_match + lock
+ * - Rule 4: matched + inactive or suspended person -> DENIED + unauthorized + lock
  * - Rule 5: system error or invalid input -> DENIED + system_error + lock (Fail Closed)
  */
 export function evaluateAccess(input: RecognitionInput): AccessDecisionResult {
@@ -115,6 +117,22 @@ export function evaluateAccess(input: RecognitionInput): AccessDecisionResult {
       };
     }
 
+    if (input.status === "recognition_error" || input.matchStatus === "rejected") {
+      return {
+        accessStatus: "denied",
+        reason: "system_error",
+        doorAction: "lock",
+      };
+    }
+
+    if (input.status === "ambiguous_match") {
+      return {
+        accessStatus: "denied",
+        reason: "insufficient_confidence",
+        doorAction: "lock",
+      };
+    }
+
     if (!input.matchStatus) {
       return {
         accessStatus: "denied",
@@ -141,20 +159,17 @@ export function evaluateAccess(input: RecognitionInput): AccessDecisionResult {
       };
     }
 
-    // Rule 4: Inactive or Suspended Person
-    if (input.matchStatus === "matched" && input.person) {
+    // Rule 4 & Rule 1: Matched Person (Recognition succeeded -> Evaluate Authorization)
+    if (input.matchStatus === "matched" && input.person && input.similarity >= matchThreshold) {
       const personStatus = (input.person.status || "active").toLowerCase();
       if (personStatus !== "active") {
         return {
           accessStatus: "denied",
-          reason: "face_no_match",
+          reason: "unauthorized",
           doorAction: "lock",
         };
       }
-    }
 
-    // Rule 1: Valid Matched Active Person
-    if (input.matchStatus === "matched" && input.person && input.similarity >= matchThreshold) {
       return {
         accessStatus: "granted",
         reason: "face_match",

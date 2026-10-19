@@ -8,6 +8,12 @@ export const dynamic = "force-dynamic";
 const VALID_REASONS = [
   "face_match",
   "face_no_match",
+  "unauthorized",
+  "spoof_detected",
+  "liveness_failed",
+  "no_person_detected",
+  "no_face_detected",
+  "poor_quality_face",
   "insufficient_confidence",
   "time_restriction",
   "manual_override",
@@ -17,10 +23,18 @@ const VALID_REASONS = [
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession();
-    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
         { status: 401 }
+      );
+    }
+
+    const role = (session.user.role || "").toUpperCase();
+    if (role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
       );
     }
 
@@ -96,6 +110,7 @@ export async function GET(req: NextRequest) {
             lastName: true,
             category: true,
             department: true,
+            status: true,
             faceImageUrl: true,
           },
         },

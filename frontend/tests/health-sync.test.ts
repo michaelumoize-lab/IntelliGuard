@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { NextRequest } from "next/server";
-import { auth } from "../lib/auth";
+import { __setGetServerSessionMock } from "../lib/get-session";
 import { GET } from "../app/api/dashboard/health/route";
 
 async function runHealthSyncTests() {
@@ -8,23 +8,23 @@ async function runHealthSyncTests() {
   console.log("  Health Probe & Cache Synchronization Verification");
   console.log("==================================================\n");
 
-  const originalGetSession = auth.api.getSession;
-
   try {
     // 0. Unauthenticated & Non-Admin Access Rejection (P0 Security)
     console.log("[Test 0] Testing Unauthenticated & Non-Admin Rejection on /api/dashboard/health...");
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = (async () =>
-      null) as unknown as typeof auth.api.getSession;
+    __setGetServerSessionMock(async () => null);
 
     const unauthRes = await GET(new NextRequest("http://localhost:3000/api/dashboard/health"));
     if (unauthRes.status !== 401) {
       throw new Error(`Expected 401 for unauthenticated health probe, got ${unauthRes.status}`);
     }
 
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = (async () => ({
-      user: { id: "user-1", email: "user@example.com", name: "Standard User", role: "USER" },
-      session: { id: "sess-user-1", userId: "user-1", expiresAt: new Date(Date.now() + 60000) },
-    })) as unknown as typeof auth.api.getSession;
+    __setGetServerSessionMock(
+      async () =>
+        ({
+          user: { id: "user-1", email: "user@example.com", name: "Standard User", role: "USER" },
+          session: { id: "sess-user-1", userId: "user-1", expiresAt: new Date(Date.now() + 60000) },
+        }) as unknown as Awaited<ReturnType<typeof import("../lib/get-session").getServerSession>>
+    );
 
     const forbiddenRes = await GET(new NextRequest("http://localhost:3000/api/dashboard/health"));
     if (forbiddenRes.status !== 403) {
@@ -33,10 +33,13 @@ async function runHealthSyncTests() {
     console.log("✅ Test 0 PASSED: Unauthenticated (401) and non-admin (403) requests rejected.");
 
     // Authenticate as Admin for subsequent health probe tests
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = (async () => ({
-      user: { id: "admin-1", email: "admin@example.com", name: "Admin User", role: "ADMIN" },
-      session: { id: "sess-admin-1", userId: "admin-1", expiresAt: new Date(Date.now() + 60000) },
-    })) as unknown as typeof auth.api.getSession;
+    __setGetServerSessionMock(
+      async () =>
+        ({
+          user: { id: "admin-1", email: "admin@example.com", name: "Admin User", role: "ADMIN" },
+          session: { id: "sess-admin-1", userId: "admin-1", expiresAt: new Date(Date.now() + 60000) },
+        }) as unknown as Awaited<ReturnType<typeof import("../lib/get-session").getServerSession>>
+    );
 
     // 1. Initial Health Probe
     console.log("\n[Test 1] Testing Initial Health Probe Route Execution...");
@@ -96,7 +99,7 @@ async function runHealthSyncTests() {
     console.error("❌ Test failed:", err);
     process.exit(1);
   } finally {
-    (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = originalGetSession;
+    __setGetServerSessionMock(null);
   }
 }
 

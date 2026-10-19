@@ -26,10 +26,16 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession();
-    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
         { status: 401 }
+      );
+    }
+    if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
       );
     }
 
@@ -111,10 +117,16 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession();
-    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
         { status: 401 }
+      );
+    }
+    if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
       );
     }
 
@@ -269,10 +281,16 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession();
-    if (!session || !session.user || (session.user.role !== "ADMIN" && session.user.role !== "admin")) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { success: false, error: "UNAUTHORIZED", message: "Admin authorization required." },
+        { success: false, error: "UNAUTHORIZED", message: "Authentication required." },
         { status: 401 }
+      );
+    }
+    if (session.user.role !== "ADMIN" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "FORBIDDEN", message: "Admin authorization required." },
+        { status: 403 }
       );
     }
 
