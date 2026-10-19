@@ -14,7 +14,6 @@ from app.schemas.detection import (
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
 from app.core.quality import calculate_face_quality_score
 from app.core.insightface import inference_semaphore
-from app.core.liveness import liveness_detector as default_liveness_detector, LivenessResult
 
 router = APIRouter()
 logger = logging.getLogger("intelliguard.analyze")
@@ -223,96 +222,7 @@ async def _execute_analysis(
             insightface_time_ms=insightface_time_ms,
         )
 
-    # Stage 3: Passive Facial Liveness Verification (MiniFASNetV2-SE)
-    # Executed immediately after face detection and quality check, and strictly BEFORE embedding extraction
-    active_liveness = liveness_detector or default_liveness_detector
-
-    if active_liveness is not None:
-        async with inference_semaphore:
-            liveness_res = await run_in_threadpool(
-                active_liveness.predict, img, primary_face_bbox
-            )
-    else:
-        liveness_res = LivenessResult(
-            is_live=False,
-            status="inconclusive",
-            score=0.0,
-            real_logit=0.0,
-            spoof_logit=0.0,
-            execution_time_ms=0.0,
-            error_message="Liveness detector module not initialized.",
-        )
-
-    liveness_time_ms = liveness_res.execution_time_ms
-
-    # Fail-closed branch 1: Liveness failure or technical issue
-    if not liveness_res.is_live or liveness_res.status != "live":
-        total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
-
-        # Handle inconclusive or technical model failure without labeling as malicious spoof
-        if liveness_res.status in ("inconclusive", "error"):
-            logger.warning(
-                f"Analysis complete: Liveness check inconclusive/error ({liveness_res.error_message}) in {total_time_ms} ms."
-            )
-            return UnifiedAnalysisResponse(
-                success=False,
-                status="liveness_inconclusive",
-                person_detected=True,
-                face_detected=True,
-                person_count=len(persons),
-                face_count=len(detected_faces),
-                persons=persons,
-                faces=detected_faces,
-                primary_person_bbox=primary_person.bbox,
-                primary_face_bbox=primary_face_bbox,
-                embedding=None,
-                embedding_size=None,
-                quality_score=quality_score,
-                detection_confidence=face_conf,
-                liveness_status=liveness_res.status,
-                liveness_score=liveness_res.score,
-                model=model_name,
-                image_width=img_w,
-                image_height=img_h,
-                message="Facial liveness verification inconclusive or unavailable. Access denied for security.",
-                execution_time_ms=total_time_ms,
-                yolo_time_ms=yolo_time_ms,
-                insightface_time_ms=insightface_time_ms,
-                liveness_time_ms=liveness_time_ms,
-            )
-
-        # Confirmed presentation attack (spoof detected)
-        logger.warning(
-            f"Analysis complete: Presentation attack / spoof detected (liveness_score={liveness_res.score}) in {total_time_ms} ms. Embedding extraction skipped."
-        )
-        return UnifiedAnalysisResponse(
-            success=True,
-            status="spoof_detected",
-            person_detected=True,
-            face_detected=True,
-            person_count=len(persons),
-            face_count=len(detected_faces),
-            persons=persons,
-            faces=detected_faces,
-            primary_person_bbox=primary_person.bbox,
-            primary_face_bbox=primary_face_bbox,
-            embedding=None,
-            embedding_size=None,
-            quality_score=quality_score,
-            detection_confidence=face_conf,
-            liveness_status="spoof",
-            liveness_score=liveness_res.score,
-            model=model_name,
-            image_width=img_w,
-            image_height=img_h,
-            message="Presentation attack / spoof detected. Access denied.",
-            execution_time_ms=total_time_ms,
-            yolo_time_ms=yolo_time_ms,
-            insightface_time_ms=insightface_time_ms,
-            liveness_time_ms=liveness_time_ms,
-        )
-
-    # Stage 4: Extract 512D ArcFace Biometric Embedding Vector (Only executed for verified live faces)
+    # Stage 3: Extract 512D ArcFace Biometric Embedding Vector
     embedding_vec = _extract_embedding_vector(primary_face_raw)
     total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
@@ -335,8 +245,8 @@ async def _execute_analysis(
             embedding_size=None,
             quality_score=quality_score,
             detection_confidence=face_conf,
-            liveness_status="live",
-            liveness_score=liveness_res.score,
+            liveness_status=None,
+            liveness_score=None,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -344,11 +254,11 @@ async def _execute_analysis(
             execution_time_ms=total_time_ms,
             yolo_time_ms=yolo_time_ms,
             insightface_time_ms=insightface_time_ms,
-            liveness_time_ms=liveness_time_ms,
+            liveness_time_ms=None,
         )
 
     logger.info(
-        f"Analysis complete: Usable face processed (quality={quality_score}, liveness={liveness_res.score}) in {total_time_ms} ms."
+        f"Analysis complete: Usable face processed (quality={quality_score}) in {total_time_ms} ms."
     )
 
     return UnifiedAnalysisResponse(
@@ -366,8 +276,8 @@ async def _execute_analysis(
         embedding_size=512,
         quality_score=quality_score,
         detection_confidence=face_conf,
-        liveness_status="live",
-        liveness_score=liveness_res.score,
+        liveness_status=None,
+        liveness_score=None,
         model=model_name,
         image_width=img_w,
         image_height=img_h,
@@ -375,7 +285,7 @@ async def _execute_analysis(
         execution_time_ms=total_time_ms,
         yolo_time_ms=yolo_time_ms,
         insightface_time_ms=insightface_time_ms,
-        liveness_time_ms=liveness_time_ms,
+        liveness_time_ms=None,
     )
 
 
@@ -393,7 +303,6 @@ async def analyze_image_file(
     manager = getattr(request.app.state, "insightface_manager", None)
     face_app = getattr(request.app.state, "insightface_app", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
-    liveness = getattr(request.app.state, "liveness_detector", default_liveness_detector)
 
     if manager is None or not manager.is_loaded or face_app is None:
         raise HTTPException(
@@ -415,7 +324,7 @@ async def analyze_image_file(
     image_bytes = await file.read()
     img = read_image_bytes_to_cv2(image_bytes)
 
-    return await _execute_analysis(img, yolo, face_app, manager.model_name, liveness)
+    return await _execute_analysis(img, yolo, face_app, manager.model_name)
 
 
 @router.post(
@@ -432,7 +341,6 @@ async def analyze_image_base64(
     manager = getattr(request.app.state, "insightface_manager", None)
     face_app = getattr(request.app.state, "insightface_app", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
-    liveness = getattr(request.app.state, "liveness_detector", default_liveness_detector)
 
     if manager is None or not manager.is_loaded or face_app is None:
         raise HTTPException(
@@ -446,4 +354,4 @@ async def analyze_image_base64(
         )
 
     img = decode_base64_to_cv2(payload.image_base64)
-    return await _execute_analysis(img, yolo, face_app, manager.model_name, liveness)
+    return await _execute_analysis(img, yolo, face_app, manager.model_name)
