@@ -150,7 +150,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
       {/* Alerts Panel & Pagination Container */}
       <Card className="border border-border shadow-sm overflow-hidden space-y-0">
         <CardContent className="p-4 sm:p-6">
-          <SecurityAlertsPanel alerts={alerts} />
+          <SecurityAlertsPanel alerts={alerts} showResolveAll={true} />
         </CardContent>
 
         <DataTablePagination

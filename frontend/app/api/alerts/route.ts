@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
-import type { Prisma } from "@prisma/client";
-import { AlertType, Severity } from "@prisma/client";
+import { Prisma, AlertType, Severity } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +106,81 @@ export async function GET(req: NextRequest) {
     console.error("Failed to retrieve alerts:", error);
     return NextResponse.json(
       { success: false, error: "DATABASE_ERROR", message: "Failed to retrieve security alerts." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const authCheck = await checkAdminAuth();
+  if (authCheck.error) return authCheck.error;
+
+  try {
+    const body = await req.json().catch(() => ({}));
+    const resolvedValue = body.resolved !== undefined ? Boolean(body.resolved) : true;
+    const resolvedByUserId =
+      resolvedValue && typeof authCheck.session.user.id === "string" && authCheck.session.user.id.trim()
+        ? authCheck.session.user.id
+        : null;
+
+    const where: Prisma.AlertWhereInput = {};
+    if (resolvedValue) {
+      where.resolved = false;
+    } else {
+      where.resolved = true;
+    }
+
+    if (Array.isArray(body.alertIds) && body.alertIds.length > 0) {
+      const validIds = body.alertIds
+        .map((id: unknown) => (typeof id === "number" ? id : parseInt(String(id), 10)))
+        .filter((id: number) => !isNaN(id));
+      if (validIds.length > 0) {
+        where.id = { in: validIds };
+      }
+    }
+
+    if (body.deviceId && !isNaN(parseInt(String(body.deviceId), 10))) {
+      where.deviceId = parseInt(String(body.deviceId), 10);
+    }
+
+    let updateResult;
+    try {
+      updateResult = await prisma.alert.updateMany({
+        where,
+        data: {
+          resolved: resolvedValue,
+          resolvedAt: resolvedValue ? new Date() : null,
+          resolvedBy: resolvedByUserId,
+        },
+      });
+    } catch (updateErr: unknown) {
+      if (
+        resolvedByUserId &&
+        updateErr instanceof Prisma.PrismaClientKnownRequestError &&
+        updateErr.code === "P2003"
+      ) {
+        updateResult = await prisma.alert.updateMany({
+          where,
+          data: {
+            resolved: resolvedValue,
+            resolvedAt: resolvedValue ? new Date() : null,
+            resolvedBy: null,
+          },
+        });
+      } else {
+        throw updateErr;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: updateResult.count,
+      message: `Successfully updated ${updateResult.count} alert${updateResult.count === 1 ? "" : "s"}.`,
+    });
+  } catch (error: unknown) {
+    console.error("Failed to update alerts:", error);
+    return NextResponse.json(
+      { success: false, error: "DATABASE_ERROR", message: "Failed to update alerts." },
       { status: 500 }
     );
   }

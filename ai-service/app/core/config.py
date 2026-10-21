@@ -30,17 +30,6 @@ class Settings:
     )
     YOLO_CONFIDENCE_THRESHOLD: float = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.40"))
     YOLO_IOU_THRESHOLD: float = float(os.getenv("YOLO_IOU_THRESHOLD", "0.45"))
-    LIVENESS_MODEL_NAME: str = os.getenv("LIVENESS_MODEL_NAME", "minifasnet_quantized")
-    LIVENESS_MODEL_URL: str = os.getenv(
-        "LIVENESS_MODEL_URL",
-        "https://raw.githubusercontent.com/facenox/face-antispoof-onnx/main/models/best_model_quantized.onnx",
-    )
-    LIVENESS_CHECKSUM: str = os.getenv(
-        "LIVENESS_CHECKSUM",
-        "fde20585635cae62ed1d41796f76b6f8bc4b92cd91ec1cf0f1bc6485d2d587a9",
-    )
-    LIVENESS_THRESHOLD: float = float(os.getenv("LIVENESS_THRESHOLD", "0.60"))
-    LIVENESS_INPUT_SIZE: int = int(os.getenv("LIVENESS_INPUT_SIZE", "128"))
     AI_SERVICE_API_KEY: str = os.getenv("AI_SERVICE_API_KEY", "").strip()
 
     def __init__(self) -> None:

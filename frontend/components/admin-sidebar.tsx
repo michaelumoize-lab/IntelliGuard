@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
   Cpu,
+  Sparkles,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 
@@ -280,6 +281,22 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel>Support</SidebarGroupLabel>
           <SidebarMenu>
+            {/* Project Overview — Exclusive to Admin */}
+            {user.role === "ADMIN" && (
+              <SidebarMenuItem key="/dashboard/project-overview">
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/dashboard/project-overview"}
+                  tooltip="Project Overview"
+                >
+                  <Link href="/dashboard/project-overview" onClick={handleNavClick}>
+                    <Sparkles className="size-4 text-primary" />
+                    <span className="font-medium text-foreground">Project Overview</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+
             {supportNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || (item.title === "Settings" && pathname.startsWith("/settings"));

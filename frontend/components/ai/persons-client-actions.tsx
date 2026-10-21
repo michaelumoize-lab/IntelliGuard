@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PersonModal } from "@/components/ai/person-modal";
 import { ReplaceFaceModal } from "@/components/ai/replace-face-modal";
+import { PersonDetailsDrawer } from "@/components/ai/person-details-drawer";
 import { DataTableSearch } from "@/components/dashboard/data-table-search";
 import {
   PlusIcon,
@@ -157,6 +158,7 @@ export interface PersonRowData {
 export function PersonRowActions({ person }: { person: PersonRowData }) {
   const router = useRouter();
 
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isReplacingFace, setIsReplacingFace] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -225,9 +227,13 @@ export function PersonRowActions({ person }: { person: PersonRowData }) {
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
+          <DropdownMenuItem onClick={() => setIsDrawerOpen(true)} className="cursor-pointer">
+            <EyeIcon className="mr-2 h-4 w-4" /> Quick View (Drawer)
+          </DropdownMenuItem>
+
           <DropdownMenuItem asChild>
             <Link href={`/dashboard/persons/${person.id}`} className="cursor-pointer">
-              <EyeIcon className="mr-2 h-4 w-4" /> View Profile
+              <EyeIcon className="mr-2 h-4 w-4" /> View Full Profile
             </Link>
           </DropdownMenuItem>
 
@@ -264,6 +270,25 @@ export function PersonRowActions({ person }: { person: PersonRowData }) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Quick View Details Drawer */}
+      <PersonDetailsDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        person={{
+          id: person.id,
+          personCode: person.personCode,
+          firstName: person.firstName,
+          lastName: person.lastName,
+          email: person.email,
+          phone: person.phone,
+          department: person.department,
+          status: person.status,
+          category: person.category,
+          faceImageUrl: person.faceImageUrl,
+        }}
+        onStatusUpdated={() => router.refresh()}
+      />
 
       {/* Edit Modal */}
       {isEditing && (

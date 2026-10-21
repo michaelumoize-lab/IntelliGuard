@@ -93,7 +93,7 @@ async function runDashboardTests() {
   console.log("\n[Test 6] Verifying P0 Authentication, Role Enforcement & Alert resolvedBy Tracking...");
   const { NextRequest } = await import("next/server");
   const { __setGetServerSessionMock } = await import("../lib/get-session");
-  const { GET: GET_ALERTS } = await import("../app/api/alerts/route");
+  const { GET: GET_ALERTS, PATCH: PATCH_ALERTS_BATCH } = await import("../app/api/alerts/route");
   const { PATCH: PATCH_ALERT } = await import("../app/api/alerts/[id]/route");
   const { GET: GET_ACTIVITY } = await import("../app/api/dashboard/activity/route");
   const { GET: GET_STATS } = await import("../app/api/dashboard/stats/route");
@@ -206,7 +206,55 @@ async function runDashboardTests() {
       );
     }
 
-    console.log("✅ Test 6 PASSED: All 5 dashboard/alerts routes enforce 401/403/200 and record resolvedBy.");
+    // 6d. Test Batch PATCH /api/alerts (Resolve All)
+    const batchAlert1 = await prisma.alert.create({
+      data: {
+        alertType: "system_error",
+        title: "Batch Resolve Alert 1",
+        message: "First batch test alert",
+        severity: "low",
+        resolved: false,
+      },
+    });
+    const batchAlert2 = await prisma.alert.create({
+      data: {
+        alertType: "system_error",
+        title: "Batch Resolve Alert 2",
+        message: "Second batch test alert",
+        severity: "medium",
+        resolved: false,
+      },
+    });
+
+    const rBatchPatch200 = await PATCH_ALERTS_BATCH(
+      new NextRequest("http://localhost:3000/api/alerts", {
+        method: "PATCH",
+        body: JSON.stringify({
+          resolved: true,
+          alertIds: [batchAlert1.id, batchAlert2.id],
+        }),
+      })
+    );
+    const batchData = await rBatchPatch200.json();
+
+    if (rBatchPatch200.status !== 200 || !batchData.success || batchData.count !== 2) {
+      throw new Error(
+        `Expected batch PATCH /api/alerts to resolve 2 alerts, got status=${rBatchPatch200.status}, count=${batchData.count}`
+      );
+    }
+
+    const checkBatch = await prisma.alert.findMany({
+      where: { id: { in: [batchAlert1.id, batchAlert2.id] } },
+    });
+    if (!checkBatch.every((a) => a.resolved && a.resolvedBy === tempUserId)) {
+      throw new Error("Batch resolved alerts were not correctly marked resolved with resolvedBy.");
+    }
+
+    await prisma.alert.deleteMany({
+      where: { id: { in: [batchAlert1.id, batchAlert2.id] } },
+    });
+
+    console.log("✅ Test 6 PASSED: All 5 dashboard/alerts routes enforce 401/403/200, batch resolve works, and records resolvedBy.");
   } catch (err: unknown) {
     console.error("❌ Test 6 failed:", err);
     process.exitCode = 1;
@@ -218,6 +266,70 @@ async function runDashboardTests() {
     if (tempUserId && tempUserId.startsWith("test-admin-")) {
       await prisma.user.delete({ where: { id: tempUserId } }).catch(() => {});
     }
+  }
+
+  // 7. Test Admin-Only Server-Side Protection on /dashboard/project-overview
+  console.log("\n[Test 7] Testing Server-Side Admin-Only Protection for Project Overview...");
+  try {
+    const { __setGetServerSessionMock } = await import("../lib/get-session");
+    const ProjectOverviewPage = (await import("../app/dashboard/project-overview/page")).default;
+
+    // 7a. Unauthenticated caller throws redirect to /auth/sign-in
+    __setGetServerSessionMock(async () => null);
+    let unauthRedirected = false;
+    try {
+      await ProjectOverviewPage();
+    } catch (e: unknown) {
+      const errStr = String(e);
+      if (errStr.includes("NEXT_REDIRECT") || errStr.includes("/auth/sign-in")) {
+        unauthRedirected = true;
+      }
+    }
+    if (!unauthRedirected) {
+      throw new Error("Expected ProjectOverviewPage to redirect unauthenticated caller to /auth/sign-in");
+    }
+
+    // 7b. Non-admin caller throws redirect to /dashboard
+    __setGetServerSessionMock(
+      async () =>
+        ({
+          user: { id: "viewer-1", email: "viewer@intelliguard.local", name: "Viewer", role: "USER" },
+          session: { id: "sess-v", userId: "viewer-1", expiresAt: new Date(Date.now() + 60000) },
+        }) as unknown as Awaited<ReturnType<typeof import("../lib/get-session").getServerSession>>
+    );
+    let nonAdminRedirected = false;
+    try {
+      await ProjectOverviewPage();
+    } catch (e: unknown) {
+      const errStr = String(e);
+      if (errStr.includes("NEXT_REDIRECT") || errStr.includes("/dashboard")) {
+        nonAdminRedirected = true;
+      }
+    }
+    if (!nonAdminRedirected) {
+      throw new Error("Expected ProjectOverviewPage to redirect non-admin caller to /dashboard");
+    }
+
+    // 7c. Authenticated Admin caller renders without throwing
+    __setGetServerSessionMock(
+      async () =>
+        ({
+          user: { id: "admin-1", email: "admin@intelliguard.local", name: "Admin", role: "ADMIN" },
+          session: { id: "sess-a", userId: "admin-1", expiresAt: new Date(Date.now() + 60000) },
+        }) as unknown as Awaited<ReturnType<typeof import("../lib/get-session").getServerSession>>
+    );
+    const renderResult = await ProjectOverviewPage();
+    if (!renderResult) {
+      throw new Error("Expected ProjectOverviewPage to return JSX element for authorized admin");
+    }
+
+    console.log("✅ Test 7 PASSED: /dashboard/project-overview strictly enforces server-side admin protection.");
+  } catch (err: unknown) {
+    console.error("❌ Test 7 failed:", err);
+    process.exitCode = 1;
+  } finally {
+    const { __setGetServerSessionMock } = await import("../lib/get-session");
+    __setGetServerSessionMock(null);
   }
 
   console.log("\n==================================================");

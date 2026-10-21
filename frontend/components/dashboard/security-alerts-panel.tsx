@@ -31,12 +31,59 @@ interface SecurityAlertsPanelProps {
     low: number;
   };
   onAlertResolved?: (id: number) => void;
+  showResolveAll?: boolean;
 }
 
-export function SecurityAlertsPanel({ alerts, countsBySeverity, onAlertResolved }: SecurityAlertsPanelProps) {
+export function SecurityAlertsPanel({
+  alerts,
+  countsBySeverity,
+  onAlertResolved,
+  showResolveAll = false,
+}: SecurityAlertsPanelProps) {
   const router = useRouter();
   const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [isResolvingAll, setIsResolvingAll] = useState(false);
   const [resolvedIds, setResolvedIds] = useState<number[]>([]);
+
+  const unresolvedAlerts = alerts.filter(
+    (a) => !a.resolved && !resolvedIds.includes(a.id)
+  );
+
+  const handleResolveAll = async () => {
+    if (isResolvingAll || unresolvedAlerts.length === 0) return;
+    setIsResolvingAll(true);
+
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resolved: true,
+          alertIds: unresolvedAlerts.map((a) => a.id),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setResolvedIds((prev) => [
+          ...prev,
+          ...unresolvedAlerts.map((a) => a.id),
+        ]);
+        toast.success(
+          data.message || `All ${unresolvedAlerts.length} alerts marked as resolved.`
+        );
+        router.refresh();
+      } else {
+        toast.error(data.message || "Failed to resolve alerts.");
+      }
+    } catch (err) {
+      console.error("Failed to resolve alerts:", err);
+      toast.error("Failed to resolve all security alerts.");
+    } finally {
+      setIsResolvingAll(false);
+    }
+  };
 
   const handleResolve = async (alert: SecurityAlertItem) => {
     if (resolvingId || alert.resolved || resolvedIds.includes(alert.id)) return;
@@ -89,12 +136,35 @@ export function SecurityAlertsPanel({ alerts, countsBySeverity, onAlertResolved 
           <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0" />
           <h3 className="text-sm font-semibold text-foreground">Security Anomaly Alerts</h3>
         </div>
-        <Link
-          href="/dashboard/alerts"
-          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 transition-colors"
-        >
-          View All Alerts <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          {showResolveAll && unresolvedAlerts.length > 0 && (
+            <button
+              onClick={handleResolveAll}
+              disabled={isResolvingAll}
+              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isResolvingAll ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Resolving All...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Resolve All ({unresolvedAlerts.length})</span>
+                </>
+              )}
+            </button>
+          )}
+          {!showResolveAll && (
+            <Link
+              href="/dashboard/alerts"
+              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 transition-colors"
+            >
+              View All Alerts <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Severity Breakdown Summary */}

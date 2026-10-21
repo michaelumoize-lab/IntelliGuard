@@ -10,6 +10,7 @@ import {
 } from "@/components/ai/live-camera-preview";
 import { AccessResultCard } from "@/components/ai/access-result-card";
 import { LiveScanControls } from "@/components/ai/live-scan-controls";
+import { HardwareTerminalHUD } from "@/components/ai/hardware-terminal-hud";
 import { scanFace, AccessScanResponse } from "@/lib/access/access-client";
 import { playBiometricSound } from "@/lib/audio";
 import {
@@ -248,7 +249,6 @@ export default function WebcamSimulationPage() {
         if (response.access_status === "granted") {
           playBiometricSound("granted");
         } else if (
-          response.status === "spoof_detected" ||
           response.status === "unknown_individual" ||
           response.status === "ambiguous_match" ||
           response.match_status === "unknown" ||
@@ -267,10 +267,6 @@ export default function WebcamSimulationPage() {
       let overlayStatus: CameraOverlayResult["status"] = "denied";
       if (isTechnicalError) {
         overlayStatus = "error";
-      } else if (response.status === "spoof_detected") {
-        overlayStatus = "spoof_detected";
-      } else if (response.status === "liveness_inconclusive") {
-        overlayStatus = "liveness_inconclusive";
       } else if (response.status === "no_person") {
         overlayStatus = "no_person";
       } else if (response.status === "person_no_face") {
@@ -295,7 +291,6 @@ export default function WebcamSimulationPage() {
         status: overlayStatus,
         name: isDeactivated ? `${personName || "User"} (${unauthorizedStatusTag})` : personName,
         similarity: response.face?.similarity,
-        liveness_score: response.liveness_score ?? undefined,
         message: response.message,
       });
 
@@ -334,12 +329,6 @@ export default function WebcamSimulationPage() {
       if (isTechnicalError) {
         historyName = "Recognition Error";
         historyMatchStatus = "error";
-      } else if (response.status === "spoof_detected") {
-        historyName = "Presentation Attack (Spoof)";
-        historyMatchStatus = "spoof_detected";
-      } else if (response.status === "liveness_inconclusive") {
-        historyName = "Liveness Inconclusive";
-        historyMatchStatus = "liveness_inconclusive";
       } else if (isDeactivated) {
         historyName = `${personName} (User is ${unauthorizedStatusTag.toLowerCase()})`;
         historyMatchStatus = "deactivated";
@@ -609,11 +598,19 @@ export default function WebcamSimulationPage() {
         </div>
 
         {/* Right Column: Access Decision Result Card with Side-by-Side Verification (7 cols on lg) */}
-        <div className="lg:col-span-7 h-full">
+        <div className="lg:col-span-7 space-y-4">
           <AccessResultCard
             result={latestResult}
             isLoading={isScanning && !latestResult}
             capturedImageUrl={capturedImageUrl}
+          />
+
+          {/* Simulated Physical Hardware Terminal HUD (OLED & RGB LED) */}
+          <HardwareTerminalHUD
+            result={latestResult}
+            isScanning={isScanning}
+            isMonitoring={isMonitoring}
+            soundEnabled={soundEnabled}
           />
         </div>
       </div>

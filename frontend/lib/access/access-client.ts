@@ -4,8 +4,6 @@ export interface AccessScanResponse {
     | "no_person"
     | "person_no_face"
     | "face_low_quality"
-    | "spoof_detected"
-    | "liveness_inconclusive"
     | "face_detected_processing"
     | "known_individual"
     | "unknown_individual"
@@ -18,8 +16,6 @@ export interface AccessScanResponse {
     | "face_match"
     | "face_no_match"
     | "unauthorized"
-    | "spoof_detected"
-    | "liveness_failed"
     | "no_person_detected"
     | "no_face_detected"
     | "poor_quality_face"
@@ -29,9 +25,6 @@ export interface AccessScanResponse {
     | "system_error";
   door_action: "unlock" | "lock" | "no_action";
   match_status?: "matched" | "unknown" | "ambiguous" | "rejected" | null;
-  liveness_status?: "live" | "spoof" | "inconclusive" | null;
-  liveness_score?: number | null;
-  liveness_time_ms?: number | null;
   person?: {
     id: number;
     person_code: string;
@@ -134,9 +127,6 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
       persons: data.persons ?? [],
       faces: data.faces ?? [],
       device: data.device ?? null,
-      liveness_status: data.liveness_status ?? null,
-      liveness_score: data.liveness_score ?? null,
-      liveness_time_ms: data.liveness_time_ms ?? null,
       processing_time_ms: typeof data.processing_time_ms === "number" ? data.processing_time_ms : 0,
       message: data.message || "Failed to process face scan request.",
       error: data.error || "SERVER_ERROR",

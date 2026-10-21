@@ -9,8 +9,6 @@ const VALID_REASONS = [
   "face_match",
   "face_no_match",
   "unauthorized",
-  "spoof_detected",
-  "liveness_failed",
   "no_person_detected",
   "no_face_detected",
   "poor_quality_face",
