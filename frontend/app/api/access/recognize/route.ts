@@ -5,8 +5,15 @@ import { getServerSession } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
 
+const DEPRECATION_HEADERS = {
+  Warning: '299 - "Deprecated: Use POST /api/access instead"',
+  Deprecation: "true",
+  Link: '</api/access>; rel="successor-version"',
+};
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
+  console.warn("[DEPRECATION WARNING] POST /api/access/recognize called. Callers should migrate to POST /api/access.");
 
   try {
     // Authenticate admin session
@@ -75,6 +82,8 @@ export async function POST(req: NextRequest) {
     if (recognition.matchStatus === "matched" && recognition.person) {
       return NextResponse.json({
         success: true,
+        deprecated: true,
+        deprecation_notice: "POST /api/access/recognize is deprecated. Migrate to POST /api/access for unified access control.",
         match_status: "matched",
         person: {
           id: recognition.person.id,
@@ -94,12 +103,14 @@ export async function POST(req: NextRequest) {
           model: recognition.face.model || aiResult.model,
         },
         processing_time_ms: processingTimeMs,
-      });
+      }, { headers: DEPRECATION_HEADERS });
     }
 
     if (recognition.matchStatus === "ambiguous") {
       return NextResponse.json({
         success: true,
+        deprecated: true,
+        deprecation_notice: "POST /api/access/recognize is deprecated. Migrate to POST /api/access for unified access control.",
         match_status: "ambiguous",
         person: null,
         face: {
@@ -110,12 +121,14 @@ export async function POST(req: NextRequest) {
         },
         candidates: recognition.candidates,
         processing_time_ms: processingTimeMs,
-      });
+      }, { headers: DEPRECATION_HEADERS });
     }
 
     // Unknown face classification
     return NextResponse.json({
       success: true,
+      deprecated: true,
+      deprecation_notice: "POST /api/access/recognize is deprecated. Migrate to POST /api/access for unified access control.",
       match_status: "unknown",
       person: null,
       face: {
@@ -125,7 +138,7 @@ export async function POST(req: NextRequest) {
         model: recognition.face.model || aiResult.model,
       },
       processing_time_ms: processingTimeMs,
-    });
+    }, { headers: DEPRECATION_HEADERS });
   } catch (error: unknown) {
     console.error("Unexpected error during face recognition:", error);
     return NextResponse.json(

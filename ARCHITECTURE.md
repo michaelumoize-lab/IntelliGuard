@@ -42,7 +42,7 @@ IntelliGuard is structured into four distinct physical and logic layers:
                 │                       ┌────────────────────────────────┐
                 │                       │      3. FASTAPI AI SERVICE     │
                 │                       │                                │
-                │                       │  InsightFace (Buffalo_L)       │
+                │                       │  InsightFace (buffalo_s)       │
                 │                       │  ├── Face Detection (SCRFD)    │
                 │                       │  ├── Landmark Alignment        │
                 │                       │  └── 512D ArcFace Embedding    │
@@ -68,7 +68,7 @@ IntelliGuard is structured into four distinct physical and logic layers:
 | :-------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------- |
 | **ESP32-S3 CAM**            | Motion sensing, photo capture, HTTP communication, local hardware feedback (LED, buzzer, OLED, relay).                                                | Does **NOT** run AI models or store database records.             |
 | **Next.js Backend**         | Primary application gateway, admin dashboard, business logic, access decision evaluation, calling FastAPI, issuing database queries, logging events.  | Does **NOT** generate facial embeddings directly.                 |
-| **FastAPI AI Service**      | Stateless AI microservice. Performs face detection, quality scoring, and 512D ArcFace embedding generation using InsightFace (`Buffalo_L`).           | Does **NOT** connect to PostgreSQL or manage user authentication. |
+| **FastAPI AI Service**      | Stateless AI microservice. Performs face detection, quality scoring, and 512D ArcFace embedding generation using InsightFace (`buffalo_s`).           | Does **NOT** connect to PostgreSQL or manage user authentication. |
 | **PostgreSQL + `pgvector`** | Primary database persistence. Executes vector similarity search (`<=>` cosine distance) directly in-engine using indexed HNSW/IVFFlat vector indexes. | Does **NOT** make business access control decisions.              |
 
 ---
@@ -93,7 +93,7 @@ Next.js API Route Handler
 FastAPI AI Microservice
       │
       ├── 5. Decode image with OpenCV (`cv2.imdecode`)
-      ├── 6. Run InsightFace (`Buffalo_L`) face detection
+      ├── 6. Run InsightFace (`buffalo_s`) face detection
       ├── 7. Validate face count (MUST be exactly 1 face)
       ├── 8. Extract 512D L2-normalized ArcFace embedding
       ├── 9. Evaluate composite face quality score
@@ -129,13 +129,13 @@ HC-SR501 PIR Motion Sensor triggers
 ESP32-S3 CAM captures photo (OV5640)
       │
       ▼
-ESP32 sends HTTP POST (image bytes) to Next.js (`/api/access/recognize`)
+ESP32 sends HTTP POST (image bytes + device headers) to Next.js (`/api/access`)
       │
       ▼
-Next.js API Handler forwards image to FastAPI (`POST /api/v1/embedding`)
+Next.js API Handler forwards image to FastAPI (`POST /api/v1/analyze`)
       │
       ▼
-FastAPI AI Service generates 512D embedding vector using InsightFace (`Buffalo_L`)
+FastAPI AI Service generates 512D embedding vector using InsightFace (`buffalo_s`)
       │
       ▼
 FastAPI returns 512D embedding vector to Next.js

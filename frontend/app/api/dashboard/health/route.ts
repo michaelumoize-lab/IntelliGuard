@@ -152,8 +152,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Execute a new probe and coordinate concurrent requests
-  let probePromise: Promise<HealthCheckResponse>;
-  probePromise = runHealthCheckProbe()
+  const probePromise: Promise<HealthCheckResponse> = runHealthCheckProbe()
     .then((result) => {
       if (activeProbePromise === probePromise) {
         cachedHealth = {

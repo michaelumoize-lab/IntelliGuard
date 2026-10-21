@@ -11,8 +11,7 @@ async function runMilestone5Tests() {
   console.log("  Milestone 5: Management & Lifecycle Verification");
   console.log("==================================================\n");
 
-  const singleFacePath = path.join(__dirname, "../../backend/tests/single_face.jpg");
-  const noFacePath = path.join(__dirname, "../../backend/tests/no_face.jpg");
+  const singleFacePath = path.join(__dirname, "../../ai-service/tests/single_face.jpg");
 
   if (!fs.existsSync(singleFacePath)) {
     console.error("❌ Test image single_face.jpg not found at:", singleFacePath);
@@ -67,6 +66,11 @@ async function runMilestone5Tests() {
 
     // Create test person in DB using ikResult.url for both faceImageUrl & FaceEmbedding.imagePath
     const personCode = `TEST-M5-${Date.now()}`;
+    // Generate isolated normalized 512D vector for test person to prevent collision with existing DB records
+    const uniqueVector = Array.from({ length: 512 }, (_, i) => Math.cos(i * 1.7 + 0.42));
+    const norm = Math.sqrt(uniqueVector.reduce((sum, v) => sum + v * v, 0));
+    const testEmbedding = uniqueVector.map((v) => v / norm);
+
     const newPerson = await prisma.$transaction(async (tx) => {
       const p = await tx.person.create({
         data: {
@@ -84,7 +88,7 @@ async function runMilestone5Tests() {
         },
       });
 
-      const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
+      const vectorLiteral = `[${testEmbedding.join(",")}]`;
       await tx.$executeRawUnsafe(
         `
         INSERT INTO face_embeddings (
@@ -129,10 +133,10 @@ async function runMilestone5Tests() {
     // Test 3: Self-Exclusion Duplicate Check
     // ----------------------------------------------------
     console.log("\n[Test 3] Testing pgvector duplicate check with self-exclusion...");
-    const globalCheck = await checkForDuplicateFace(aiResult.embedding);
+    const globalCheck = await checkForDuplicateFace(testEmbedding);
     assert(globalCheck.isDuplicate === true, "Test 3: Global check detects duplicate face");
 
-    const selfExcludedCheck = await checkForDuplicateFace(aiResult.embedding, undefined, newPerson.id);
+    const selfExcludedCheck = await checkForDuplicateFace(testEmbedding, undefined, newPerson.id);
     assert(
       selfExcludedCheck.isDuplicate === false,
       "Test 3: Self-excluded check (excluding person.id) allows face replacement for same individual"

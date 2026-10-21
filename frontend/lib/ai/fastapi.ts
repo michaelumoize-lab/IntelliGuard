@@ -115,9 +115,16 @@ export const fastAPIAnalysisResponseSchema = z.object({
   insightface_time_ms: z.number().finite().nonnegative().optional(),
 });
 
-function getServiceHeaders(): Record<string, string> {
+function getServiceHeaders(correlationId?: string): Record<string, string> {
+  const headers: Record<string, string> = {};
   const apiKey = (process.env.AI_SERVICE_API_KEY || process.env.FASTAPI_API_KEY || "").trim();
-  return apiKey ? { "X-Service-Key": apiKey } : {};
+  if (apiKey) {
+    headers["X-Service-Key"] = apiKey;
+  }
+  if (correlationId) {
+    headers["X-Correlation-ID"] = correlationId;
+  }
+  return headers;
 }
 
 /**
@@ -126,7 +133,8 @@ function getServiceHeaders(): Record<string, string> {
  */
 export async function generateEmbedding(
   imageBuffer: Buffer,
-  filename: string = "face.jpg"
+  filename: string = "face.jpg",
+  correlationId?: string
 ): Promise<FastAPIEmbeddingResult> {
   const baseUrl = process.env.FASTAPI_URL || "http://localhost:8000";
   const minQualityThreshold = parseFloat(process.env.MIN_FACE_QUALITY || "0.50");
@@ -144,7 +152,7 @@ export async function generateEmbedding(
 
     response = await fetch(endpoint, {
       method: "POST",
-      headers: getServiceHeaders(),
+      headers: getServiceHeaders(correlationId),
       body: formData,
       signal: controller.signal,
     });
@@ -260,7 +268,8 @@ export interface FaceDetectionResult {
  */
 export async function detectFaces(
   imageBuffer: Buffer,
-  filename: string = "face.jpg"
+  filename: string = "face.jpg",
+  correlationId?: string
 ): Promise<FaceDetectionResult> {
   const baseUrl = process.env.FASTAPI_URL || "http://localhost:8000";
   const endpoint = `${baseUrl.replace(/\/$/, "")}/api/v1/detect`;
@@ -275,7 +284,7 @@ export async function detectFaces(
 
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: getServiceHeaders(),
+      headers: getServiceHeaders(correlationId),
       body: formData,
       signal: controller.signal,
     });
@@ -355,7 +364,8 @@ export interface FastAPIAnalysisResult {
  */
 export async function analyzeImage(
   imageBuffer: Buffer,
-  filename: string = "frame.jpg"
+  filename: string = "frame.jpg",
+  correlationId?: string
 ): Promise<FastAPIAnalysisResult> {
   const baseUrl = process.env.FASTAPI_URL || "http://localhost:8000";
   const endpoint = `${baseUrl.replace(/\/$/, "")}/api/v1/analyze`;
@@ -371,7 +381,7 @@ export async function analyzeImage(
 
     response = await fetch(endpoint, {
       method: "POST",
-      headers: getServiceHeaders(),
+      headers: getServiceHeaders(correlationId),
       body: formData,
       signal: controller.signal,
     });

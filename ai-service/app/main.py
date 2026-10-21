@@ -1,8 +1,12 @@
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.core.config import settings
 from app.core.insightface import insightface_manager
@@ -15,6 +19,21 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("intelliguard.main")
+
+
+class CorrelationIdMiddleware(BaseHTTPMiddleware):
+    """Propagates or generates X-Correlation-ID header for distributed request tracing."""
+
+    async def dispatch(self, request: Request, call_next):
+        correlation_id = (
+            request.headers.get("X-Correlation-ID")
+            or request.headers.get("X-Request-ID")
+            or str(uuid.uuid4())
+        )
+        request.state.correlation_id = correlation_id
+        response: Response = await call_next(request)
+        response.headers["X-Correlation-ID"] = correlation_id
+        return response
 
 
 @asynccontextmanager
@@ -68,6 +87,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Distributed correlation tracing middleware
+app.add_middleware(CorrelationIdMiddleware)
 
 # Include API v1 router under /api/v1 prefix
 app.include_router(api_router, prefix="/api/v1")

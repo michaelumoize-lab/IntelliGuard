@@ -734,25 +734,150 @@ POST   /api/devices
 GET    /api/devices/[id]
 PATCH  /api/devices/[id]
 
-POST   /api/recognition
-GET    /api/recognition
+POST   /api/access                  ---
 
-GET    /api/access-logs
+# Phase 4 Stabilization, Reproducibility & Operations
+
+## 1. Clean Environment Reproducibility
+
+To set up IntelliGuard from scratch in a fresh environment:
+
+### Prerequisites
+- Node.js `v20.x` or `v22.x` (verified on Node `v22.23.1`)
+- Python `3.10`–`3.14` (verified on Python `3.14.5`)
+- PostgreSQL 15+ with the `pgvector` extension enabled (e.g. Neon Serverless Postgres)
+
+### Step 1: AI Service Setup (FastAPI)
+```bash
+cd ai-service
+python -m venv .venv
+
+# On Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# On macOS/Linux:
+# source .venv/bin/activate
+
+pip install -r requirements.txt
+cp .env.example .env
+
+# Verify AI test suite (33 tests)
+pytest -v
+
+# Run FastAPI development server (port 8000)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Step 2: Web & Gateway Setup (Next.js)
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+# Populate .env.local with DATABASE_URL, BETTER_AUTH_SECRET, FASTAPI_URL, IMAGEKIT keys
+
+# Apply Prisma baseline migrations & generate client
+npx prisma generate
+npx tsx scripts/apply-hnsw-index.ts
+
+# Execute comprehensive automated test suite (12 test suites)
+npm test
+
+# Run Next.js development server (port 3000)
+npm run dev
+```
+
+---
+
+## 2. Database & Vector Index Runbook
+
+### HNSW Index Topology
+- **Model**: `buffalo_s` (ArcFace 512-dimensional unit embeddings)
+- **Index Type**: Hierarchical Navigable Small World (`HNSW`)
+- **Metric**: Cosine Similarity via pgvector cosine distance operator (`vector_cosine_ops`, `<=>`)
+- **Construction Parameters**: `m = 16`, `ef_construction = 64`
+- **Query Parameter**: Default `ef_search = 40` (configurable per session)
+- **Index Script**: `npx tsx scripts/apply-hnsw-index.ts` (idempotently ensures `CREATE EXTENSION IF NOT EXISTS vector;` and index `face_embeddings_embedding_hnsw_idx` exist)
+
+---
+
+## 3. Operational Troubleshooting
+
+| Symptom | Root Cause | Remediation Procedure |
+| :--- | :--- | :--- |
+| **FastAPI 503 / `ECONNREFUSED`** | Python service not running or port conflict | Verify `http://localhost:8000/api/v1/health`. Ensure `.venv` has all dependencies installed. Next.js gracefully fails closed with `system_error` and door lock. |
+| **Registration HTTP 409 Conflict** | Face already enrolled | `POST /api/persons` and `/api/persons/precheck` enforce cosine similarity check at threshold `0.50`. If replacing a person's photo, use `POST /api/persons/[id]/face` which self-excludes the individual. |
+| **`ambiguous_match` Decision** | Two distinct subjects within margin | If top 2 matches have cosine similarity difference `< 0.08` (`FACE_AMBIGUITY_MARGIN`), the system denies access with `insufficient_confidence` to prevent false positive impersonation. Register clearer, frontal captures. |
+| **Device HTTP 401 Unauthorized** | Missing or invalid device headers | ESP32 or edge client must provide `X-Device-Id` and `X-Device-Key` (plaintext secret generated during device registration). System validates against SHA-256 `apiKeyHash`. |
+| **FastAPI `face_low_quality`** | Occluded, blurry, or extreme pose | Ensure illumination is balanced, face bounding box is > 80x80 px, and yaw/pitch angles are within frontal tolerance. System responds with `poor_quality_face` and `no_action`. |
+
+---
+
+## 4. Hardware Integration Interface Specification (ESP32-S3-CAM)
+
+When integrating the physical **ESP32-S3-CAM** unit, the device communicates with the Next.js Authoritative Access Control Gateway via HTTP POST multipart/form-data:
+
+### Request Contract
+- **Endpoint**: `POST /api/access`
+- **Content-Type**: `multipart/form-data; boundary=...`
+- **Headers**:
+  ```http
+  X-Device-Id: dev_c7d9a1f2b3e4
+  X-Device-Key: ig_dev_a1b2c3d4e5f6...
+  X-Correlation-ID: (optional, generated if omitted)
+  ```
+- **Body Fields**:
+  - `image`: Binary JPEG payload captured from OV5640 (recommended resolution: 640x480 or 800x600, JPEG quality 80–90)
+
+### Response Contract (JSON)
+```json
+{
+  "access_status": "granted",
+  "door_action": "unlock",
+  "reason": "face_match",
+  "status": "known_individual",
+  "match_status": "matched",
+  "similarity": 0.892,
+  "execution_time_ms": 114,
+  "correlation_id": "req-1792601934-abc",
+  "person": {
+    "id": 26,
+    "personCode": "PER-0822152C",
+    "name": "Michael Umoize",
+    "department": "Engineering"
+  }
+}
+```
+
+### Door Action Matrix
+| `access_status` | `door_action` | Condition / State |
+| :--- | :--- | :--- |
+| `granted` | `unlock` | Registered `active` person recognized with similarity >= 0.50 without ambiguity. |
+| `denied` | `lock` | `inactive` or `suspended` person (`unauthorized`), unknown person (`face_no_match`), ambiguous identity (`insufficient_confidence`), or system failure (`system_error`). |
+| `denied` | `no_action` | No person detected in frame, no face in frame, or face quality below threshold. |
+
+### Client Retry & Fail-Safe Directives
+- **Hardware Fail-Safe**: Relays and solenoids MUST remain normally open (locked). Any HTTP error (4xx, 5xx), connection drop, or timeout must default to `lock`.
+- **Timeout**: Set HTTP request timeout on ESP32 to `5000ms`.
+- **Throttling**: ESP32 firmware should rate-limit scan triggers to at most once per `1000ms`.
+
+---
+
+# Authoritative unified access control gateway
+GET    /api/access/logs             # Access logs query endpoint
+POST   /api/access/recognize        # Deprecated compatibility endpoint
 
 GET    /api/alerts
 PATCH  /api/alerts/[id]
 
-POST   /api/devices/[id]/heartbeat
+POST   /api/devices/[id]/health
 ```
 
-The FastAPI service provides AI-specific endpoints.
-
-Possible endpoints:
+The FastAPI service provides AI-specific inference endpoints under `/api/v1`:
 
 ```text
-POST /detect
-POST /embedding
-POST /recognize
+GET  /api/v1/health                 # Service health, model status, and memory metrics
+POST /api/v1/detect                 # SCRFD face detection & bounding boxes
+POST /api/v1/embedding              # InsightFace 512D ArcFace vector extraction
+POST /api/v1/analyze                # Unified YOLO person detection + InsightFace analysis
 ```
 
 The exact API structure may evolve during development.
@@ -1275,7 +1400,7 @@ python-multipart
 python-dotenv
 ```
 
-The current InsightFace development environment uses the **Buffalo_L** model.
+The current InsightFace runtime environment is standardized on the **buffalo_s** model pack (512D ArcFace embeddings, optimized for lightweight container execution under 512MB RAM).
 
 During development, inference currently runs using the **CPU execution provider**.
 
@@ -1326,7 +1451,7 @@ IntelliGuard should prioritize:
 
 The database schema and core project foundation have been established.
 
-The InsightFace environment has been successfully configured and the **Buffalo_L** model has been downloaded and tested.
+The InsightFace environment has been successfully configured and the **buffalo_s** model has been integrated and validated.
 
 Initial face detection has been successfully completed using the CPU inference provider.
 
@@ -1388,6 +1513,133 @@ LED / OLED / Buzzer / Lock
 
 ---
 
+---
+
+# Phase 4 Stabilization, Reproducibility & Operations
+
+## 1. Clean Environment Reproducibility
+
+To set up IntelliGuard from scratch in a fresh environment:
+
+### Prerequisites
+- Node.js `v20.x` or `v22.x` (verified on Node `v22.23.1`)
+- Python `3.10`–`3.14` (verified on Python `3.14.5`)
+- PostgreSQL 15+ with the `pgvector` extension enabled (e.g. Neon Serverless Postgres)
+
+### Step 1: AI Service Setup (FastAPI)
+```bash
+cd ai-service
+python -m venv .venv
+
+# On Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# On macOS/Linux:
+# source .venv/bin/activate
+
+pip install -r requirements.txt
+cp .env.example .env
+
+# Verify AI test suite (33 tests)
+pytest -v
+
+# Run FastAPI development server (port 8000)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Step 2: Web & Gateway Setup (Next.js)
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+# Populate .env.local with DATABASE_URL, BETTER_AUTH_SECRET, FASTAPI_URL, IMAGEKIT keys
+
+# Apply Prisma baseline migrations & generate client
+npx prisma generate
+npx tsx scripts/apply-hnsw-index.ts
+
+# Execute comprehensive automated test suite (12 test suites)
+npm test
+
+# Run Next.js development server (port 3000)
+npm run dev
+```
+
+---
+
+## 2. Database & Vector Index Runbook
+
+### HNSW Index Topology
+- **Model**: `buffalo_s` (ArcFace 512-dimensional unit embeddings)
+- **Index Type**: Hierarchical Navigable Small World (`HNSW`)
+- **Metric**: Cosine Similarity via pgvector cosine distance operator (`vector_cosine_ops`, `<=>`)
+- **Construction Parameters**: `m = 16`, `ef_construction = 64`
+- **Query Parameter**: Default `ef_search = 40` (configurable per session)
+- **Index Script**: `npx tsx scripts/apply-hnsw-index.ts` (idempotently ensures `CREATE EXTENSION IF NOT EXISTS vector;` and index `face_embeddings_embedding_hnsw_idx` exist)
+
+---
+
+## 3. Operational Troubleshooting
+
+| Symptom | Root Cause | Remediation Procedure |
+| :--- | :--- | :--- |
+| **FastAPI 503 / `ECONNREFUSED`** | Python service not running or port conflict | Verify `http://localhost:8000/api/v1/health`. Ensure `.venv` has all dependencies installed. Next.js gracefully fails closed with `system_error` and door lock. |
+| **Registration HTTP 409 Conflict** | Face already enrolled | `POST /api/persons` and `/api/persons/precheck` enforce cosine similarity check at threshold `0.50`. If replacing a person's photo, use `POST /api/persons/[id]/face` which self-excludes the individual. |
+| **`ambiguous_match` Decision** | Two distinct subjects within margin | If top 2 matches have cosine similarity difference `< 0.08` (`FACE_AMBIGUITY_MARGIN`), the system denies access with `insufficient_confidence` to prevent false positive impersonation. Register clearer, frontal captures. |
+| **Device HTTP 401 Unauthorized** | Missing or invalid device headers | ESP32 or edge client must provide `X-Device-Id` and `X-Device-Key` (plaintext secret generated during device registration). System validates against SHA-256 `apiKeyHash`. |
+| **FastAPI `face_low_quality`** | Occluded, blurry, or extreme pose | Ensure illumination is balanced, face bounding box is > 80x80 px, and yaw/pitch angles are within frontal tolerance. System responds with `poor_quality_face` and `no_action`. |
+
+---
+
+## 4. Hardware Integration Interface Specification (ESP32-S3-CAM)
+
+When integrating the physical **ESP32-S3-CAM** unit, the device communicates with the Next.js Authoritative Access Control Gateway via HTTP POST multipart/form-data:
+
+### Request Contract
+- **Endpoint**: `POST /api/access`
+- **Content-Type**: `multipart/form-data; boundary=...`
+- **Headers**:
+  ```http
+  X-Device-Id: dev_c7d9a1f2b3e4
+  X-Device-Key: ig_dev_a1b2c3d4e5f6...
+  X-Correlation-ID: (optional, generated if omitted)
+  ```
+- **Body Fields**:
+  - `image`: Binary JPEG payload captured from OV5640 (recommended resolution: 640x480 or 800x600, JPEG quality 80–90)
+
+### Response Contract (JSON)
+```json
+{
+  "access_status": "granted",
+  "door_action": "unlock",
+  "reason": "face_match",
+  "status": "known_individual",
+  "match_status": "matched",
+  "similarity": 0.892,
+  "execution_time_ms": 114,
+  "correlation_id": "req-1792601934-abc",
+  "person": {
+    "id": 26,
+    "personCode": "PER-0822152C",
+    "name": "Michael Umoize",
+    "department": "Engineering"
+  }
+}
+```
+
+### Door Action Matrix
+| `access_status` | `door_action` | Condition / State |
+| :--- | :--- | :--- |
+| `granted` | `unlock` | Registered `active` person recognized with similarity >= 0.50 without ambiguity. |
+| `denied` | `lock` | `inactive` or `suspended` person (`unauthorized`), unknown person (`face_no_match`), ambiguous identity (`insufficient_confidence`), or system failure (`system_error`). |
+| `denied` | `no_action` | No person detected in frame, no face in frame, or face quality below threshold. |
+
+### Client Retry & Fail-Safe Directives
+- **Hardware Fail-Safe**: Relays and solenoids MUST remain normally open (locked). Any HTTP error (4xx, 5xx), connection drop, or timeout must default to `lock`.
+- **Timeout**: Set HTTP request timeout on ESP32 to `5000ms`.
+- **Throttling**: ESP32 firmware should rate-limit scan triggers to at most once per `1000ms`.
+
+---
+
 # Author
 
 **Michael Umoize**
@@ -1401,5 +1653,5 @@ AI & Machine Learning Enthusiast
 
 The original source code of this project is licensed under the MIT License.
 
-Pre-trained model artifacts, including the default InsightFace `buffalo_l` model zoo weights, are excluded from the MIT License and are subject to [InsightFace's licensing terms](https://github.com/deepinsight/insightface#license), which restrict their use to non-commercial research purposes only.
+Pre-trained model artifacts, including the default InsightFace `buffalo_s` model zoo weights, are excluded from the MIT License and are subject to [InsightFace's licensing terms](https://github.com/deepinsight/insightface#license), which restrict their use to non-commercial research purposes only.
 

@@ -12,6 +12,10 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
+  const correlationId =
+    req.headers.get("x-correlation-id") ||
+    req.headers.get("x-request-id") ||
+    `ig_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
 
   try {
     // 1. Extract and validate multipart form data
@@ -257,7 +261,7 @@ export async function POST(req: NextRequest) {
     // 3. Step 3: Run Unified YOLO Person Detection & InsightFace Biometric Pipeline
     let aiResult;
     try {
-      aiResult = await analyzeImage(imageBuffer, imageFile.name || "access.jpg");
+      aiResult = await analyzeImage(imageBuffer, imageFile.name || "access.jpg", correlationId);
     } catch (aiErr: unknown) {
       const processingTimeMs = Date.now() - startTime;
 
@@ -748,6 +752,9 @@ export async function POST(req: NextRequest) {
         : null,
       candidates: recognition.candidates,
       processing_time_ms: processingTimeMs,
+      correlation_id: correlationId,
+    }, {
+      headers: { "X-Correlation-ID": correlationId },
     });
   } catch (error: unknown) {
     console.error("Unexpected error in access decision route:", error);

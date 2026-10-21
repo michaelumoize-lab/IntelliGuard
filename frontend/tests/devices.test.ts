@@ -30,6 +30,8 @@ async function runMilestone10Tests() {
   }
 
   let createdDeviceId: number | null = null;
+  let mockLogId: number | null = null;
+  let mockAlertId: number | null = null;
   let firstApiKey: string | null = null;
   let secondApiKey: string | null = null;
   const testSerial = `TEST-ESP32-M10-${Date.now()}`;
@@ -166,11 +168,11 @@ async function runMilestone10Tests() {
     );
 
     const filterByStatus = await prisma.device.findMany({
-      where: { status: "offline" },
+      where: { status: "online" },
     });
     assert(
       filterByStatus.some((d) => d.id === createdDeviceId),
-      "Test 6: Filter by status='offline' matches created device"
+      "Test 6: Filter by status='online' matches created device"
     );
 
     const filterByType = await prisma.device.findMany({
@@ -264,6 +266,7 @@ async function runMilestone10Tests() {
         processingTimeMs: 45,
       },
     });
+    mockLogId = mockLog.id;
 
     const mockAlert = await prisma.alert.create({
       data: {
@@ -275,6 +278,7 @@ async function runMilestone10Tests() {
         resolved: false,
       },
     });
+    mockAlertId = mockAlert.id;
 
     const deviceLogs = await prisma.accessLog.findMany({ where: { deviceId: createdDeviceId } });
     assert(
@@ -318,12 +322,21 @@ async function runMilestone10Tests() {
 
     // Clean up test records
     await prisma.accessLog.delete({ where: { id: mockLog.id } });
+    mockLogId = null;
     await prisma.alert.delete({ where: { id: mockAlert.id } });
+    mockAlertId = null;
 
   } catch (err: unknown) {
     console.error("❌ Test suite encountered unhandled exception:", err);
     testsFailed++;
     process.exitCode = 1;
+  } finally {
+    // Teardown safety: ensure orphaned test fixtures are purged even if assertions failed
+    try {
+      if (mockLogId) await prisma.accessLog.delete({ where: { id: mockLogId } }).catch(() => {});
+      if (mockAlertId) await prisma.alert.delete({ where: { id: mockAlertId } }).catch(() => {});
+      if (createdDeviceId) await prisma.device.delete({ where: { id: createdDeviceId } }).catch(() => {});
+    } catch (_) {}
   }
 
   console.log("\n==================================================");

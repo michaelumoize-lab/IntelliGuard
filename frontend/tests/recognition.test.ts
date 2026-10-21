@@ -10,8 +10,8 @@ async function runMilestone6Tests() {
   console.log("  Milestone 6: Face Recognition Verification");
   console.log("==================================================\n");
 
-  const singleFacePath = path.join(__dirname, "../../backend/tests/single_face.jpg");
-  const multiFacePath = path.join(__dirname, "../../backend/test.jpg");
+  const singleFacePath = path.join(__dirname, "../../ai-service/tests/single_face.jpg");
+  const multiFacePath = path.join(__dirname, "../../ai-service/tests/multi_face.jpg");
 
   // Inspect database face embeddings
   const dbEmbeddings = await prisma.faceEmbedding.findMany({
@@ -65,7 +65,7 @@ async function runMilestone6Tests() {
         `,
         testPerson.id,
         vectorLiteral,
-        aiResult.model || "Buffalo_L",
+        aiResult.model || "buffalo_s",
         "https://ik.imagekit.io/intelliguard_demo/single_face.jpg",
         aiResult.qualityScore
       );
