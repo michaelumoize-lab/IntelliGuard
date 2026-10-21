@@ -82,6 +82,16 @@ async function runPhase2RemediationTests() {
   const unknownVec = makeUnitVector(510, 511, 0.2);
 
   try {
+    // Clean up any stale test records from previously interrupted runs
+    await prisma.person.deleteMany({
+      where: {
+        OR: [
+          { personCode: { startsWith: "P2-" } },
+          { firstName: { in: ["PhaseTwo", "Concurrent"] } },
+        ],
+      },
+    }).catch(() => {});
+
     // Mock Admin Session for API route tests
     (auth.api as unknown as { getSession: typeof auth.api.getSession }).getSession = (async () => ({
       user: { id: "admin-phase2-test", email: "admin@intelliguard.local", name: "Phase2 Admin", role: "ADMIN" },
@@ -792,13 +802,41 @@ async function runPhase2RemediationTests() {
     ImageKit.prototype.upload = originalIkUpload;
     ImageKit.prototype.deleteFile = originalIkDeleteFile;
 
-    // Clean up ONLY test records created during this test run
-    if (createdPersonIds.length > 0) {
-      await prisma.alert.deleteMany({ where: { personId: { in: createdPersonIds } } }).catch(() => {});
-      await prisma.accessLog.deleteMany({ where: { personId: { in: createdPersonIds } } }).catch(() => {});
-      await prisma.faceEmbedding.deleteMany({ where: { personId: { in: createdPersonIds } } }).catch(() => {});
-      await prisma.person.deleteMany({ where: { id: { in: createdPersonIds } } }).catch(() => {});
-    }
+    // Clean up test records created during this test run
+    await prisma.alert.deleteMany({
+      where: {
+        OR: [
+          { personId: { in: createdPersonIds } },
+          { person: { personCode: { startsWith: "P2-" } } },
+        ],
+      },
+    }).catch(() => {});
+    await prisma.accessLog.deleteMany({
+      where: {
+        OR: [
+          { personId: { in: createdPersonIds } },
+          { person: { personCode: { startsWith: "P2-" } } },
+        ],
+      },
+    }).catch(() => {});
+    await prisma.faceEmbedding.deleteMany({
+      where: {
+        OR: [
+          { personId: { in: createdPersonIds } },
+          { person: { personCode: { startsWith: "P2-" } } },
+          { person: { firstName: { in: ["PhaseTwo", "Concurrent"] } } },
+        ],
+      },
+    }).catch(() => {});
+    await prisma.person.deleteMany({
+      where: {
+        OR: [
+          { id: { in: createdPersonIds } },
+          { personCode: { startsWith: "P2-" } },
+          { firstName: { in: ["PhaseTwo", "Concurrent"] } },
+        ],
+      },
+    }).catch(() => {});
 
     // Also clean up any unlinked test logs/alerts created for ambiguous/unknown scans during this test run
     await prisma.alert

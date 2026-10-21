@@ -124,7 +124,7 @@ export default async function PersonDetailsPage({
               <div className="space-y-2 text-xs bg-muted/40 p-3.5 rounded-lg border border-border">
                 <div className="flex justify-between items-center py-1 border-b border-border/50">
                   <span className="text-muted-foreground">Embedding Model</span>
-                  <span className="font-semibold text-foreground">{activeEmbedding.embeddingModel || "Buffalo_L"}</span>
+                  <span className="font-semibold text-foreground">{activeEmbedding.embeddingModel || "buffalo_s"}</span>
                 </div>
 
                 <div className="flex justify-between items-center py-1 border-b border-border/50">

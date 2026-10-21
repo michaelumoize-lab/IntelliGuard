@@ -11,7 +11,7 @@ async function runMilestone7IntegrationTests() {
   console.log("  Milestone 7: Access Control Integration Tests");
   console.log("==================================================\n");
 
-  const singleFacePath = path.join(__dirname, "../../backend/tests/single_face.jpg");
+  const singleFacePath = path.join(__dirname, "../../ai-service/tests/single_face.jpg");
 
   if (!fs.existsSync(singleFacePath)) {
     console.error("❌ Test image single_face.jpg not found at:", singleFacePath);
