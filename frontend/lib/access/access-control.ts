@@ -9,8 +9,6 @@ export interface RecognitionInput {
     | "known_individual"
     | "unknown_individual"
     | "ambiguous_match"
-    | "spoof_detected"
-    | "liveness_inconclusive"
     | "recognition_error";
   matchStatus?: "matched" | "unknown" | "ambiguous" | "rejected" | null;
   person?: {
@@ -33,8 +31,6 @@ export interface AccessDecisionResult {
     | "face_match"
     | "face_no_match"
     | "unauthorized"
-    | "spoof_detected"
-    | "liveness_failed"
     | "no_person_detected"
     | "no_face_detected"
     | "poor_quality_face"
@@ -96,24 +92,6 @@ export function evaluateAccess(input: RecognitionInput): AccessDecisionResult {
         accessStatus: "denied",
         reason: "poor_quality_face",
         doorAction: "no_action",
-      };
-    }
-
-    // Rule 0D: Presentation Attack (Spoof) Detected
-    if (input.status === "spoof_detected") {
-      return {
-        accessStatus: "denied",
-        reason: "spoof_detected",
-        doorAction: "lock",
-      };
-    }
-
-    // Rule 0E: Liveness Inconclusive (Fail Closed)
-    if (input.status === "liveness_inconclusive") {
-      return {
-        accessStatus: "denied",
-        reason: "liveness_failed",
-        doorAction: "lock",
       };
     }
 

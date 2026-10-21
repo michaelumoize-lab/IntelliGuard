@@ -377,138 +377,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Handle Biometric Presentation Attack (Spoofing Attempt) strictly BEFORE identity matching
-    if (aiResult.status === "spoof_detected") {
-      try {
-        await prisma.accessLog.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            personId: null,
-            embeddingId: null,
-            matchStatus: "rejected",
-            accessStatus: "denied",
-            reason: "spoof_detected",
-            doorAction: "lock",
-            confidenceScore: null,
-            processingTimeMs,
-          },
-        });
-      } catch (logErr: unknown) {
-        console.error("Failed to record spoof_detected AccessLog:", logErr);
-      }
-
-      try {
-        await prisma.alert.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            alertType: "unauthorized_access",
-            title: "Biometric Spoof Attempt Blocked",
-            message: `Presentation attack detected at terminal. MiniFASNet real-face confidence: ${
-              aiResult.livenessScore !== null && aiResult.livenessScore !== undefined
-                ? (aiResult.livenessScore * 100).toFixed(1) + "%"
-                : "N/A"
-            }. Access denied immediately.`,
-            severity: "critical",
-          },
-        });
-      } catch (alertErr: unknown) {
-        console.error("Failed to record spoof_detected Alert:", alertErr);
-      }
-
-      return NextResponse.json({
-        success: true,
-        status: "spoof_detected",
-        person_detected: true,
-        face_detected: true,
-        access_status: "denied",
-        reason: "spoof_detected",
-        door_action: "lock",
-        match_status: "rejected",
-        liveness_status: aiResult.livenessStatus ?? "spoof",
-        liveness_score: aiResult.livenessScore ?? null,
-        liveness_time_ms: aiResult.livenessTimeMs ?? null,
-        message: "Presentation attack / spoof detected. Access denied and security alert logged.",
-        person: null,
-        face: {
-          similarity: 0,
-          distance: 1,
-          quality_score: aiResult.qualityScore,
-          model: aiResult.model,
-        },
-        person_bbox: aiResult.primaryPersonBbox || null,
-        face_bbox: aiResult.primaryFaceBbox || null,
-        image_width: aiResult.imageWidth,
-        image_height: aiResult.imageHeight,
-        persons: aiResult.persons,
-        faces: aiResult.faces,
-        device: deviceAuth.device
-          ? {
-              id: deviceAuth.device.id,
-              serial_number: deviceAuth.device.serialNumber,
-              device_name: deviceAuth.device.deviceName,
-            }
-          : null,
-        processing_time_ms: processingTimeMs,
-      });
-    }
-
-    // Handle Inconclusive / Failed Liveness Verification strictly BEFORE identity matching (Fail-Safe)
-    if (aiResult.status === "liveness_inconclusive") {
-      try {
-        await prisma.accessLog.create({
-          data: {
-            deviceId: deviceAuth.device?.id || null,
-            personId: null,
-            embeddingId: null,
-            matchStatus: "rejected",
-            accessStatus: "denied",
-            reason: "system_error",
-            doorAction: "lock",
-            confidenceScore: null,
-            processingTimeMs,
-          },
-        });
-      } catch (logErr: unknown) {
-        console.error("Failed to record liveness_inconclusive AccessLog:", logErr);
-      }
-
-      return NextResponse.json({
-        success: false,
-        status: "liveness_inconclusive",
-        person_detected: true,
-        face_detected: true,
-        access_status: "denied",
-        reason: "liveness_failed",
-        door_action: "lock",
-        match_status: "rejected",
-        liveness_status: aiResult.livenessStatus ?? "inconclusive",
-        liveness_score: aiResult.livenessScore ?? null,
-        liveness_time_ms: aiResult.livenessTimeMs ?? null,
-        message: aiResult.message || "Facial liveness verification inconclusive. Access denied for security.",
-        person: null,
-        face: {
-          similarity: 0,
-          distance: 1,
-          quality_score: aiResult.qualityScore,
-          model: aiResult.model,
-        },
-        person_bbox: aiResult.primaryPersonBbox || null,
-        face_bbox: aiResult.primaryFaceBbox || null,
-        image_width: aiResult.imageWidth,
-        image_height: aiResult.imageHeight,
-        persons: aiResult.persons,
-        faces: aiResult.faces,
-        device: deviceAuth.device
-          ? {
-              id: deviceAuth.device.id,
-              serial_number: deviceAuth.device.serialNumber,
-              device_name: deviceAuth.device.deviceName,
-            }
-          : null,
-        processing_time_ms: processingTimeMs,
-      });
-    }
-
     if (aiResult.status === "recognition_error") {
       try {
         await prisma.accessLog.create({
@@ -534,9 +402,6 @@ export async function POST(req: NextRequest) {
         reason: "system_error",
         door_action: "lock",
         match_status: "rejected",
-        liveness_status: aiResult.livenessStatus ?? null,
-        liveness_score: aiResult.livenessScore ?? null,
-        liveness_time_ms: aiResult.livenessTimeMs ?? null,
         message: aiResult.message || "Biometric recognition error encountered. Please check camera feed or try again.",
         person: null,
         face: {
@@ -572,9 +437,6 @@ export async function POST(req: NextRequest) {
         reason: "poor_quality_face",
         door_action: "no_action",
         match_status: null,
-        liveness_status: aiResult.livenessStatus ?? null,
-        liveness_score: aiResult.livenessScore ?? null,
-        liveness_time_ms: aiResult.livenessTimeMs ?? null,
         message:
           aiResult.message ||
           "Face detected with low quality or obstruction. Please face the camera directly in good lighting.",
@@ -648,9 +510,6 @@ export async function POST(req: NextRequest) {
                 device_name: deviceAuth.device.deviceName,
               }
             : null,
-          liveness_status: aiResult.livenessStatus ?? null,
-          liveness_score: aiResult.livenessScore ?? null,
-          liveness_time_ms: aiResult.livenessTimeMs ?? null,
           error: "INVALID_AI_RESPONSE",
           message: "Processing failed: AI service returned an incomplete or malformed facial embedding.",
           processing_time_ms: processingTimeMs,
@@ -717,9 +576,6 @@ export async function POST(req: NextRequest) {
                 device_name: deviceAuth.device.deviceName,
               }
             : null,
-          liveness_status: aiResult.livenessStatus ?? null,
-          liveness_score: aiResult.livenessScore ?? null,
-          liveness_time_ms: aiResult.livenessTimeMs ?? null,
           error: "DATABASE_ERROR",
           message: "Verification error: database or vector similarity search failed.",
           processing_time_ms: errTimeMs,
@@ -891,9 +747,6 @@ export async function POST(req: NextRequest) {
           }
         : null,
       candidates: recognition.candidates,
-      liveness_status: aiResult.livenessStatus ?? "live",
-      liveness_score: aiResult.livenessScore ?? null,
-      liveness_time_ms: aiResult.livenessTimeMs ?? null,
       processing_time_ms: processingTimeMs,
     });
   } catch (error: unknown) {

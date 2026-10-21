@@ -248,7 +248,6 @@ export default function WebcamSimulationPage() {
         if (response.access_status === "granted") {
           playBiometricSound("granted");
         } else if (
-          response.status === "spoof_detected" ||
           response.status === "unknown_individual" ||
           response.status === "ambiguous_match" ||
           response.match_status === "unknown" ||
@@ -267,10 +266,6 @@ export default function WebcamSimulationPage() {
       let overlayStatus: CameraOverlayResult["status"] = "denied";
       if (isTechnicalError) {
         overlayStatus = "error";
-      } else if (response.status === "spoof_detected") {
-        overlayStatus = "spoof_detected";
-      } else if (response.status === "liveness_inconclusive") {
-        overlayStatus = "liveness_inconclusive";
       } else if (response.status === "no_person") {
         overlayStatus = "no_person";
       } else if (response.status === "person_no_face") {
@@ -295,7 +290,6 @@ export default function WebcamSimulationPage() {
         status: overlayStatus,
         name: isDeactivated ? `${personName || "User"} (${unauthorizedStatusTag})` : personName,
         similarity: response.face?.similarity,
-        liveness_score: response.liveness_score ?? undefined,
         message: response.message,
       });
 
@@ -334,12 +328,6 @@ export default function WebcamSimulationPage() {
       if (isTechnicalError) {
         historyName = "Recognition Error";
         historyMatchStatus = "error";
-      } else if (response.status === "spoof_detected") {
-        historyName = "Presentation Attack (Spoof)";
-        historyMatchStatus = "spoof_detected";
-      } else if (response.status === "liveness_inconclusive") {
-        historyName = "Liveness Inconclusive";
-        historyMatchStatus = "liveness_inconclusive";
       } else if (isDeactivated) {
         historyName = `${personName} (User is ${unauthorizedStatusTag.toLowerCase()})`;
         historyMatchStatus = "deactivated";

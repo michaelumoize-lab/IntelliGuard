@@ -165,49 +165,19 @@ function runAccessControlUnitTests() {
     process.exitCode = 1;
   }
 
-  // Test 11: Presentation Attack (Spoof) Detected -> Lock & Deny
-  console.log("\n[Test 11] Presentation Attack (Spoof) Detected...");
+  // Test 11: Explicit status="ambiguous_match" -> Lock & Deny with insufficient_confidence
+  console.log("\n[Test 11] Explicit status='ambiguous_match'...");
   const res11 = evaluateAccess({
-    status: "spoof_detected",
-    similarity: 0.95, // Even if similarity was high, liveness overrides it
-    distance: 0.05,
-    person: mockPerson,
-  });
-  if (res11.accessStatus === "denied" && res11.reason === "spoof_detected" && res11.doorAction === "lock") {
-    console.log("✅ PASSED: Spoof detected correctly locked door and denied access regardless of face match.");
-  } else {
-    console.error("❌ FAILED: Unexpected decision for spoof presentation attack:", res11);
-    process.exitCode = 1;
-  }
-
-  // Test 12: Liveness Check Inconclusive -> Fail Closed (Lock & Deny)
-  console.log("\n[Test 12] Liveness Check Inconclusive...");
-  const res12 = evaluateAccess({
-    status: "liveness_inconclusive",
-    similarity: 0.88,
-    distance: 0.12,
-    person: mockPerson,
-  });
-  if (res12.accessStatus === "denied" && res12.reason === "liveness_failed" && res12.doorAction === "lock") {
-    console.log("✅ PASSED: Inconclusive liveness correctly failed closed with lock.");
-  } else {
-    console.error("❌ FAILED: Unexpected decision for inconclusive liveness:", res12);
-    process.exitCode = 1;
-  }
-
-  // Test 13: Explicit status="ambiguous_match" -> Lock & Deny with insufficient_confidence
-  console.log("\n[Test 13] Explicit status='ambiguous_match'...");
-  const res13 = evaluateAccess({
     status: "ambiguous_match",
     matchStatus: "ambiguous",
     person: null,
     similarity: 0.62,
     distance: 0.38,
   });
-  if (res13.accessStatus === "denied" && res13.reason === "insufficient_confidence" && res13.doorAction === "lock") {
+  if (res11.accessStatus === "denied" && res11.reason === "insufficient_confidence" && res11.doorAction === "lock") {
     console.log("✅ PASSED: Explicit status='ambiguous_match' denied with insufficient_confidence & lock.");
   } else {
-    console.error("❌ FAILED: Unexpected decision for status='ambiguous_match':", res13);
+    console.error("❌ FAILED: Unexpected decision for status='ambiguous_match':", res11);
     process.exitCode = 1;
   }
 

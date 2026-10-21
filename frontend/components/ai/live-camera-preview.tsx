@@ -30,8 +30,6 @@ export interface CameraOverlayResult {
     | "ambiguous"
     | "unknown"
     | "deactivated"
-    | "spoof_detected"
-    | "liveness_inconclusive"
     | "no_person"
     | "person_no_face"
     | "face_low_quality"
@@ -39,7 +37,6 @@ export interface CameraOverlayResult {
     | "error";
   name?: string;
   similarity?: number;
-  liveness_score?: number | null;
   message?: string;
 }
 
@@ -154,9 +151,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       if (overlayResult?.status === "granted") {
         return "border-emerald-400 shadow-[0_0_12px_#10b981]";
       }
-      if (overlayResult?.status === "spoof_detected") {
-        return "border-rose-500 shadow-[0_0_16px_#f43f5e]";
-      }
       if (
         overlayResult?.status === "denied" ||
         overlayResult?.status === "deactivated" ||
@@ -167,8 +161,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       }
       if (
         overlayResult?.status === "ambiguous" ||
-        overlayResult?.status === "face_low_quality" ||
-        overlayResult?.status === "liveness_inconclusive"
+        overlayResult?.status === "face_low_quality"
       ) {
         return "border-amber-400 shadow-[0_0_12px_#f59e0b]";
       }
@@ -365,11 +358,9 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   className={`px-3 py-1.5 rounded-full border bg-black/90 backdrop-blur-xl text-xs shadow-2xl flex items-center gap-2 transition-all animate-in fade-in zoom-in-95 duration-200 select-none max-w-[calc(100%-48px)] sm:max-w-none ${
                     overlayResult.status === "granted"
                       ? "border-emerald-400/90 shadow-[0_0_16px_rgba(16,185,129,0.4)]"
-                      : overlayResult.status === "spoof_detected"
-                      ? "border-rose-500/90 shadow-[0_0_20px_rgba(244,63,94,0.6)]"
                       : overlayResult.status === "deactivated"
                       ? "border-destructive/90 shadow-[0_0_16px_rgba(239,68,68,0.4)]"
-                      : overlayResult.status === "ambiguous" || overlayResult.status === "face_low_quality" || overlayResult.status === "liveness_inconclusive"
+                      : overlayResult.status === "ambiguous" || overlayResult.status === "face_low_quality"
                       ? "border-amber-400/90 shadow-[0_0_16px_rgba(245,158,11,0.4)]"
                       : overlayResult.status === "person_no_face"
                       ? "border-cyan-400/90 shadow-[0_0_16px_rgba(34,211,238,0.4)]"
@@ -387,16 +378,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider border border-emerald-500/40 shrink-0">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                       <span>GRANTED</span>
-                    </span>
-                  ) : overlayResult.status === "spoof_detected" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-bold text-[10px] uppercase tracking-wider border border-rose-500/40 shrink-0 animate-pulse">
-                      <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-                      <span>SPOOF DETECTED</span>
-                    </span>
-                  ) : overlayResult.status === "liveness_inconclusive" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] uppercase tracking-wider border border-amber-400/40 shrink-0">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                      <span>INCONCLUSIVE</span>
                     </span>
                   ) : overlayResult.status === "deactivated" ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
@@ -449,10 +430,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   <span className="font-bold text-white text-xs tracking-wide truncate max-w-[110px] sm:max-w-xs drop-shadow-sm">
                     {overlayResult.status === "granted"
                       ? overlayResult.name || "Access Allowed"
-                      : overlayResult.status === "spoof_detected"
-                      ? "Presentation Attack Blocked"
-                      : overlayResult.status === "liveness_inconclusive"
-                      ? "Liveness Inconclusive"
                       : overlayResult.status === "deactivated"
                       ? overlayResult.name || "User Deactivated"
                       : overlayResult.status === "ambiguous"
@@ -523,10 +500,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                       ? "border-cyan-400 bg-cyan-500/5 shadow-[0_0_20px_rgba(34,211,238,0.25)] scale-[1.01]"
                       : overlayResult?.status === "granted"
                       ? "border-emerald-400/90 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-                      : overlayResult?.status === "spoof_detected"
-                      ? "border-rose-500 bg-rose-500/10 shadow-[0_0_25px_rgba(244,63,94,0.4)]"
-                      : overlayResult?.status === "liveness_inconclusive"
-                      ? "border-amber-400 bg-amber-500/10 shadow-[0_0_20px_rgba(245,158,11,0.3)]"
                       : overlayResult?.status === "denied" || overlayResult?.status === "deactivated" || overlayResult?.status === "unknown"
                       ? "border-destructive/90 bg-destructive/5 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
                       : overlayResult?.status === "person_no_face"
@@ -549,10 +522,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                       className={`w-1.5 h-1.5 rounded-full ${
                         overlayResult?.status === "granted"
                           ? "bg-emerald-400 shadow-[0_0_6px_#10b981]"
-                          : overlayResult?.status === "spoof_detected"
-                          ? "bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse"
-                          : overlayResult?.status === "liveness_inconclusive"
-                          ? "bg-amber-400 shadow-[0_0_6px_#f59e0b]"
                           : overlayResult?.status === "unknown" || overlayResult?.status === "denied"
                           ? "bg-rose-400 shadow-[0_0_6px_#f43f5e]"
                           : overlayResult?.status === "face_low_quality" || overlayResult?.status === "ambiguous"
@@ -567,10 +536,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                     <span>
                       {isScanning || overlayResult?.status === "processing"
                         ? "SCANNING BIOMETRICS..."
-                        : overlayResult?.status === "spoof_detected"
-                        ? "PRESENTATION ATTACK DETECTED"
-                        : overlayResult?.status === "liveness_inconclusive"
-                        ? "LIVENESS INCONCLUSIVE"
                         : overlayResult?.status === "deactivated"
                         ? "USER DEACTIVATED"
                         : overlayResult?.status === "granted"
