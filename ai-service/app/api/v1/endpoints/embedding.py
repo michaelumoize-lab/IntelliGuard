@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.embedding import FaceEmbeddingResponse, Base64EmbeddingRequest
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
-from app.core.quality import calculate_face_quality_score
+from app.core.quality import calculate_face_quality_score, validate_registration_quality
 from app.core.insightface import inference_semaphore
 
 router = APIRouter()
@@ -73,11 +73,16 @@ def _extract_512d_embedding(img: np.ndarray, face_app) -> tuple[List[float], flo
     normalized_vec = raw_embedding / l2_norm
     embedding_list = [round(float(v), 6) for v in normalized_vec]
 
-    # 5. Quality evaluation & detection confidence
-    quality_score = calculate_face_quality_score(img, face)
-    detection_confidence = round(float(face.det_score), 4) if hasattr(face, "det_score") else 0.0
+    # 5. Quality evaluation & detection confidence with strict registration validation
+    is_valid, rejection_reason, assessment = validate_registration_quality(img, face)
+    if not is_valid:
+        logger.warning(f"Registration embedding rejected due to poor quality: {rejection_reason}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Face image does not meet enrollment quality requirements: {rejection_reason}",
+        )
 
-    return embedding_list, quality_score, detection_confidence
+    return embedding_list, assessment.quality_score, assessment.detection_confidence
 
 
 @router.post(
