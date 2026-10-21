@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -12,16 +12,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
   Zap,
   User,
-  ShieldCheck,
-  ShieldAlert,
-  Clock,
   Layers,
-  ArrowRight,
 } from "lucide-react";
 import { AccessScanResponse } from "@/lib/access/access-client";
 
@@ -49,31 +42,31 @@ export function VectorInspectorModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl bg-card border-border p-6 shadow-xl space-y-4">
-        <DialogHeader className="pb-3 border-b border-border/70">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
-              <Zap className="w-4 h-4 text-primary" /> Biometric Vector Similarity Breakdown
+      <DialogContent className="sm:max-w-xl md:max-w-2xl max-h-[88vh] overflow-y-auto bg-card border-border p-4 sm:p-6 shadow-2xl space-y-4">
+        <DialogHeader className="pb-3 border-b border-border/70 pr-8">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <DialogTitle className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary shrink-0" /> Biometric Vector Similarity Breakdown
             </DialogTitle>
             <Badge
               variant={isMatch ? "default" : "destructive"}
-              className="text-xs uppercase font-mono px-2.5 py-0.5"
+              className="text-xs uppercase font-mono px-2.5 py-0.5 shrink-0"
             >
               {isMatch ? "Confidence: High" : "Confidence: Sub-threshold"}
             </Badge>
           </div>
-          <DialogDescription className="text-xs text-muted-foreground">
+          <DialogDescription className="text-xs text-muted-foreground mt-1">
             Exact cosine similarity calculation between the live optical capture and enrolled database vector.
           </DialogDescription>
         </DialogHeader>
 
         {/* Visual Comparison: Live Capture vs Enrolled Face */}
-        <div className="grid grid-cols-2 gap-4 p-4 rounded-xl border border-border/80 bg-muted/20">
-          <div className="flex flex-col items-center text-center space-y-2">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border/80 bg-muted/20">
+          <div className="flex flex-col items-center text-center space-y-1.5 sm:space-y-2">
             <span className="text-[10px] font-mono font-semibold uppercase text-muted-foreground">
               Live Probe Frame
             </span>
-            <div className="w-24 h-24 rounded-xl bg-black border border-border overflow-hidden flex items-center justify-center shadow-inner">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-black border border-border overflow-hidden flex items-center justify-center shadow-inner">
               {capturedImageUrl ? (
                 <Image
                   src={capturedImageUrl}
@@ -92,11 +85,11 @@ export function VectorInspectorModal({
             </span>
           </div>
 
-          <div className="flex flex-col items-center text-center space-y-2">
+          <div className="flex flex-col items-center text-center space-y-1.5 sm:space-y-2">
             <span className="text-[10px] font-mono font-semibold uppercase text-muted-foreground">
               Enrolled Template
             </span>
-            <div className="w-24 h-24 rounded-xl bg-muted border border-border overflow-hidden flex items-center justify-center shadow-inner">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-muted border border-border overflow-hidden flex items-center justify-center shadow-inner">
               {result.person?.face_image_url ? (
                 <Image
                   src={result.person.face_image_url}
@@ -110,14 +103,14 @@ export function VectorInspectorModal({
                 <User className="w-8 h-8 text-muted-foreground" />
               )}
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground">
+            <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[140px]">
               {result.person ? `${result.person.first_name} ${result.person.last_name}` : "No Profile"}
             </span>
           </div>
         </div>
 
         {/* Vector Metric Gauge */}
-        <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3">
+        <div className="p-3.5 sm:p-4 rounded-xl border border-border/80 bg-card space-y-2.5 sm:space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-foreground flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-primary" /> Cosine Similarity Score
@@ -144,34 +137,34 @@ export function VectorInspectorModal({
 
           <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
             <span>0.00 (Orthogonal)</span>
-            <span className="text-foreground font-semibold">Decision Threshold: 0.50</span>
+            <span className="text-foreground font-semibold">Threshold: 0.50</span>
             <span>1.00 (Identical)</span>
           </div>
         </div>
 
         {/* Detailed Metrics Table */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
-          <div className="p-2.5 rounded-lg border border-border bg-muted/30">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 text-xs font-mono">
+          <div className="p-2 sm:p-2.5 rounded-lg border border-border bg-muted/30">
             <span className="text-[10px] text-muted-foreground uppercase block mb-0.5">Cosine Distance</span>
             <span className="font-bold text-foreground">{distance.toFixed(4)}</span>
           </div>
-          <div className="p-2.5 rounded-lg border border-border bg-muted/30">
+          <div className="p-2 sm:p-2.5 rounded-lg border border-border bg-muted/30">
             <span className="text-[10px] text-muted-foreground uppercase block mb-0.5">Confidence Margin</span>
             <span className={`font-bold ${confidenceMargin >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
               {confidenceMargin >= 0 ? `+${(confidenceMargin * 100).toFixed(1)}%` : `${(confidenceMargin * 100).toFixed(1)}%`}
             </span>
           </div>
-          <div className="p-2.5 rounded-lg border border-border bg-muted/30">
+          <div className="p-2 sm:p-2.5 rounded-lg border border-border bg-muted/30">
             <span className="text-[10px] text-muted-foreground uppercase block mb-0.5">Vector Dimension</span>
             <span className="font-bold text-foreground">512 Floats</span>
           </div>
-          <div className="p-2.5 rounded-lg border border-border bg-muted/30">
+          <div className="p-2 sm:p-2.5 rounded-lg border border-border bg-muted/30">
             <span className="text-[10px] text-muted-foreground uppercase block mb-0.5">Neural Model</span>
             <span className="font-bold text-foreground truncate block">{result.face?.model || "Buffalo_S"}</span>
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end pt-1">
           <Button size="sm" variant="outline" onClick={onClose}>
             Close Inspector
           </Button>
