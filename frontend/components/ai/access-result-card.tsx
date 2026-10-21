@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { AccessScanResponse } from "@/lib/access/access-client";
+import { VectorInspectorModal } from "@/components/ai/vector-inspector-modal";
 import {
   CheckCircle2,
   XCircle,
@@ -30,6 +31,8 @@ interface AccessResultCardProps {
 }
 
 export function AccessResultCard({ result, isLoading, capturedImageUrl }: AccessResultCardProps) {
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+
   if (isLoading) {
     return (
       <div className="w-full bg-card/90 backdrop-blur-md border border-border/80 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col items-center justify-center min-h-[380px] animate-pulse">
@@ -378,7 +381,15 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
               <span className="text-muted-foreground font-medium flex items-center gap-1">
                 <Zap className="w-3.5 h-3.5 text-primary" /> Cosine Similarity
               </span>
-              <span className="font-mono font-bold text-foreground">{similarityPct}</span>
+              <button
+                type="button"
+                onClick={() => setIsInspectorOpen(true)}
+                className="font-mono font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1 cursor-pointer underline decoration-dotted"
+                title="Click to inspect vector breakdown"
+              >
+                <span>{similarityPct}</span>
+                <span className="text-[10px] text-primary">(Inspect)</span>
+              </button>
             </div>
             <div className="relative w-full h-2.5 bg-muted rounded-full overflow-hidden flex">
               {/* 0.50 Threshold Marker */}
@@ -459,6 +470,14 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
           </div>
         )}
       </div>
+
+      {/* Vector Similarity Inspector Modal */}
+      <VectorInspectorModal
+        isOpen={isInspectorOpen}
+        onClose={() => setIsInspectorOpen(false)}
+        result={result}
+        capturedImageUrl={capturedImageUrl}
+      />
     </div>
   );
 }

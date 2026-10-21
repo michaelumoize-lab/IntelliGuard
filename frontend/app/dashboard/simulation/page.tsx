@@ -10,6 +10,7 @@ import {
 } from "@/components/ai/live-camera-preview";
 import { AccessResultCard } from "@/components/ai/access-result-card";
 import { LiveScanControls } from "@/components/ai/live-scan-controls";
+import { HardwareTerminalHUD } from "@/components/ai/hardware-terminal-hud";
 import { scanFace, AccessScanResponse } from "@/lib/access/access-client";
 import { playBiometricSound } from "@/lib/audio";
 import {
@@ -597,11 +598,19 @@ export default function WebcamSimulationPage() {
         </div>
 
         {/* Right Column: Access Decision Result Card with Side-by-Side Verification (7 cols on lg) */}
-        <div className="lg:col-span-7 h-full">
+        <div className="lg:col-span-7 space-y-4">
           <AccessResultCard
             result={latestResult}
             isLoading={isScanning && !latestResult}
             capturedImageUrl={capturedImageUrl}
+          />
+
+          {/* Simulated Physical Hardware Terminal HUD (OLED & RGB LED) */}
+          <HardwareTerminalHUD
+            result={latestResult}
+            isScanning={isScanning}
+            isMonitoring={isMonitoring}
+            soundEnabled={soundEnabled}
           />
         </div>
       </div>

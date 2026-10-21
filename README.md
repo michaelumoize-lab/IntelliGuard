@@ -141,7 +141,7 @@ FastAPI is **not the main application backend** and is not responsible for the a
 
 InsightFace is the primary facial-recognition framework.
 
-The current development environment uses the **Buffalo_L** model.
+The current environment uses the **Buffalo_S** model (`buffalo_s`) for high-throughput edge-compatible inference.
 
 InsightFace is responsible for:
 
@@ -244,11 +244,6 @@ The database stores:
 
 - MB-102 Breadboard
 - Jumper Wires
-
-### Planned Access-Control Hardware
-
-- Relay module
-- Suitable low-voltage electronic lock/actuator
 
 ---
 
@@ -926,7 +921,7 @@ This provides an opportunity to evaluate power consumption and IoT efficiency.
 
 # Access-Control Hardware
 
-The final physical prototype may include a relay-controlled access mechanism.
+The final physical prototype includes feedback via OLED, RGB LED, and active buzzer.
 
 Example:
 
@@ -940,7 +935,7 @@ Access Granted
 ESP32 GPIO
       │
       ▼
-Relay
+OLED / RGB LED / Buzzer Feedback
       │
       ▼
 Electronic Lock
@@ -1116,7 +1111,7 @@ This provides an additional database and systems-engineering component to the pr
 
 ## Phase 8 — Access-Control Integration
 
-- [ ] Relay module
+- [ ] Physical peripheral breadboard assembly
 - [ ] Demonstration lock/actuator
 - [ ] Access-granted hardware response
 - [ ] Access-denied hardware response

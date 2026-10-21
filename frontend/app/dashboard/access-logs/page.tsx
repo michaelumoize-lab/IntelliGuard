@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma, AccessStatus, MatchStatus } from "@prisma/client";
 import { DataTableSearch } from "@/components/dashboard/data-table-search";
 import { DataTablePagination } from "@/components/dashboard/data-table-pagination";
+import { ExportLogsButton } from "@/components/dashboard/export-logs-button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -110,6 +111,23 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
           <p className="text-sm text-muted-foreground">
             Audit log history of all biometric recognition and access decision events.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ExportLogsButton
+            logs={logs.map((l) => ({
+              id: l.id,
+              createdAt: l.createdAt,
+              personName: l.person ? `${l.person.firstName} ${l.person.lastName}` : null,
+              personCode: l.person?.personCode || null,
+              accessStatus: l.accessStatus,
+              matchStatus: l.matchStatus,
+              reason: l.reason,
+              doorAction: l.doorAction,
+              confidenceScore: l.confidenceScore,
+              processingTimeMs: l.processingTimeMs,
+            }))}
+          />
         </div>
       </div>
 
