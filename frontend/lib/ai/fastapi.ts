@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { z } from "zod";
+
 export interface FastAPIEmbeddingResult {
   success: boolean;
   faceDetected: boolean;
@@ -12,11 +14,23 @@ export interface FastAPIEmbeddingResult {
 }
 
 export class FastAPIError extends Error {
-  code: "FASTAPI_UNAVAILABLE" | "NO_FACE_DETECTED" | "MULTIPLE_FACES" | "POOR_QUALITY" | "INVALID_IMAGE" | "AI_SERVICE_ERROR";
+  code:
+    | "FASTAPI_UNAVAILABLE"
+    | "NO_FACE_DETECTED"
+    | "MULTIPLE_FACES"
+    | "POOR_QUALITY"
+    | "INVALID_IMAGE"
+    | "AI_SERVICE_ERROR";
   statusCode: number;
 
   constructor(
-    code: "FASTAPI_UNAVAILABLE" | "NO_FACE_DETECTED" | "MULTIPLE_FACES" | "POOR_QUALITY" | "INVALID_IMAGE" | "AI_SERVICE_ERROR",
+    code:
+      | "FASTAPI_UNAVAILABLE"
+      | "NO_FACE_DETECTED"
+      | "MULTIPLE_FACES"
+      | "POOR_QUALITY"
+      | "INVALID_IMAGE"
+      | "AI_SERVICE_ERROR",
     message: string,
     statusCode: number = 400
   ) {
@@ -27,6 +41,80 @@ export class FastAPIError extends Error {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Strict Zod Runtime Validation Schemas for FastAPI Microservice Responses
+// ---------------------------------------------------------------------------
+
+export const faceEmbeddingVectorSchema = z
+  .array(z.number().finite())
+  .length(512, "Biometric embedding vector must contain exactly 512 dimensions");
+
+export const fastAPIEmbeddingResponseSchema = z.object({
+  success: z.boolean(),
+  face_detected: z.boolean(),
+  embedding: faceEmbeddingVectorSchema,
+  embedding_size: z.number().int().optional().default(512),
+  normalized: z.boolean().optional().default(true),
+  quality_score: z.number().finite().min(0.0).max(1.0),
+  detection_confidence: z.number().finite().min(0.0).max(1.0),
+  model: z.string().optional().default("buffalo_s"),
+  model_version: z.string().nullable().optional(),
+  execution_time_ms: z.number().finite().nonnegative().default(0),
+});
+
+export const fastAPIDetectedFaceSchema = z.object({
+  bbox: z.array(z.number().finite()).default([]),
+  confidence: z.number().finite().default(0),
+  landmarks: z.array(z.array(z.number().finite())).optional(),
+});
+
+export const fastAPIDetectedPersonSchema = z.object({
+  bbox: z.array(z.number().finite()).default([]),
+  confidence: z.number().finite().default(0),
+  is_primary: z.boolean().default(false),
+});
+
+export const fastAPIDetectionResponseSchema = z.object({
+  success: z.boolean(),
+  face_count: z.number().int().nonnegative().default(0),
+  faces: z.array(fastAPIDetectedFaceSchema).default([]),
+  execution_time_ms: z.number().finite().nonnegative().optional().default(0),
+});
+
+export const fastAPIAnalysisResponseSchema = z.object({
+  success: z.boolean(),
+  status: z.enum([
+    "no_person",
+    "person_no_face",
+    "face_low_quality",
+    "spoof_detected",
+    "liveness_inconclusive",
+    "face_detected_processing",
+    "known_individual",
+    "unknown_individual",
+    "recognition_error",
+  ]),
+  person_detected: z.boolean(),
+  face_detected: z.boolean(),
+  person_count: z.number().int().nonnegative().default(0),
+  face_count: z.number().int().nonnegative().default(0),
+  persons: z.array(fastAPIDetectedPersonSchema).default([]),
+  faces: z.array(fastAPIDetectedFaceSchema).default([]),
+  primary_person_bbox: z.array(z.number().finite()).length(4).nullable().optional(),
+  primary_face_bbox: z.array(z.number().finite()).length(4).nullable().optional(),
+  embedding: faceEmbeddingVectorSchema.nullable().optional(),
+  embedding_size: z.number().int().nullable().optional(),
+  quality_score: z.number().finite().min(0.0).max(1.0).nullable().optional(),
+  detection_confidence: z.number().finite().min(0.0).max(1.0).nullable().optional(),
+  model: z.string().optional().default("buffalo_s"),
+  image_width: z.number().int().positive().default(640),
+  image_height: z.number().int().positive().default(480),
+  message: z.string().optional(),
+  execution_time_ms: z.number().finite().nonnegative().default(0),
+  yolo_time_ms: z.number().finite().nonnegative().optional(),
+  insightface_time_ms: z.number().finite().nonnegative().optional(),
+});
+
 function getServiceHeaders(): Record<string, string> {
   const apiKey = (process.env.AI_SERVICE_API_KEY || process.env.FASTAPI_API_KEY || "").trim();
   return apiKey ? { "X-Service-Key": apiKey } : {};
@@ -34,13 +122,14 @@ function getServiceHeaders(): Record<string, string> {
 
 /**
  * Server-side client function to request 512D facial embedding generation from FastAPI AI microservice.
+ * Enforces strict runtime Zod response validation and biometric quality standards.
  */
 export async function generateEmbedding(
   imageBuffer: Buffer,
   filename: string = "face.jpg"
 ): Promise<FastAPIEmbeddingResult> {
   const baseUrl = process.env.FASTAPI_URL || "http://localhost:8000";
-  const minQualityThreshold = parseFloat(process.env.MIN_FACE_QUALITY || "0.70");
+  const minQualityThreshold = parseFloat(process.env.MIN_FACE_QUALITY || "0.50");
 
   const endpoint = `${baseUrl.replace(/\/$/, "")}/api/v1/embedding`;
 
@@ -90,6 +179,15 @@ export async function generateEmbedding(
       throw new FastAPIError("NO_FACE_DETECTED", errorDetail, 400);
     } else if (errorDetail.includes("Multiple faces detected") || errorDetail.includes("one face is required")) {
       throw new FastAPIError("MULTIPLE_FACES", errorDetail, 400);
+    } else if (
+      errorDetail.includes("enrollment quality") ||
+      errorDetail.includes("too dark") ||
+      errorDetail.includes("too blurry") ||
+      errorDetail.includes("angle is too extreme") ||
+      errorDetail.includes("partially cut off") ||
+      errorDetail.includes("quality is too low")
+    ) {
+      throw new FastAPIError("POOR_QUALITY", errorDetail, 400);
     } else if (response.status === 400) {
       throw new FastAPIError("INVALID_IMAGE", errorDetail, 400);
     } else {
@@ -97,21 +195,36 @@ export async function generateEmbedding(
     }
   }
 
-  const data = await response.json();
-
-  if (!data.embedding || !Array.isArray(data.embedding) || data.embedding.length !== 512) {
+  let rawData: unknown;
+  try {
+    rawData = await response.json();
+  } catch {
     throw new FastAPIError(
       "AI_SERVICE_ERROR",
-      `Invalid embedding dimension returned: expected 512, received ${data.embedding?.length}`,
-      500
+      "AI face processing service returned an unparseable response.",
+      502
     );
   }
 
-  const qualityScore = typeof data.quality_score === "number" ? data.quality_score : 0.0;
-  if (qualityScore < minQualityThreshold) {
+  const parseResult = fastAPIEmbeddingResponseSchema.safeParse(rawData);
+  if (!parseResult.success) {
+    const issueSummary = parseResult.error.issues
+      .map((i) => `${i.path.join(".") || "root"}: ${i.message}`)
+      .join("; ");
+    console.error("FastAPI generateEmbedding response validation failure:", issueSummary);
+    throw new FastAPIError(
+      "AI_SERVICE_ERROR",
+      `AI service response validation failed: ${issueSummary}`,
+      502
+    );
+  }
+
+  const data = parseResult.data;
+
+  if (data.quality_score < minQualityThreshold) {
     throw new FastAPIError(
       "POOR_QUALITY",
-      `Face image quality score is too low (${qualityScore.toFixed(2)} < required minimum ${minQualityThreshold.toFixed(2)}). Please upload a clearer, well-lit photo.`,
+      `Face image quality score is too low (${data.quality_score.toFixed(2)} < required minimum ${minQualityThreshold.toFixed(2)}). Please upload a clearer, well-lit photo.`,
       400
     );
   }
@@ -120,12 +233,12 @@ export async function generateEmbedding(
     success: true,
     faceDetected: true,
     embedding: data.embedding,
-    embeddingSize: data.embedding_size || 512,
-    normalized: data.normalized ?? true,
-    qualityScore,
-    detectionConfidence: data.detection_confidence || 0.0,
-    model: data.model || "buffalo_s",
-    executionTimeMs: data.execution_time_ms || 0.0,
+    embeddingSize: data.embedding_size,
+    normalized: data.normalized,
+    qualityScore: data.quality_score,
+    detectionConfidence: data.detection_confidence,
+    model: data.model,
+    executionTimeMs: data.execution_time_ms,
   };
 }
 
@@ -173,16 +286,22 @@ export async function detectFaces(
       throw new Error(`AI Detection responded with status ${response.status}: ${errText}`);
     }
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const parseResult = fastAPIDetectionResponseSchema.safeParse(rawData);
+    if (!parseResult.success) {
+      throw new Error("AI Detection response schema validation failed.");
+    }
+
+    const data = parseResult.data;
     return {
-      success: !!data.success,
-      faceCount: typeof data.face_count === "number" ? data.face_count : (data.faces || []).length,
-      faces: (data.faces || []).map((f: { bbox?: number[]; confidence?: number; landmarks?: number[][] }) => ({
-        bbox: f.bbox || [],
-        confidence: typeof f.confidence === "number" ? f.confidence : 0,
-        landmarks: f.landmarks || undefined,
+      success: data.success,
+      faceCount: data.face_count,
+      faces: data.faces.map((f) => ({
+        bbox: f.bbox,
+        confidence: f.confidence,
+        landmarks: f.landmarks,
       })),
-      executionTimeMs: data.execution_time_ms || 0,
+      executionTimeMs: data.execution_time_ms,
     };
   } catch (err: unknown) {
     console.error("FastAPI detectFaces error:", err);
@@ -232,6 +351,7 @@ export interface FastAPIAnalysisResult {
 /**
  * Server-side client function to request unified YOLO person detection,
  * InsightFace face detection, and embedding extraction from FastAPI.
+ * Enforces strict runtime Zod response validation.
  */
 export async function analyzeImage(
   imageBuffer: Buffer,
@@ -289,38 +409,61 @@ export async function analyzeImage(
     throw new FastAPIError("AI_SERVICE_ERROR", errorDetail, response.status);
   }
 
-  const data = await response.json();
+  let rawData: unknown;
+  try {
+    rawData = await response.json();
+  } catch {
+    throw new FastAPIError(
+      "AI_SERVICE_ERROR",
+      "AI computer vision service returned an unparseable response.",
+      502
+    );
+  }
+
+  const parseResult = fastAPIAnalysisResponseSchema.safeParse(rawData);
+  if (!parseResult.success) {
+    const issueSummary = parseResult.error.issues
+      .map((i) => `${i.path.join(".") || "root"}: ${i.message}`)
+      .join("; ");
+    console.error("FastAPI analyzeImage response validation failure:", issueSummary);
+    throw new FastAPIError(
+      "AI_SERVICE_ERROR",
+      `AI analysis response validation failed: ${issueSummary}`,
+      502
+    );
+  }
+
+  const data = parseResult.data;
 
   return {
-    success: !!data.success,
+    success: data.success,
     status: data.status,
-    personDetected: !!data.person_detected,
-    faceDetected: !!data.face_detected,
-    personCount: typeof data.person_count === "number" ? data.person_count : 0,
-    faceCount: typeof data.face_count === "number" ? data.face_count : 0,
-    persons: (data.persons || []).map((p: { bbox?: number[]; confidence?: number; is_primary?: boolean }) => ({
-      bbox: p.bbox || [],
-      confidence: typeof p.confidence === "number" ? p.confidence : 0,
-      is_primary: !!p.is_primary,
+    personDetected: data.person_detected,
+    faceDetected: data.face_detected,
+    personCount: data.person_count,
+    faceCount: data.face_count,
+    persons: data.persons.map((p) => ({
+      bbox: p.bbox,
+      confidence: p.confidence,
+      is_primary: p.is_primary,
     })),
-    faces: (data.faces || []).map((f: { bbox?: number[]; confidence?: number; landmarks?: number[][] }) => ({
-      bbox: f.bbox || [],
-      confidence: typeof f.confidence === "number" ? f.confidence : 0,
-      landmarks: f.landmarks || undefined,
+    faces: data.faces.map((f) => ({
+      bbox: f.bbox,
+      confidence: f.confidence,
+      landmarks: f.landmarks,
     })),
     primaryPersonBbox: data.primary_person_bbox || null,
     primaryFaceBbox: data.primary_face_bbox || null,
-    embedding: Array.isArray(data.embedding) ? data.embedding : null,
+    embedding: data.embedding || null,
     embeddingSize: data.embedding_size || (data.embedding ? data.embedding.length : null),
-    qualityScore: typeof data.quality_score === "number" ? data.quality_score : null,
-    detectionConfidence: typeof data.detection_confidence === "number" ? data.detection_confidence : null,
+    qualityScore: data.quality_score ?? null,
+    detectionConfidence: data.detection_confidence ?? null,
     model: data.model || "buffalo_s",
-    imageWidth: data.image_width || 640,
-    imageHeight: data.image_height || 480,
+    imageWidth: data.image_width,
+    imageHeight: data.image_height,
     message: data.message || undefined,
-    executionTimeMs: data.execution_time_ms || 0,
+    executionTimeMs: data.execution_time_ms,
     yoloTimeMs: data.yolo_time_ms || 0,
     insightfaceTimeMs: data.insightface_time_ms || 0,
   };
 }
-

@@ -12,7 +12,7 @@ from app.schemas.detection import (
     Base64DetectRequest,
 )
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
-from app.core.quality import calculate_face_quality_score
+from app.core.quality import calculate_face_quality_score, assess_face_quality
 from app.core.insightface import inference_semaphore
 
 router = APIRouter()
@@ -188,14 +188,21 @@ async def _execute_analysis(
     match_result = _match_primary_face(faces_raw, primary_person.bbox)
     primary_face_raw, primary_face_bbox = match_result if match_result else (faces_raw[0], detected_faces[0].bbox)
 
-    face_conf = round(float(primary_face_raw.det_score), 4) if hasattr(primary_face_raw, "det_score") else 0.0
-    quality_score = calculate_face_quality_score(img, primary_face_raw)
+    assessment = assess_face_quality(img, primary_face_raw)
+    face_conf = assessment.detection_confidence
+    quality_score = assessment.quality_score
 
-    # 3. State: Face Detected — Low Quality (Quality score < 0.50 or detection score < 0.50)
-    if face_conf < 0.50 or quality_score < 0.50:
+    # 3. State: Face Detected — Low Quality (Quality score < 0.45 or detection score < 0.45)
+    # Allows reasonable webcam variation while preventing blurred, dark, or profile images from entering pgvector matching
+    if face_conf < 0.45 or quality_score < 0.45 or assessment.is_blurry or assessment.is_underexposed:
         total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        guidance_msg = (
+            f"Face detected with low quality: {assessment.guidance}"
+            if assessment.guidance
+            else "Face detected with low quality or obstruction. Please face the camera directly in good lighting."
+        )
         logger.info(
-            f"Analysis complete: Low quality face detected (quality={quality_score}, det_score={face_conf})."
+            f"Analysis complete: Low quality face detected (quality={quality_score}, det_score={face_conf}, issues={assessment.issues})."
         )
         return UnifiedAnalysisResponse(
             success=True,
@@ -215,7 +222,7 @@ async def _execute_analysis(
             model=model_name,
             image_width=img_w,
             image_height=img_h,
-            message="Face detected with low quality or obstruction. Please face the camera directly in good lighting.",
+            message=guidance_msg,
             execution_time_ms=total_time_ms,
             yolo_time_ms=yolo_time_ms,
             insightface_time_ms=insightface_time_ms,
@@ -296,7 +303,6 @@ async def analyze_image_file(
     manager = getattr(request.app.state, "insightface_manager", None)
     face_app = getattr(request.app.state, "insightface_app", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
-    liveness = getattr(request.app.state, "liveness_detector", default_liveness_detector)
 
     if manager is None or not manager.is_loaded or face_app is None:
         raise HTTPException(
