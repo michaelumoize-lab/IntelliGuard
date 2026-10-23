@@ -240,7 +240,7 @@ When integrating the physical **ESP32-S3-CAM** unit, the device communicates wit
 | `denied` | `no_action` | No person detected in frame, no face in frame, or face quality below threshold. |
 
 ### Client Retry & Fail-Safe Directives
-- **Hardware Fail-Safe**: Relays and solenoids MUST remain normally open (locked). Any HTTP error (4xx, 5xx), connection drop, or timeout must default to `lock`.
+- **Hardware Fail-Safe**: Configure relay contacts by lock type: pulse normally-open contacts for strike locks and use normally-closed contacts for magnetic locks, as specified in `ROADMAP.md`. Any HTTP error (4xx, 5xx), connection drop, or timeout must default to `lock`. Document the magnetic lock's power-loss behavior and verify firmware polarity and relay wiring before deployment.
 - **Timeout**: Set HTTP request timeout on ESP32 to `5000ms`.
 - **Throttling**: ESP32 firmware should rate-limit scan triggers to at most once per `1000ms`.
 
