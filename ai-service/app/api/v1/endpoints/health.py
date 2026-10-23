@@ -15,11 +15,13 @@ async def get_health_status(request: Request, response: Response) -> HealthRespo
     # Prefer application state set during lifespan, fallback to manager instance
     manager = getattr(request.app.state, "insightface_manager", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
+    antispoof = getattr(request.app.state, "antispoof_manager", None)
     
     insightface_ready = manager is not None and manager.is_loaded
     yolo_ready = yolo is not None and yolo.is_loaded
+    antispoof_ready = (not settings.ANTISPOOF_ENABLED) or (antispoof is not None and getattr(antispoof, "is_loaded", False))
 
-    if insightface_ready and yolo_ready:
+    if insightface_ready and yolo_ready and antispoof_ready:
         return HealthResponse(
             status="healthy",
             service="intelliguard-ai",
@@ -38,6 +40,8 @@ async def get_health_status(request: Request, response: Response) -> HealthRespo
         errors.append(manager.error_message if manager else "InsightFace manager not initialized")
     if not yolo_ready:
         errors.append(yolo.error_message if yolo else "YOLO detector not initialized")
+    if not antispoof_ready:
+        errors.append(antispoof.error_message if antispoof else "Anti-spoofing manager not initialized")
     error_msg = "; ".join(errors)
 
     return HealthResponse(

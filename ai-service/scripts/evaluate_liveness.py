@@ -163,6 +163,19 @@ def main():
         logger.error("Failed to load Anti-Spoofing models!")
         sys.exit(1)
 
+    # Initialize face detector for accurate face crop bounding boxes
+    face_app = None
+    try:
+        from app.core.insightface import InsightFaceManager
+        face_mgr = InsightFaceManager()
+        if face_mgr.initialize():
+            face_app = face_mgr.app
+            logger.info("InsightFace face detector initialized successfully for dataset face cropping.")
+        else:
+            logger.warning("InsightFaceManager initialization failed; evaluation will fall back to center crop (metrics may not be representative).")
+    except Exception as e:
+        logger.warning(f"Could not initialize InsightFace detector ({e}); evaluation will fall back to center crop (metrics may not be representative).")
+
     # If single test image is specified
     target_img_path = args.test_image
     if not target_img_path and not args.genuine_dir and not args.spoof_dir:
@@ -189,8 +202,14 @@ def main():
             sys.exit(1)
 
         h, w = img.shape[:2]
-        # Full-face detection center crop as fallback
-        bbox = [w * 0.1, h * 0.1, w * 0.9, h * 0.9]
+        bbox = None
+        if face_app is not None:
+            faces = face_app.get(img)
+            if faces:
+                bbox = faces[0].bbox.tolist()
+        if bbox is None:
+            # Full-face detection center crop as fallback
+            bbox = [w * 0.1, h * 0.1, w * 0.9, h * 0.9]
 
         print(f"Testing image: {p.name} ({w}x{h})")
         res = manager.predict(img, bbox)
@@ -208,7 +227,7 @@ def main():
     if args.genuine_dir or args.spoof_dir:
         gen_dir = Path(args.genuine_dir) if args.genuine_dir else None
         spf_dir = Path(args.spoof_dir) if args.spoof_dir else None
-        metrics = evaluate_dataset(manager, gen_dir, spf_dir)
+        metrics = evaluate_dataset(manager, gen_dir, spf_dir, face_app=face_app)
 
         print("\n" + "=" * 65)
         print("   ISO/IEC 30107-3 Biometric PAD Performance Report")

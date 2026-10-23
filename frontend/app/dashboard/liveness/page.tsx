@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import {
   ShieldCheck,
@@ -24,6 +24,8 @@ interface LivenessData {
   model: string;
   liveScore: number;
   threshold?: number | null;
+  liveThreshold?: number | null;
+  spoofThreshold?: number | null;
   individualScores: Record<string, number>;
   processingTimeMs: number;
   ensembleMethod?: string;
@@ -45,12 +47,35 @@ export default function LivenessInspectorPage() {
   const [result, setResult] = useState<LivenessResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const activeFileRef = useRef<File | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      activeFileRef.current = file;
       setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      setPreviewUrl((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(file);
+      });
       setResult(null);
       setErrorMessage(null);
     }
@@ -63,6 +88,13 @@ export default function LivenessInspectorPage() {
       return;
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    activeFileRef.current = file;
+
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -73,6 +105,7 @@ export default function LivenessInspectorPage() {
       const res = await fetch("/api/liveness", {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
 
       const data = await res.json();
@@ -80,12 +113,19 @@ export default function LivenessInspectorPage() {
         throw new Error(data.message || data.detail || "Anti-spoofing verification failed.");
       }
 
-      setResult(data as LivenessResponse);
+      if (activeFileRef.current === file) {
+        setResult(data as LivenessResponse);
+      }
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Failed to analyze liveness.";
       setErrorMessage(msg);
     } finally {
-      setIsLoading(false);
+      if (activeFileRef.current === file) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -265,69 +305,93 @@ export default function LivenessInspectorPage() {
               })()}
 
               {/* Confidence Score Bar */}
-              <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Ensemble Bona Fide Confidence
-                  </span>
-                  <span className="text-lg font-mono font-extrabold text-foreground">
-                    {(result.liveness.liveScore * 100).toFixed(2)}%
-                  </span>
-                </div>
+              {(() => {
+                const liveThresh = typeof result.liveness.liveThreshold === "number" ? result.liveness.liveThreshold : null;
+                const spoofThresh = typeof result.liveness.spoofThreshold === "number" ? result.liveness.spoofThreshold : null;
 
-                <div className="relative w-full h-3.5 bg-muted rounded-full overflow-hidden flex">
-                  {/* Threshold markers */}
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10"
-                    style={{ left: "45%" }}
-                    title="Spoof Threshold: 45%"
-                  />
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-emerald-500 z-10"
-                    style={{ left: "80%" }}
-                    title="Live Threshold: 80%"
-                  />
-                  <div
-                    style={{ width: `${Math.max(0, Math.min(100, result.liveness.liveScore * 100))}%` }}
-                    className={`h-full transition-all duration-700 ${
-                      result.liveness.status === "live"
-                        ? "bg-emerald-500"
-                        : result.liveness.status === "spoof_detected"
-                        ? "bg-destructive"
-                        : "bg-amber-500"
-                    }`}
-                  />
-                </div>
+                return (
+                  <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Ensemble Bona Fide Confidence
+                      </span>
+                      <span className="text-lg font-mono font-extrabold text-foreground">
+                        {(result.liveness.liveScore * 100).toFixed(2)}%
+                      </span>
+                    </div>
 
-                <div className="flex justify-between text-[11px] font-mono text-muted-foreground">
-                  <span className="text-destructive font-semibold">Spoof &le; 45%</span>
-                  <span className="text-amber-500 font-semibold">Inconclusive</span>
-                  <span className="text-emerald-500 font-semibold">Live &ge; 80%</span>
-                </div>
-              </div>
+                    <div className="relative w-full h-3.5 bg-muted rounded-full overflow-hidden flex">
+                      {/* Active threshold markers */}
+                      {spoofThresh !== null && (
+                        <div
+                          className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10"
+                          style={{ left: `${Math.max(0, Math.min(100, spoofThresh * 100))}%` }}
+                          title={`Active Spoof Threshold: ${(spoofThresh * 100).toFixed(0)}%`}
+                        />
+                      )}
+                      {liveThresh !== null && (
+                        <div
+                          className="absolute top-0 bottom-0 w-0.5 bg-emerald-500 z-10"
+                          style={{ left: `${Math.max(0, Math.min(100, liveThresh * 100))}%` }}
+                          title={`Active Live Threshold: ${(liveThresh * 100).toFixed(0)}%`}
+                        />
+                      )}
+                      <div
+                        style={{ width: `${Math.max(0, Math.min(100, result.liveness.liveScore * 100))}%` }}
+                        className={`h-full transition-all duration-700 ${
+                          result.liveness.status === "live"
+                            ? "bg-emerald-500"
+                            : result.liveness.status === "spoof_detected"
+                            ? "bg-destructive"
+                            : "bg-amber-500"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-[11px] font-mono text-muted-foreground">
+                      {spoofThresh !== null ? (
+                        <span className="text-destructive font-semibold">Spoof &lt; {(spoofThresh * 100).toFixed(0)}%</span>
+                      ) : (
+                        <span />
+                      )}
+                      <span className="text-amber-500 font-semibold">Inconclusive</span>
+                      {liveThresh !== null ? (
+                        <span className="text-emerald-500 font-semibold">Live &ge; {(liveThresh * 100).toFixed(0)}%</span>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Sub-Model Breakdowns */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Object.entries(result.liveness.individualScores || {}).map(([modelName, score]) => {
                   const scorePct = (score * 100).toFixed(1);
-                  const isModelLive = score >= 0.80;
-                  const isModelSpoof = score <= 0.45;
+                  const liveThresh = typeof result.liveness.liveThreshold === "number" ? result.liveness.liveThreshold : null;
+                  const spoofThresh = typeof result.liveness.spoofThreshold === "number" ? result.liveness.spoofThreshold : null;
+                  const isModelLive = liveThresh !== null ? score >= liveThresh : null;
+                  const isModelSpoof = spoofThresh !== null ? score < spoofThresh : null;
+                  const tagLabel = isModelLive === true ? "Live" : isModelSpoof === true ? "Spoof" : isModelLive !== null && isModelSpoof !== null ? "Marginal" : null;
 
                   return (
                     <div key={modelName} className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-foreground truncate">{modelName}</span>
-                        <span
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
-                            isModelLive
-                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                              : isModelSpoof
-                              ? "bg-destructive/15 text-destructive"
-                              : "bg-amber-500/15 text-amber-500"
-                          }`}
-                        >
-                          {isModelLive ? "Live" : isModelSpoof ? "Spoof" : "Marginal"}
-                        </span>
+                        {tagLabel && (
+                          <span
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                              isModelLive
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : isModelSpoof
+                                ? "bg-destructive/15 text-destructive"
+                                : "bg-amber-500/15 text-amber-500"
+                            }`}
+                          >
+                            {tagLabel}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex justify-between items-baseline font-mono">

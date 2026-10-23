@@ -65,9 +65,16 @@ The bona fide confidence score is $P(\text{class}_1)$.
 
 ## 4. Dual-Model Ensemble Fusion & Tri-State Decision Logic
 
-Both networks evaluate the face independently. Their genuine scores are combined via **mean class-score fusion**:
+Both networks evaluate the face independently. `predict_liveness` selects the fusion method dynamically according to `settings.ANTISPOOF_ENSEMBLE_METHOD`:
 
-$$S_{\text{ensemble}} = \frac{P_{\text{V2}}(\text{class}_1) + P_{\text{V1SE}}(\text{class}_1)}{2}$$
+- **`mean` (Configured Default & Fallback):** Equal-weight average of both class-1 probabilities:
+  $$S_{\text{ensemble}} = \frac{P_{\text{V2}}(\text{class}_1) + P_{\text{V1SE}}(\text{class}_1)}{2}$$
+- **`min` (Conservative High-Security):** Minimum score across both networks, requiring both models to agree:
+  $$S_{\text{ensemble}} = \min(P_{\text{V2}}(\text{class}_1), P_{\text{V1SE}}(\text{class}_1))$$
+- **`v2_weighted` (Fine-Texture Priority):** 60/40 weighting favoring MiniFASNetV2's tighter crop:
+  $$S_{\text{ensemble}} = 0.6 \cdot P_{\text{V2}}(\text{class}_1) + 0.4 \cdot P_{\text{V1SE}}(\text{class}_1)$$
+
+The resulting ensemble score is compared directly against the configured thresholds (`ANTISPOOF_LIVE_THRESHOLD` and `ANTISPOOF_SPOOF_THRESHOLD`).
 
 ```
                 ┌─────────────────────────────────┐
@@ -76,7 +83,7 @@ $$S_{\text{ensemble}} = \frac{P_{\text{V2}}(\text{class}_1) + P_{\text{V1SE}}(\t
                                  │
            ┌─────────────────────┼─────────────────────┐
            ▼                     ▼                     ▼
-    S_ensemble >= 0.80     0.45 < S < 0.80      S_ensemble <= 0.45
+    S_ensemble >= 0.80     0.45 <= S < 0.80      S_ensemble < 0.45
      ┌───────────┐         ┌──────────────┐      ┌─────────────────┐
      │   LIVE    │         │ INCONCLUSIVE │      │ SPOOF DETECTED  │
      └─────┬─────┘         └──────┬───────┘      └────────┬────────┘
@@ -90,11 +97,11 @@ $$S_{\text{ensemble}} = \frac{P_{\text{V2}}(\text{class}_1) + P_{\text{V1SE}}(\t
 1. **`LIVE` ($S \ge 0.80$):**
    - High-confidence bona fide human presentation.
    - Eligible to proceed to ArcFace 512D embedding extraction and pgvector identity matching.
-2. **`SPOOF_DETECTED` ($S \le 0.45$):**
-   - Confirmed presentation attack.
+2. **`SPOOF_DETECTED` ($S < 0.45$):**
+   - Confirmed presentation attack (strict less-than comparison; score exactly at 0.45 is treated as inconclusive).
    - `embedding = None` (fail-closed guard).
    - Relays locked, AccessLog `reason: "spoof_detected"`, and high-severity Security Alert recorded.
-3. **`INCONCLUSIVE` ($0.45 < S < 0.80$):**
+3. **`INCONCLUSIVE` ($0.45 \le S < 0.80$):**
    - Marginal confidence or conflicting models.
    - User is prompted to reposition and look directly at the camera under clear lighting.
    - Door remains locked; no security accusation is made against the user.

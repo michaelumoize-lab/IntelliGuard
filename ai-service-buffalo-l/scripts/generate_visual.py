@@ -45,12 +45,16 @@ for i, f in enumerate(faces_l):
             cv2.circle(canvas_l, (int(kp[0]), int(kp[1])), 5, (0, 255, 255), -1)
 
 # Add title banners
+s_conf = f"{faces_s[0].det_score:.3f}" if len(faces_s) > 0 else "n/a"
+s_label = f"Buffalo_S: {len(faces_s)} {'Face' if len(faces_s) == 1 else 'Faces'} Detected | Conf: {s_conf}"
 cv2.rectangle(canvas_s, (0, 0), (w, 60), (0, 0, 0), -1)
-cv2.putText(canvas_s, f"Buffalo_S: 1 Face Detected | Conf: {faces_s[0].det_score:.3f}", (20, 42),
+cv2.putText(canvas_s, s_label, (20, 42),
             cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 0), 3)
 
+l_conf = f"{faces_l[0].det_score:.3f}" if len(faces_l) > 0 else "n/a"
+l_label = f"Buffalo_L: {len(faces_l)} {'Face' if len(faces_l) == 1 else 'Faces'} Detected | Primary Conf: {l_conf}"
 cv2.rectangle(canvas_l, (0, 0), (w, 60), (0, 0, 0), -1)
-cv2.putText(canvas_l, f"Buffalo_L: 3 Faces Detected | Primary Conf: {faces_l[0].det_score:.3f}", (20, 42),
+cv2.putText(canvas_l, l_label, (20, 42),
             cv2.FONT_HERSHEY_SIMPLEX, 1.1, (255, 180, 50), 3)
 
 # Stack side-by-side

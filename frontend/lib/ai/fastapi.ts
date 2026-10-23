@@ -6,6 +6,8 @@ export interface FastAPILivenessDetail {
   model: string;
   liveScore: number;
   threshold?: number | null;
+  liveThreshold?: number | null;
+  spoofThreshold?: number | null;
   individualScores: Record<string, number>;
   processingTimeMs: number;
   ensembleMethod?: string;
@@ -65,9 +67,12 @@ export const fastAPILivenessDetailSchema = z.object({
   model: z.string(),
   live_score: z.number().finite().min(0.0).max(1.0),
   threshold: z.number().finite().nullable().optional(),
+  live_threshold: z.number().finite().nullable().optional(),
+  spoof_threshold: z.number().finite().nullable().optional(),
   individual_scores: z.record(z.string(), z.number().finite()).default({}),
   processing_time_ms: z.number().finite().nonnegative().default(0),
   ensemble_method: z.string().optional(),
+  error_message: z.string().nullable().optional(),
 });
 
 export const fastAPIEmbeddingResponseSchema = z.object({
@@ -276,6 +281,8 @@ export async function generateEmbedding(
           model: data.liveness.model,
           liveScore: data.liveness.live_score,
           threshold: data.liveness.threshold,
+          liveThreshold: data.liveness.live_threshold,
+          spoofThreshold: data.liveness.spoof_threshold,
           individualScores: data.liveness.individual_scores,
           processingTimeMs: data.liveness.processing_time_ms,
           ensembleMethod: data.liveness.ensemble_method,
@@ -519,6 +526,8 @@ export async function analyzeImage(
           model: data.liveness.model,
           liveScore: data.liveness.live_score,
           threshold: data.liveness.threshold,
+          liveThreshold: data.liveness.live_threshold,
+          spoofThreshold: data.liveness.spoof_threshold,
           individualScores: data.liveness.individual_scores,
           processingTimeMs: data.liveness.processing_time_ms,
           ensembleMethod: data.liveness.ensemble_method,
@@ -529,16 +538,17 @@ export async function analyzeImage(
 
 export const fastAPILivenessResponseSchema = z.object({
   success: z.boolean(),
-  liveness: fastAPILivenessDetailSchema,
+  liveness: fastAPILivenessDetailSchema.nullable().optional(),
   face_detected: z.boolean(),
   face_count: z.number().int().nonnegative().default(1),
+  bbox: z.array(z.number().finite()).length(4).nullable().optional(),
   primary_face_bbox: z.array(z.number().finite()).length(4).nullable().optional(),
   execution_time_ms: z.number().finite().nonnegative().default(0),
 });
 
 export interface FastAPILivenessCheckResult {
   success: boolean;
-  liveness: FastAPILivenessDetail;
+  liveness: FastAPILivenessDetail | null;
   faceDetected: boolean;
   faceCount: number;
   primaryFaceBbox?: number[] | null;
@@ -594,7 +604,17 @@ export async function checkLiveness(
     throw new FastAPIError("AI_SERVICE_ERROR", errorDetail, response.status);
   }
 
-  const rawData = await response.json();
+  let rawData: unknown;
+  try {
+    rawData = await response.json();
+  } catch (parseErr: unknown) {
+    throw new FastAPIError(
+      "AI_SERVICE_ERROR",
+      `Failed to parse AI service response as JSON: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
+      502
+    );
+  }
+
   const parseResult = fastAPILivenessResponseSchema.safeParse(rawData);
   if (!parseResult.success) {
     const issueSummary = parseResult.error.issues
@@ -610,18 +630,22 @@ export async function checkLiveness(
   const data = parseResult.data;
   return {
     success: data.success,
-    liveness: {
-      status: data.liveness.status,
-      model: data.liveness.model,
-      liveScore: data.liveness.live_score,
-      threshold: data.liveness.threshold,
-      individualScores: data.liveness.individual_scores,
-      processingTimeMs: data.liveness.processing_time_ms,
-      ensembleMethod: data.liveness.ensemble_method,
-    },
+    liveness: data.liveness
+      ? {
+          status: data.liveness.status,
+          model: data.liveness.model,
+          liveScore: data.liveness.live_score,
+          threshold: data.liveness.threshold,
+          liveThreshold: data.liveness.live_threshold,
+          spoofThreshold: data.liveness.spoof_threshold,
+          individualScores: data.liveness.individual_scores,
+          processingTimeMs: data.liveness.processing_time_ms,
+          ensembleMethod: data.liveness.ensemble_method,
+        }
+      : null,
     faceDetected: data.face_detected,
     faceCount: data.face_count,
-    primaryFaceBbox: data.primary_face_bbox,
+    primaryFaceBbox: data.primary_face_bbox ?? data.bbox ?? null,
     executionTimeMs: data.execution_time_ms,
   };
 }

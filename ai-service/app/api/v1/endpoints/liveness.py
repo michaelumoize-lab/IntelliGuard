@@ -80,10 +80,12 @@ async def _inspect_liveness(
         status=liveness_res.status,
         model=liveness_res.model,
         live_score=liveness_res.live_score,
+        threshold=liveness_res.threshold,
         live_threshold=liveness_res.live_threshold,
         spoof_threshold=liveness_res.spoof_threshold,
         individual_scores=liveness_res.individual_scores,
         processing_time_ms=liveness_res.processing_time_ms,
+        ensemble_method=liveness_res.ensemble_method,
         error_message=liveness_res.error_message,
     )
 
@@ -93,6 +95,7 @@ async def _inspect_liveness(
         success=liveness_res.status != "error",
         face_detected=True,
         bbox=bbox,
+        primary_face_bbox=bbox,
         detection_confidence=conf,
         liveness=liveness_detail,
         active_recognition_model=model_name,

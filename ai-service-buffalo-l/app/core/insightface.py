@@ -13,8 +13,11 @@ from app.core.config import settings
 logger = logging.getLogger("intelliguard.insightface")
 
 
+BUFFALO_L_SHA256 = "80ffe37d8a5940d59a7384c201a2a38d4741f2f3c51eef46ebb28218a7b0ca2f"
+
+
 def ensure_minimal_models(
-    model_name: str = "buffalo_s",
+    model_name: str = "buffalo_l",
     expected_checksum: Optional[str] = None,
 ) -> str:
     """Ensure only required ONNX models (detection and recognition) exist in the model directory.
@@ -24,7 +27,11 @@ def ensure_minimal_models(
     to keep RAM footprint below 120MB on constrained cloud instances (e.g. Render 512MB tier).
     """
     if expected_checksum is None:
-        expected_checksum = settings.INSIGHTFACE_CHECKSUM or settings.INSIGHTFACE_ZIP_CHECKSUM
+        expected_checksum = (
+            settings.INSIGHTFACE_CHECKSUM
+            or settings.INSIGHTFACE_ZIP_CHECKSUM
+            or (BUFFALO_L_SHA256 if model_name == "buffalo_l" else None)
+        )
 
     models_dir = os.path.expanduser(f"~/.insightface/models/{model_name}")
     os.makedirs(models_dir, exist_ok=True)

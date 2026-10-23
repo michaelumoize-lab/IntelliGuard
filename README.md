@@ -15,13 +15,13 @@ IntelliGuard is an intelligent edge-to-cloud access control and security monitor
 | **Person Detection** | Working | YOLOv8 Nano (`yolov8n.onnx`) |
 | **Facial Embedding** | Working | InsightFace ArcFace 512D (`buffalo_s` & `buffalo_l` ONNX Runtime) |
 | **Vector Similarity Search** | Working | PostgreSQL + `pgvector` HNSW Cosine Index (`<=>`) |
-| **Access Decision Engine** | Working | Next.js API Gateway, Ambiguity Margin (`0.08`), Fail-Closed Guard |
+| **Access Decision Engine** | Working | Next.js API Gateway, Ambiguity Margin (`0.05`), Fail-Closed Guard |
 | **Admin Dashboard & Management** | Working | Next.js App Router, PAD Inspector, Prisma, ImageKit |
 | **Edge Hardware Interface** | Ready | ESP32-S3 CAM (`POST /api/access` contract, PIR, Relay lock) |
 
 **Test Results:** **68 passed, 0 failed** (55 AI service pytest + 13 Frontend integration test suites).
 
-> 📘 **See [ANTISPOOFING.md](file:///c:/Users/Michael%20Umoize/Desktop/Learning%20AI-ML/IntelliGuard/ANTISPOOFING.md) for full Presentation Attack Detection architecture, mathematical formulations, and benchmarks.**
+> 📘 **See [ANTISPOOFING.md](./ANTISPOOFING.md) for full Presentation Attack Detection architecture, mathematical formulations, and benchmarks.**
 
 ---
 
@@ -45,7 +45,7 @@ python -m venv .venv
 pip install -r requirements.txt
 cp .env.example .env
 
-# Run AI test suite (33 tests)
+# Run AI test suite (55 tests)
 pytest -v
 
 # Start FastAPI service (port 8000)
@@ -59,11 +59,16 @@ npm install
 cp .env.example .env.local
 # Populate .env.local with DATABASE_URL, BETTER_AUTH_SECRET, FASTAPI_URL, IMAGEKIT keys
 
-# Apply Prisma migrations & generate client
+# Initialize database schema & apply migrations
+# For an existing migration history:
+npx prisma migrate deploy
+# (For a fresh development database, run `npx prisma db push` or `npx prisma migrate dev`)
+
+# Generate Prisma Client & apply pgvector HNSW index
 npx prisma generate
 npx tsx scripts/apply-hnsw-index.ts
 
-# Run Frontend test suite (12 suites)
+# Run Frontend test suite (13 test suites)
 npm test
 
 # Start Next.js development server (port 3000)
@@ -78,18 +83,18 @@ npm run dev
 IntelliGuard/
 ├── ai-service/                   # FastAPI AI microservice
 │   ├── app/
-│   │   ├── api/v1/               # Endpoints: /detect, /embedding, /analyze, /health
+│   │   ├── api/v1/               # Endpoints: /detect, /embedding, /analyze, /liveness, /health
 │   │   ├── core/                 # InsightFace, YOLOv8, face quality assessment
 │   │   └── schemas/              # Pydantic request/response schemas
 │   ├── scripts/                  # Model benchmarking and validation scripts
-│   └── tests/                    # Pytest test suite (33 tests)
+│   └── tests/                    # Pytest test suite (55 tests)
 ├── frontend/                     # Next.js 14 Application & Access Gateway
 │   ├── app/                      # App Router (Dashboard, Persons, Devices, Access Logs, API)
 │   ├── components/               # UI components (shadcn/ui, Tailwind CSS)
 │   ├── lib/                      # Prisma client, Better-Auth, ImageKit, access rules
 │   ├── prisma/                   # Schema definitions & database migrations
 │   ├── scripts/                  # HNSW index setup & test runners
-│   └── tests/                    # 12 automated integration test suites
+│   └── tests/                    # 13 automated integration test suites
 ├── ARCHITECTURE.md               # Detailed architecture, workflows & hardware spec
 └── README.md                     # Project documentation
 ```

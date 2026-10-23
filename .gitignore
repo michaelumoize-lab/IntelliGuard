@@ -69,3 +69,14 @@ Thumbs.db
 **/.pytest_cache/
 **/__pycache__/
 *.pyc
+
+# --------------------------
+# Generated Reports & Local Biometric Test Assets
+# --------------------------
+*_report.json
+*michael*.JPG
+*michael*.jpg
+*michael*.png
+michael.JPG
+ai-service-buffalo-l/michael.JPG
+ai-service-buffalo-l/michael_comparison_visual.jpg

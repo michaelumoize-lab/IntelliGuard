@@ -11,9 +11,9 @@ class Settings:
 
     APP_NAME: str = os.getenv("APP_NAME", "IntelliGuard AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s")
-    INSIGHTFACE_DET_SIZE_W: int = int(os.getenv("INSIGHTFACE_DET_SIZE_W", "640" if os.getenv("INSIGHTFACE_MODEL") == "buffalo_l" else "320"))
-    INSIGHTFACE_DET_SIZE_H: int = int(os.getenv("INSIGHTFACE_DET_SIZE_H", "640" if os.getenv("INSIGHTFACE_MODEL") == "buffalo_l" else "320"))
+    INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")
+    INSIGHTFACE_DET_SIZE_W: int = int(os.getenv("INSIGHTFACE_DET_SIZE_W", "640" if INSIGHTFACE_MODEL == "buffalo_l" else "320"))
+    INSIGHTFACE_DET_SIZE_H: int = int(os.getenv("INSIGHTFACE_DET_SIZE_H", "640" if INSIGHTFACE_MODEL == "buffalo_l" else "320"))
     INSIGHTFACE_CHECKSUM: Optional[str] = os.getenv(
         "INSIGHTFACE_CHECKSUM", os.getenv("INSIGHTFACE_ZIP_CHECKSUM", None)
     )

@@ -129,6 +129,7 @@ class LivenessInspectionResponse(BaseModel):
     success: bool = Field(True, description="Whether liveness inspection succeeded")
     face_detected: bool = Field(..., description="Whether a face was detected in image")
     bbox: Optional[List[float]] = Field(default=None, description="Face bounding box [x1, y1, x2, y2]")
+    primary_face_bbox: Optional[List[float]] = Field(default=None, description="Face bounding box alias [x1, y1, x2, y2]")
     detection_confidence: Optional[float] = Field(default=None, description="Detection confidence score")
     liveness: Optional[LivenessDetail] = Field(default=None, description="Anti-spoofing evaluation details")
     active_recognition_model: str = Field(..., description="Configured InsightFace model name (buffalo_s/buffalo_l)")

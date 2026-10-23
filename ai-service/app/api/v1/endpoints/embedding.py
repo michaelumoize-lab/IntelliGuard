@@ -101,6 +101,14 @@ def _extract_512d_embedding(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Face registration rejected: Liveness check was inconclusive. Please ensure optimal lighting and look directly into the camera.",
                 )
+            elif liveness_res.status != "live":
+                logger.warning(
+                    f"Registration embedding rejected: Non-live liveness verification status '{liveness_res.status}'"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Face registration rejected: Liveness verification status is '{liveness_res.status}'. Only bona fide live faces may be enrolled.",
+                )
         except HTTPException:
             raise
         except Exception as e:

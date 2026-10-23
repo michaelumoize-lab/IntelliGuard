@@ -176,35 +176,69 @@ def test_antispoof_result_structure():
     assert d["individual_scores"]["MiniFASNetV2"] == 0.98
 
 
-def test_decision_logic_live_threshold():
-    """Test that an ensemble score >= live_threshold is classified as 'live'."""
+def test_decision_logic_live_threshold(monkeypatch):
+    """Test that an ensemble score >= live_threshold is classified as 'live' by predict_liveness."""
     mgr = AntiSpoofingManager()
     mgr.is_loaded = True
-    # Simulate single model scores
-    score_v2 = 0.92
-    score_v1se = 0.88
-    ensemble_score = (score_v2 + score_v1se) / 2.0
-    
-    assert ensemble_score >= settings.ANTISPOOF_LIVE_THRESHOLD
-    # In predict_liveness, this yields status == 'live'
+    mgr.session_v2 = object()
+    mgr.session_v1se = object()
+
+    def mock_infer(*args, **kwargs):
+        return 0.85
+
+    monkeypatch.setattr(mgr, "_infer_single_model", mock_infer)
+    dummy_img = np.zeros((100, 100, 3), dtype=np.uint8)
+    res = mgr.predict_liveness(dummy_img, [10.0, 10.0, 80.0, 80.0])
+    assert res.status == "live"
+    assert res.is_live is True
+    assert res.live_score == 0.85
 
 
-def test_decision_logic_spoof_threshold():
-    """Test that an ensemble score <= spoof_threshold is classified as 'spoof_detected'."""
-    score_v2 = 0.20
-    score_v1se = 0.35
-    ensemble_score = (score_v2 + score_v1se) / 2.0
-    
-    assert ensemble_score <= settings.ANTISPOOF_SPOOF_THRESHOLD
+def test_decision_logic_spoof_threshold(monkeypatch):
+    """Test that an ensemble score < spoof_threshold is classified as 'spoof_detected' by predict_liveness."""
+    mgr = AntiSpoofingManager()
+    mgr.is_loaded = True
+    mgr.session_v2 = object()
+    mgr.session_v1se = object()
+
+    def mock_infer(*args, **kwargs):
+        return 0.30
+
+    monkeypatch.setattr(mgr, "_infer_single_model", mock_infer)
+    dummy_img = np.zeros((100, 100, 3), dtype=np.uint8)
+    res = mgr.predict_liveness(dummy_img, [10.0, 10.0, 80.0, 80.0])
+    assert res.status == "spoof_detected"
+    assert res.is_live is False
+    assert res.live_score == 0.30
 
 
-def test_decision_logic_inconclusive_threshold():
-    """Test that an ensemble score between spoof_threshold and live_threshold is 'inconclusive'."""
-    score_v2 = 0.65
-    score_v1se = 0.60
-    ensemble_score = (score_v2 + score_v1se) / 2.0
-    
-    assert settings.ANTISPOOF_SPOOF_THRESHOLD < ensemble_score < settings.ANTISPOOF_LIVE_THRESHOLD
+def test_decision_logic_inconclusive_threshold(monkeypatch):
+    """Test that an ensemble score in [spoof_threshold, live_threshold) is 'inconclusive' by predict_liveness."""
+    mgr = AntiSpoofingManager()
+    mgr.is_loaded = True
+    mgr.session_v2 = object()
+    mgr.session_v1se = object()
+
+    # Exact lower boundary: score == 0.45 should be inconclusive (not spoof, since comparison is < 0.45)
+    def mock_infer_boundary(*args, **kwargs):
+        return 0.45
+
+    monkeypatch.setattr(mgr, "_infer_single_model", mock_infer_boundary)
+    dummy_img = np.zeros((100, 100, 3), dtype=np.uint8)
+    res_boundary = mgr.predict_liveness(dummy_img, [10.0, 10.0, 80.0, 80.0])
+    assert res_boundary.status == "inconclusive"
+    assert res_boundary.is_live is False
+    assert res_boundary.live_score == 0.45
+
+    # Mid-range uncertainty
+    def mock_infer_mid(*args, **kwargs):
+        return 0.65
+
+    monkeypatch.setattr(mgr, "_infer_single_model", mock_infer_mid)
+    res_mid = mgr.predict_liveness(dummy_img, [10.0, 10.0, 80.0, 80.0])
+    assert res_mid.status == "inconclusive"
+    assert res_mid.is_live is False
+    assert res_mid.live_score == 0.65
 
 
 # =========================================================================

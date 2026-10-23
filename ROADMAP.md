@@ -24,7 +24,7 @@ This document outlines upcoming engineering enhancements, hardware integration t
 ## 2. Advanced Anti-Spoofing & Edge Vision
 
 - [x] **Passive Software Liveness (Implemented)**:
-  - Quantized MiniFASNetV2-SE ONNX model integrated into FastAPI `/analyze` pipeline.
+  - Dual-model ensemble (MiniFASNetV2 at 2.7x scale and MiniFASNetV1SE at 4.0x scale) integrated into FastAPI `/analyze`, `/embedding`, and `/liveness` pipelines.
   - Fail-closed denial (`spoof_detected`) on spoof confidence without database queries.
 - [ ] **Hardware-Assisted Active Challenge-Response**:
   - Flash the ESP32 RGB LED in a pseudo-random color sequence during capture.
