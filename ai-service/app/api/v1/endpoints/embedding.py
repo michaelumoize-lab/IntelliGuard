@@ -56,7 +56,12 @@ def _extract_512d_embedding(
 
     # 3. Anti-Spoofing / Presentation Attack Detection (fail-closed enrollment check)
     liveness_detail: Optional[LivenessDetail] = None
-    if settings.ANTISPOOF_ENABLED and antispoof_manager is not None and getattr(antispoof_manager, "is_loaded", False):
+    if settings.ANTISPOOF_ENABLED:
+        if antispoof_manager is None or not getattr(antispoof_manager, "is_loaded", False):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Anti-spoofing engine is unavailable; enrollment is blocked.",
+            )
         try:
             x1, y1, x2, y2 = face.bbox
             liveness_res = antispoof_manager.predict(img, [float(x1), float(y1), float(x2), float(y2)])
@@ -70,8 +75,14 @@ def _extract_512d_embedding(
                 individual_scores=liveness_res.individual_scores,
                 processing_time_ms=liveness_res.processing_time_ms,
                 ensemble_method=liveness_res.ensemble_method,
+                error_message=liveness_res.error_message,
             )
 
+            if liveness_res.status == "error":
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Anti-spoofing verification failed during enrollment: {liveness_res.error_message}",
+                )
             if liveness_res.status == "spoof_detected":
                 logger.warning(
                     f"Registration embedding rejected: Presentation attack / spoof detected "
