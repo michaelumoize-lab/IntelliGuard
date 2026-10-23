@@ -1,5 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
+from app.schemas.detection import LivenessDetail
 
 
 class Base64EmbeddingRequest(BaseModel):
@@ -32,6 +33,7 @@ class FaceEmbeddingResponse(BaseModel):
     )
     model: str = Field("buffalo_s", description="Name of the InsightFace model pack used")
     model_version: Optional[str] = Field(None, description="Model version if available")
+    liveness: Optional[LivenessDetail] = Field(default=None, description="Anti-spoofing liveness verification details")
     execution_time_ms: float = Field(..., description="Inference execution time in milliseconds")
 
     model_config = ConfigDict(

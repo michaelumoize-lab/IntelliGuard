@@ -4,6 +4,8 @@ export interface AccessScanResponse {
     | "no_person"
     | "person_no_face"
     | "face_low_quality"
+    | "spoof_detected"
+    | "liveness_inconclusive"
     | "face_detected_processing"
     | "known_individual"
     | "unknown_individual"
@@ -16,6 +18,7 @@ export interface AccessScanResponse {
     | "face_match"
     | "face_no_match"
     | "unauthorized"
+    | "spoof_detected"
     | "no_person_detected"
     | "no_face_detected"
     | "poor_quality_face"
@@ -42,6 +45,19 @@ export interface AccessScanResponse {
     quality_score?: number | null;
     model?: string;
   };
+  liveness?: {
+    status: "live" | "spoof_detected" | "inconclusive" | "error";
+    model: string;
+    live_score?: number;
+    liveScore?: number;
+    threshold?: number | null;
+    individual_scores?: Record<string, number>;
+    individualScores?: Record<string, number>;
+    processing_time_ms?: number;
+    processingTimeMs?: number;
+    ensemble_method?: string;
+    ensembleMethod?: string;
+  } | null;
   person_bbox?: number[] | null;
   face_bbox?: number[] | null;
   image_width?: number;
@@ -102,6 +118,38 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
     // Non-JSON error body fallback
   }
 
+  // 1. If server returned an Anti-Spoofing or Liveness outcome, preserve it explicitly
+  if (
+    data &&
+    (data.status === "spoof_detected" ||
+      data.status === "liveness_inconclusive" ||
+      data.reason === "spoof_detected")
+  ) {
+    return {
+      success: true,
+      status: data.status,
+      person_detected: Boolean(data.person_detected),
+      face_detected: Boolean(data.face_detected),
+      access_status: "denied",
+      reason: data.reason || "spoof_detected",
+      door_action: data.door_action || "lock",
+      match_status: data.match_status ?? "rejected",
+      person: null,
+      face: data.face ?? undefined,
+      liveness: data.liveness ?? null,
+      person_bbox: data.person_bbox ?? null,
+      face_bbox: data.face_bbox ?? null,
+      image_width: data.image_width,
+      image_height: data.image_height,
+      persons: data.persons ?? [],
+      faces: data.faces ?? [],
+      device: data.device ?? null,
+      processing_time_ms: typeof data.processing_time_ms === "number" ? data.processing_time_ms : 0,
+      message: data.message || "Presentation attack detected. Access denied.",
+      error: data.error,
+    };
+  }
+
   if (
     !response.ok ||
     data.success === false ||
@@ -115,11 +163,12 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
       person_detected: Boolean(data.person_detected),
       face_detected: Boolean(data.face_detected),
       access_status: "denied",
-      reason: "system_error",
+      reason: data.reason || "system_error",
       door_action: "lock",
       match_status: "rejected",
       person: null,
       face: data.face ?? undefined,
+      liveness: data.liveness ?? null,
       person_bbox: data.person_bbox ?? null,
       face_bbox: data.face_bbox ?? null,
       image_width: data.image_width,
@@ -129,7 +178,7 @@ export async function scanFace(imageBlob: Blob): Promise<AccessScanResponse> {
       device: data.device ?? null,
       processing_time_ms: typeof data.processing_time_ms === "number" ? data.processing_time_ms : 0,
       message: data.message || "Failed to process face scan request.",
-      error: data.error || "SERVER_ERROR",
+      error: data.error || (response.ok ? "BIOMETRIC_REJECTED" : `HTTP_${response.status}`),
     };
   }
 

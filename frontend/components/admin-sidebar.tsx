@@ -123,6 +123,11 @@ const mainNavItems: NavItem[] = [
     href: "/dashboard/simulation",
     icon: Camera,
   },
+  {
+    title: "Anti-Spoofing (PAD)",
+    href: "/dashboard/liveness",
+    icon: Shield,
+  },
 ];
 
 const supportNavItems: NavItem[] = [

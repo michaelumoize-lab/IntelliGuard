@@ -40,6 +40,27 @@ export function HardwareTerminalHUD({
       ledColor = "bg-emerald-500 shadow-[0_0_16px_#10b981]";
       ledLabel = "UNLOCKED (GREEN)";
       buzzerState = "CHIME (BEEP)";
+    } else if (
+      result.status === "spoof_detected" ||
+      result.reason === "spoof_detected" ||
+      result.liveness?.status === "spoof_detected"
+    ) {
+      oledLine1 = "SPOOF DETECTED";
+      oledLine2 = "ATTACK BLOCKED";
+      oledLine3 = "DOOR: LOCKED";
+      ledColor = "bg-rose-600 shadow-[0_0_16px_#e11d48] animate-ping";
+      ledLabel = "SPOOF ATTACK (RED)";
+      buzzerState = "ALARM (PULSE)";
+    } else if (
+      result.status === "liveness_inconclusive" ||
+      result.liveness?.status === "inconclusive"
+    ) {
+      oledLine1 = "LIVENESS UNCERTAIN";
+      oledLine2 = "PLEASE RETRY";
+      oledLine3 = "DOOR: LOCKED";
+      ledColor = "bg-amber-400 shadow-[0_0_14px_#f59e0b]";
+      ledLabel = "INCONCLUSIVE (AMBER)";
+      buzzerState = "WARN BEEP";
     } else if (result.reason === "unauthorized") {
       oledLine1 = "ACCESS DENIED";
       oledLine2 = result.person ? `${result.person.first_name.toUpperCase()}` : "UNAUTHORIZED";
@@ -47,6 +68,27 @@ export function HardwareTerminalHUD({
       ledColor = "bg-rose-500 shadow-[0_0_16px_#f43f5e] animate-ping";
       ledLabel = "BLOCKED (RED)";
       buzzerState = "ALARM (FAST)";
+    } else if (result.status === "no_person" || result.reason === "no_person_detected") {
+      oledLine1 = "NO PERSON";
+      oledLine2 = "FRAME EMPTY";
+      oledLine3 = "DOOR: LOCKED";
+      ledColor = "bg-slate-500 shadow-[0_0_10px_#64748b]";
+      ledLabel = "IDLE (GRAY)";
+      buzzerState = "OFF";
+    } else if (result.status === "person_no_face" || result.reason === "no_face_detected") {
+      oledLine1 = "PERSON DETECTED";
+      oledLine2 = "NO FACE VISIBLE";
+      oledLine3 = "DOOR: LOCKED";
+      ledColor = "bg-cyan-500 shadow-[0_0_12px_#06b6d4]";
+      ledLabel = "POSITION FACE (CYAN)";
+      buzzerState = "OFF";
+    } else if (result.status === "face_low_quality" || result.reason === "poor_quality_face") {
+      oledLine1 = "LOW QUALITY FACE";
+      oledLine2 = "LOOK AT CAMERA";
+      oledLine3 = "DOOR: LOCKED";
+      ledColor = "bg-amber-400 shadow-[0_0_14px_#f59e0b]";
+      ledLabel = "LOW QUALITY (AMBER)";
+      buzzerState = "WARN BEEP";
     } else if (result.match_status === "unknown" || result.status === "unknown_individual") {
       oledLine1 = "ACCESS DENIED";
       oledLine2 = "UNKNOWN PERSON";

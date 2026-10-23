@@ -451,6 +451,132 @@ export async function POST(req: NextRequest) {
           quality_score: aiResult.qualityScore,
           model: aiResult.model,
         },
+        liveness: aiResult.liveness || null,
+        person_bbox: aiResult.primaryPersonBbox || null,
+        face_bbox: aiResult.primaryFaceBbox || null,
+        image_width: aiResult.imageWidth,
+        image_height: aiResult.imageHeight,
+        persons: aiResult.persons,
+        faces: aiResult.faces,
+        device: deviceAuth.device
+          ? {
+              id: deviceAuth.device.id,
+              serial_number: deviceAuth.device.serialNumber,
+              device_name: deviceAuth.device.deviceName,
+            }
+          : null,
+        processing_time_ms: processingTimeMs,
+      });
+    }
+
+    // Handle Anti-Spoofing / Presentation Attack Detection Results
+    if (aiResult.status === "spoof_detected") {
+      try {
+        await prisma.accessLog.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            matchStatus: "rejected",
+            accessStatus: "denied",
+            reason: "spoof_detected",
+            doorAction: "lock",
+            confidenceScore: aiResult.liveness?.liveScore ?? null,
+            processingTimeMs,
+          },
+        });
+
+        const liveScorePct = typeof aiResult.liveness?.liveScore === "number"
+          ? (aiResult.liveness.liveScore * 100).toFixed(1)
+          : "0.0";
+        await prisma.alert.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            alertType: "unauthorized_access",
+            title: "Facial Presentation Attack (Spoof) Detected",
+            message: `Anti-spoofing ensemble (${aiResult.liveness?.model || "MiniFASNet"}) detected a presentation attack (liveness score: ${liveScorePct}%). Access denied and door secured.`,
+            severity: "critical",
+          },
+        });
+      } catch (logErr: unknown) {
+        console.error("Failed to record spoof_detected AccessLog/Alert:", logErr);
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          status: "spoof_detected",
+          person_detected: true,
+          face_detected: true,
+          access_status: "denied",
+          reason: "spoof_detected",
+          door_action: "lock",
+          match_status: "rejected",
+          message:
+            aiResult.message ||
+            "Presentation attack detected (fake/spoof face). Access denied.",
+          person: null,
+          face: {
+            similarity: 0,
+            distance: 1,
+            quality_score: aiResult.qualityScore,
+            model: aiResult.model,
+          },
+          liveness: aiResult.liveness || null,
+          person_bbox: aiResult.primaryPersonBbox || null,
+          face_bbox: aiResult.primaryFaceBbox || null,
+          image_width: aiResult.imageWidth,
+          image_height: aiResult.imageHeight,
+          persons: aiResult.persons,
+          faces: aiResult.faces,
+          device: deviceAuth.device
+            ? {
+                id: deviceAuth.device.id,
+                serial_number: deviceAuth.device.serialNumber,
+                device_name: deviceAuth.device.deviceName,
+              }
+            : null,
+          processing_time_ms: processingTimeMs,
+        },
+        { status: 200 }
+      );
+    }
+
+    if (aiResult.status === "liveness_inconclusive") {
+      try {
+        await prisma.accessLog.create({
+          data: {
+            deviceId: deviceAuth.device?.id || null,
+            matchStatus: "rejected",
+            accessStatus: "denied",
+            reason: "insufficient_confidence",
+            doorAction: "no_action",
+            confidenceScore: aiResult.liveness?.liveScore ?? null,
+            processingTimeMs,
+          },
+        });
+      } catch (logErr: unknown) {
+        console.error("Failed to record liveness_inconclusive AccessLog:", logErr);
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: "liveness_inconclusive",
+        person_detected: true,
+        face_detected: true,
+        access_status: "denied",
+        reason: "insufficient_confidence",
+        door_action: "no_action",
+        match_status: null,
+        message:
+          aiResult.message ||
+          "Liveness verification was inconclusive. Please face the camera directly in clear lighting and try again.",
+        person: null,
+        face: {
+          similarity: 0,
+          distance: 1,
+          quality_score: aiResult.qualityScore,
+          model: aiResult.model,
+        },
+        liveness: aiResult.liveness || null,
         person_bbox: aiResult.primaryPersonBbox || null,
         face_bbox: aiResult.primaryFaceBbox || null,
         image_width: aiResult.imageWidth,
@@ -737,6 +863,7 @@ export async function POST(req: NextRequest) {
         quality_score: recognition.face.qualityScore ?? aiResult.qualityScore,
         model: recognition.face.model || aiResult.model,
       },
+      liveness: aiResult.liveness || null,
       person_bbox: aiResult.primaryPersonBbox || null,
       face_bbox: aiResult.primaryFaceBbox || null,
       image_width: aiResult.imageWidth,

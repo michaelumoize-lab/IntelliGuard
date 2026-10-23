@@ -152,8 +152,8 @@ PostgreSQL returns best and second-best matching `Person` candidates and similar
       │
       ▼
 Next.js evaluates Access Rules & Fail-Closed Guard:
-  ├── Is similarity >= Threshold (e.g., 0.60)?
-  ├── Is score margin (best - 2nd best) >= Ambiguity Margin (e.g., 0.05)?
+  ├── Is similarity >= FACE_MATCH_THRESHOLD (default 0.50, configurable per deployment via env)?
+  ├── Is score margin (best - 2nd best) >= FACE_AMBIGUITY_MARGIN (default 0.05, configurable per deployment via env)?
   │     └── IF margin insufficient ──► Access Decision: DENIED (Ambiguous Match Alert triggered)
   ├── Is the Person active & permitted at this door/time?
   ├── Is the Device registered, active, and authenticated (mTLS / API Key)?
@@ -193,3 +193,84 @@ Alert ─────────────► Security Alerts triggered on Un
 
 1. **Stateless AI Engine**: FastAPI performs pure memory-based inference and never holds persistent biometric databases or client credentials.
 2. **Sensitive Biometric Storage**: 512-dimensional facial embeddings are sensitive biometric identifiers. They are stored securely in PostgreSQL + `pgvector` and are never exposed in raw vector form to client UI components or public API logs.
+
+---
+
+## 7. Hardware Integration Interface Specification (ESP32-S3-CAM)
+
+When integrating the physical **ESP32-S3-CAM** unit, the device communicates with the Next.js Authoritative Access Control Gateway via HTTP POST multipart/form-data:
+
+### Request Contract
+- **Endpoint**: `POST /api/access`
+- **Content-Type**: `multipart/form-data`
+- **Headers**:
+  ```http
+  X-Device-Id: dev_c7d9a1f2b3e4
+  X-Device-Key: ig_dev_a1b2c3d4e5f6...
+  X-Correlation-ID: (optional, generated if omitted)
+  ```
+- **Body Fields**:
+  - `image`: Binary JPEG payload captured from OV5640 (recommended resolution: 640x480 or 800x600, JPEG quality 80–90)
+
+### Response Contract (JSON)
+```json
+{
+  "access_status": "granted",
+  "door_action": "unlock",
+  "reason": "face_match",
+  "status": "known_individual",
+  "match_status": "matched",
+  "similarity": 0.892,
+  "execution_time_ms": 114,
+  "correlation_id": "req-1792601934-abc",
+  "person": {
+    "id": 26,
+    "personCode": "PER-0822152C",
+    "name": "Michael Umoize",
+    "department": "Engineering"
+  }
+}
+```
+
+### Door Action Matrix
+| `access_status` | `door_action` | Condition / State | Hardware Behavior |
+| :--- | :--- | :--- | :--- |
+| `granted` | `unlock` | Registered `active` person recognized with similarity >= `FACE_MATCH_THRESHOLD` (0.50) without ambiguity. | Energize relay to unlock door for 3-5s; status LED green; audio confirmation chime. |
+| `denied` | `lock` | Presentation attack detected (`spoof_detected`). Access denied. | Security lockout; relay locked; red status LED; buzzer alarm; ESP32 does not retry. |
+| `denied` | `lock` | `inactive` or `suspended` person (`unauthorized`), unknown person (`face_no_match`), ambiguous identity (`insufficient_confidence`), or system failure (`system_error`). | Access denied; relay remains locked; red status LED; no unlock pulse. |
+| `denied` | `no_action` | Liveness verification uncertain (`liveness_inconclusive`). | Transient denial; relay remains locked; amber status LED; ESP32 prompts user to face camera and retries scan. |
+| `denied` | `no_action` | No person detected in frame, no face in frame, or face quality below threshold (`poor_quality_face`). | Idle/framing guidance; relay remains locked; blue/amber LED; prompts user to center face. |
+
+### Client Retry & Fail-Safe Directives
+- **Hardware Fail-Safe by Lock Type**:
+  - **Electric Strike Locks (Fail-Secure)**: Wire through relay **Normally Open (NO)** contacts. In the unpowered or de-energized state, the strike latch remains physically locked. To unlock upon authorized access, the firmware momentarily energizes the relay to close contacts. On complete power loss or firmware crash, the door remains securely locked.
+  - **Magnetic Locks (Fail-Safe)**: Wire through relay **Normally Closed (NC)** contacts. Magnetic locks require continuous DC electrical current to generate the electromagnetic holding force that secures the door. To unlock upon authorized access, the firmware momentarily de-energizes the relay (or opens NC contacts) to interrupt current. In the event of emergency power loss or fire alarm cut-off, magnetic holding power is instantly cut, allowing unrestricted egress as required by life-safety building codes.
+  - **Fail-Closed Communication Default**: Any HTTP error (4xx, 5xx), connection timeout, network drop, or TLS handshake failure must strictly default to `door_action: "lock"`.
+  - **Commissioning Verification**: Physical relay contact wiring (NO vs. NC) and firmware GPIO polarity (active-high vs. active-low relay boards) must be verified and tested on the bench before production deployment.
+- **Timeout**: Set HTTP request timeout on ESP32 to `5000ms`.
+- **Throttling**: ESP32 firmware should rate-limit scan triggers to at most once per `1000ms`.
+
+---
+
+## 8. Database & Vector Index Runbook
+
+### HNSW Index Topology
+- **Model**: `buffalo_s` (default) & `buffalo_l` (ArcFace 512-dimensional unit embeddings)
+- **Index Type**: Hierarchical Navigable Small World (`HNSW`)
+- **Metric**: Cosine Similarity via pgvector cosine distance operator (`vector_cosine_ops`, `<=>`)
+- **Construction Parameters**: `m = 16`, `ef_construction = 64`
+- **Query Parameter**: Default `ef_search = 40` (configurable per session)
+- **Index Script**: `npx tsx scripts/apply-hnsw-index.ts` (idempotently ensures `CREATE EXTENSION IF NOT EXISTS vector;` and index `face_embeddings_embedding_hnsw_idx` exist)
+
+---
+
+## 9. Operational Troubleshooting
+
+| Symptom | Root Cause | Remediation Procedure |
+| :--- | :--- | :--- |
+| **FastAPI 503 / `ECONNREFUSED`** | Python service not running or port conflict | Verify `http://localhost:8000/api/v1/health`. Ensure `.venv` has all dependencies installed. Next.js gracefully fails closed with `system_error` and door lock. |
+| **Registration HTTP 409 Conflict** | Face already enrolled | `POST /api/persons` and `/api/persons/precheck` enforce cosine similarity check at threshold `0.50`. If replacing a person's photo, use `POST /api/persons/[id]/face` which self-excludes the individual. |
+| **`ambiguous_match` Decision** | Two distinct subjects within margin | If top 2 matches have cosine similarity difference `< 0.05` (`FACE_AMBIGUITY_MARGIN`), the system denies access with `insufficient_confidence` to prevent false positive impersonation. Register clearer, frontal captures. |
+| **Device HTTP 401 Unauthorized** | Missing or invalid device headers | ESP32 or edge client must provide `X-Device-Id` and `X-Device-Key` (plaintext secret generated during device registration). System validates against SHA-256 `apiKeyHash`. |
+| **FastAPI `face_low_quality`** | Occluded, blurry, or extreme pose | Ensure illumination is balanced, face bounding box is > 80x80 px, and yaw/pitch angles are within frontal tolerance. System responds with `poor_quality_face` and `no_action`. |
+

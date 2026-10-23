@@ -10,7 +10,9 @@ from app.schemas.detection import (
     DetectedPerson,
     DetectedFace,
     Base64DetectRequest,
+    LivenessDetail,
 )
+from app.core.config import settings
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
 from app.core.quality import calculate_face_quality_score, assess_face_quality
 from app.core.insightface import inference_semaphore
@@ -96,6 +98,7 @@ async def _execute_analysis(
     yolo_detector,
     insightface_app,
     model_name: str,
+    antispoof_manager=None,
 ) -> UnifiedAnalysisResponse:
     """Execute the multi-stage computer vision pipeline on an OpenCV BGR image."""
     start_time = time.perf_counter()
@@ -135,6 +138,7 @@ async def _execute_analysis(
             embedding_size=None,
             quality_score=None,
             detection_confidence=None,
+            liveness=None,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -142,6 +146,7 @@ async def _execute_analysis(
             execution_time_ms=total_time_ms,
             yolo_time_ms=yolo_time_ms,
             insightface_time_ms=0.0,
+            antispoof_time_ms=0.0,
         )
 
     primary_person = next((p for p in persons if p.is_primary), persons[0])
@@ -175,6 +180,7 @@ async def _execute_analysis(
             embedding_size=None,
             quality_score=None,
             detection_confidence=None,
+            liveness=None,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -182,6 +188,7 @@ async def _execute_analysis(
             execution_time_ms=total_time_ms,
             yolo_time_ms=yolo_time_ms,
             insightface_time_ms=insightface_time_ms,
+            antispoof_time_ms=0.0,
         )
 
     # Match primary face to primary person
@@ -193,7 +200,6 @@ async def _execute_analysis(
     quality_score = assessment.quality_score
 
     # 3. State: Face Detected — Low Quality (Quality score < 0.45 or detection score < 0.45)
-    # Allows reasonable webcam variation while preventing blurred, dark, or profile images from entering pgvector matching
     if face_conf < 0.45 or quality_score < 0.45 or assessment.is_blurry or assessment.is_underexposed:
         total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
         guidance_msg = (
@@ -219,6 +225,7 @@ async def _execute_analysis(
             embedding_size=None,
             quality_score=quality_score,
             detection_confidence=face_conf,
+            liveness=None,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -226,9 +233,133 @@ async def _execute_analysis(
             execution_time_ms=total_time_ms,
             yolo_time_ms=yolo_time_ms,
             insightface_time_ms=insightface_time_ms,
+            antispoof_time_ms=0.0,
         )
 
-    # Stage 3: Extract 512D ArcFace Biometric Embedding Vector
+    # Stage 2.5: Anti-Spoofing (Dual-Model MiniFASNet Presentation Attack Detection)
+    liveness_detail = None
+    antispoof_time_ms = 0.0
+
+    if antispoof_manager and settings.ANTISPOOF_ENABLED:
+        t_antispoof_start = time.perf_counter()
+        async with inference_semaphore:
+            liveness_res = await run_in_threadpool(
+                antispoof_manager.predict_liveness,
+                img,
+                primary_face_bbox,
+            )
+        antispoof_time_ms = round((time.perf_counter() - t_antispoof_start) * 1000, 2)
+
+        liveness_detail = LivenessDetail(
+            status=liveness_res.status,
+            model=liveness_res.model,
+            live_score=liveness_res.live_score,
+            threshold=liveness_res.threshold,
+            live_threshold=liveness_res.live_threshold,
+            spoof_threshold=liveness_res.spoof_threshold,
+            individual_scores=liveness_res.individual_scores,
+            processing_time_ms=liveness_res.processing_time_ms,
+            ensemble_method=liveness_res.ensemble_method,
+            error_message=liveness_res.error_message,
+        )
+
+        # 4A. State: Spoof Detected (Presentation attack: screen replay, printed photo, or mask)
+        if liveness_res.status == "spoof_detected":
+            total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            logger.warning(
+                f"Presentation attack detected! Score={liveness_res.live_score} "
+                f"(threshold={liveness_res.spoof_threshold}), individual={liveness_res.individual_scores} in {antispoof_time_ms} ms."
+            )
+            return UnifiedAnalysisResponse(
+                success=True,
+                status="spoof_detected",
+                person_detected=True,
+                face_detected=True,
+                person_count=len(persons),
+                face_count=len(detected_faces),
+                persons=persons,
+                faces=detected_faces,
+                primary_person_bbox=primary_person.bbox,
+                primary_face_bbox=primary_face_bbox,
+                embedding=None,
+                embedding_size=None,
+                quality_score=quality_score,
+                detection_confidence=face_conf,
+                liveness=liveness_detail,
+                model=model_name,
+                image_width=img_w,
+                image_height=img_h,
+                message="Presentation attack detected. Digital screen replay or photo spoof suspected. Access denied.",
+                execution_time_ms=total_time_ms,
+                yolo_time_ms=yolo_time_ms,
+                insightface_time_ms=insightface_time_ms,
+                antispoof_time_ms=antispoof_time_ms,
+            )
+
+        # 4B. State: Liveness Inconclusive (Uncertainty region between spoof and live thresholds)
+        if liveness_res.status == "inconclusive":
+            total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            logger.info(
+                f"Liveness inconclusive. Score={liveness_res.live_score} "
+                f"(range: [{liveness_res.spoof_threshold}, {liveness_res.live_threshold}]) in {antispoof_time_ms} ms."
+            )
+            return UnifiedAnalysisResponse(
+                success=True,
+                status="liveness_inconclusive",
+                person_detected=True,
+                face_detected=True,
+                person_count=len(persons),
+                face_count=len(detected_faces),
+                persons=persons,
+                faces=detected_faces,
+                primary_person_bbox=primary_person.bbox,
+                primary_face_bbox=primary_face_bbox,
+                embedding=None,
+                embedding_size=None,
+                quality_score=quality_score,
+                detection_confidence=face_conf,
+                liveness=liveness_detail,
+                model=model_name,
+                image_width=img_w,
+                image_height=img_h,
+                message="Biometric liveness verification inconclusive. Please remove any screen glare, face the camera directly, and try again.",
+                execution_time_ms=total_time_ms,
+                yolo_time_ms=yolo_time_ms,
+                insightface_time_ms=insightface_time_ms,
+                antispoof_time_ms=antispoof_time_ms,
+            )
+
+        # 4C. State: Technical Failure in Anti-Spoofing Model
+        if liveness_res.status == "error":
+            total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            logger.error(f"Anti-spoofing engine reported an error: {liveness_res.error_message}")
+            return UnifiedAnalysisResponse(
+                success=False,
+                status="recognition_error",
+                person_detected=True,
+                face_detected=True,
+                person_count=len(persons),
+                face_count=len(detected_faces),
+                persons=persons,
+                faces=detected_faces,
+                primary_person_bbox=primary_person.bbox,
+                primary_face_bbox=primary_face_bbox,
+                embedding=None,
+                embedding_size=None,
+                quality_score=quality_score,
+                detection_confidence=face_conf,
+                liveness=liveness_detail,
+                model=model_name,
+                image_width=img_w,
+                image_height=img_h,
+                message=f"Liveness security evaluation error: {liveness_res.error_message}",
+                execution_time_ms=total_time_ms,
+                yolo_time_ms=yolo_time_ms,
+                insightface_time_ms=insightface_time_ms,
+                antispoof_time_ms=antispoof_time_ms,
+            )
+
+    # Stage 3: Extract 512D ArcFace Biometric Embedding Vector (Only executed if liveness is bona fide LIVE)
     embedding_vec = _extract_embedding_vector(primary_face_raw)
     total_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
@@ -251,6 +382,7 @@ async def _execute_analysis(
             embedding_size=None,
             quality_score=quality_score,
             detection_confidence=face_conf,
+            liveness=liveness_detail,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -258,10 +390,11 @@ async def _execute_analysis(
             execution_time_ms=total_time_ms,
             yolo_time_ms=yolo_time_ms,
             insightface_time_ms=insightface_time_ms,
+            antispoof_time_ms=antispoof_time_ms,
         )
 
     logger.info(
-        f"Analysis complete: Usable face processed (quality={quality_score}) in {total_time_ms} ms."
+        f"Analysis complete: Usable face processed (quality={quality_score}, liveness={liveness_detail.status if liveness_detail else 'disabled'}) in {total_time_ms} ms."
     )
 
     return UnifiedAnalysisResponse(
@@ -279,13 +412,15 @@ async def _execute_analysis(
         embedding_size=512,
         quality_score=quality_score,
         detection_confidence=face_conf,
+        liveness=liveness_detail,
         model=model_name,
         image_width=img_w,
         image_height=img_h,
-        message="Face detected and biometric vector extracted successfully.",
+        message="Face detected, liveness confirmed, and biometric vector extracted successfully.",
         execution_time_ms=total_time_ms,
         yolo_time_ms=yolo_time_ms,
         insightface_time_ms=insightface_time_ms,
+        antispoof_time_ms=antispoof_time_ms,
     )
 
 
@@ -293,8 +428,8 @@ async def _execute_analysis(
     "/analyze",
     response_model=UnifiedAnalysisResponse,
     status_code=status.HTTP_200_OK,
-    summary="Unified person detection, face detection, and embedding analysis",
-    description="Accepts an image file upload and executes single-pass YOLO person detection, InsightFace face detection, and embedding extraction.",
+    summary="Unified person detection, face detection, anti-spoofing, and embedding analysis",
+    description="Accepts an image file upload and executes single-pass YOLO person detection, InsightFace face detection, dual-model anti-spoofing, and ArcFace embedding extraction.",
 )
 async def analyze_image_file(
     request: Request,
@@ -303,6 +438,7 @@ async def analyze_image_file(
     manager = getattr(request.app.state, "insightface_manager", None)
     face_app = getattr(request.app.state, "insightface_app", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
+    antispoof = getattr(request.app.state, "antispoof_manager", None)
 
     if manager is None or not manager.is_loaded or face_app is None:
         raise HTTPException(
@@ -324,7 +460,7 @@ async def analyze_image_file(
     image_bytes = await file.read()
     img = read_image_bytes_to_cv2(image_bytes)
 
-    return await _execute_analysis(img, yolo, face_app, manager.model_name)
+    return await _execute_analysis(img, yolo, face_app, manager.model_name, antispoof)
 
 
 @router.post(
@@ -332,7 +468,7 @@ async def analyze_image_file(
     response_model=UnifiedAnalysisResponse,
     status_code=status.HTTP_200_OK,
     summary="Unified analysis from base64-encoded image",
-    description="Accepts a base64 encoded image string and returns unified person and face analysis details.",
+    description="Accepts a base64 encoded image string and returns unified person, face, anti-spoofing, and embedding details.",
 )
 async def analyze_image_base64(
     request: Request,
@@ -341,6 +477,7 @@ async def analyze_image_base64(
     manager = getattr(request.app.state, "insightface_manager", None)
     face_app = getattr(request.app.state, "insightface_app", None)
     yolo = getattr(request.app.state, "yolo_detector", None)
+    antispoof = getattr(request.app.state, "antispoof_manager", None)
 
     if manager is None or not manager.is_loaded or face_app is None:
         raise HTTPException(
@@ -354,5 +491,5 @@ async def analyze_image_base64(
         )
 
     img = decode_base64_to_cv2(payload.image_base64)
-    return await _execute_analysis(img, yolo, face_app, manager.model_name)
+    return await _execute_analysis(img, yolo, face_app, manager.model_name, antispoof)
 

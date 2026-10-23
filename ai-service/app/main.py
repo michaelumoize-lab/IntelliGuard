@@ -11,6 +11,7 @@ from starlette.responses import Response
 from app.core.config import settings
 from app.core.insightface import insightface_manager
 from app.core.yolo import yolo_detector
+from app.core.anti_spoofing import antispoof_manager
 from app.api.v1.router import api_router
 
 # Configure logging
@@ -59,10 +60,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             f"YOLO detector initialization failed: {yolo_detector.error_message}. Service starting in degraded mode."
         )
 
+    # 3. Load Anti-Spoofing dual-model ensemble (MiniFASNetV2 + MiniFASNetV1SE)
+    if settings.ANTISPOOF_ENABLED:
+        antispoof_ok = antispoof_manager.initialize()
+        if antispoof_ok:
+            logger.info("Anti-Spoofing dual-model (MiniFASNetV2 + MiniFASNetV1SE) initialization completed successfully.")
+        else:
+            logger.error(
+                f"Anti-Spoofing initialization failed: {antispoof_manager.error_message}. Service starting with liveness degraded."
+            )
+    else:
+        logger.info("Anti-Spoofing is disabled via ANTISPOOF_ENABLED=False.")
+
     # Attach model managers and app instances to FastAPI application state
     app.state.insightface_manager = insightface_manager
     app.state.insightface_app = insightface_manager.app
     app.state.yolo_detector = yolo_detector
+    app.state.antispoof_manager = antispoof_manager
 
     yield  # Serve requests
 

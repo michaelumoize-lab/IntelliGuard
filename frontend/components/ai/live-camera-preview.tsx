@@ -7,13 +7,6 @@ import {
   VideoOff,
   CameraOff,
   Video,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  ShieldAlert,
-  HelpCircle,
-  User,
-  Users,
 } from "lucide-react";
 import { useWebcam } from "@/hooks/use-webcam";
 import { cn } from "@/lib/utils";
@@ -34,7 +27,9 @@ export interface CameraOverlayResult {
     | "person_no_face"
     | "face_low_quality"
     | "processing"
-    | "error";
+    | "error"
+    | "spoof_detected"
+    | "liveness_inconclusive";
   name?: string;
   similarity?: number;
   message?: string;
@@ -146,28 +141,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       [captureFrame, shouldMirror, videoRef]
     );
 
-    // Reticle corner highlight classes based on access evaluation result
+    // Reticle corner highlight classes based on scanning state
     const getCornerBorderClass = () => {
-      if (overlayResult?.status === "granted") {
-        return "border-emerald-400 shadow-[0_0_12px_#10b981]";
-      }
-      if (
-        overlayResult?.status === "denied" ||
-        overlayResult?.status === "deactivated" ||
-        overlayResult?.status === "unknown" ||
-        overlayResult?.status === "error"
-      ) {
-        return "border-destructive shadow-[0_0_12px_#ef4444]";
-      }
-      if (
-        overlayResult?.status === "ambiguous" ||
-        overlayResult?.status === "face_low_quality"
-      ) {
-        return "border-amber-400 shadow-[0_0_12px_#f59e0b]";
-      }
-      if (overlayResult?.status === "person_no_face") {
-        return "border-cyan-400 shadow-[0_0_10px_#22d3ee]";
-      }
       if (isScanning || overlayResult?.status === "processing") {
         return "border-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]";
       }
@@ -351,115 +326,10 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
         {/* Biometric Guide & Terminal Simulation HUD Reticle */}
         {isCameraOn && isCameraReady && !isLoading && !isError && showHud && (
           <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 sm:p-5 select-none">
-            {/* Top HUD Bar: Decision / Status Banner */}
+            {/* Top HUD Bar: Live Camera / Scanning Status */}
             <div className="flex items-center justify-between w-full z-10 gap-2">
-              {overlayResult ? (
-                <div
-                  className={`px-3 py-1.5 rounded-full border bg-black/90 backdrop-blur-xl text-xs shadow-2xl flex items-center gap-2 transition-all animate-in fade-in zoom-in-95 duration-200 select-none max-w-[calc(100%-48px)] sm:max-w-none ${
-                    overlayResult.status === "granted"
-                      ? "border-emerald-400/90 shadow-[0_0_16px_rgba(16,185,129,0.4)]"
-                      : overlayResult.status === "deactivated"
-                      ? "border-destructive/90 shadow-[0_0_16px_rgba(239,68,68,0.4)]"
-                      : overlayResult.status === "ambiguous" || overlayResult.status === "face_low_quality"
-                      ? "border-amber-400/90 shadow-[0_0_16px_rgba(245,158,11,0.4)]"
-                      : overlayResult.status === "person_no_face"
-                      ? "border-cyan-400/90 shadow-[0_0_16px_rgba(34,211,238,0.4)]"
-                      : overlayResult.status === "no_person"
-                      ? "border-slate-600 shadow-md"
-                      : overlayResult.status === "unknown"
-                      ? "border-rose-400/90 shadow-[0_0_16px_rgba(244,63,94,0.4)]"
-                      : overlayResult.status === "processing"
-                      ? "border-cyan-400/90 shadow-[0_0_16px_rgba(34,211,238,0.4)]"
-                      : "border-destructive/90 shadow-[0_0_16px_rgba(239,68,68,0.4)]"
-                  }`}
-                >
-                  {/* Status Indicator Tag */}
-                  {overlayResult.status === "granted" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider border border-emerald-500/40 shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>GRANTED</span>
-                    </span>
-                  ) : overlayResult.status === "deactivated" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
-                      <ShieldAlert className="w-3.5 h-3.5 text-destructive" />
-                      <span>DEACTIVATED</span>
-                    </span>
-                  ) : overlayResult.status === "ambiguous" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] uppercase tracking-wider border border-amber-400/40 shrink-0">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                      <span>AMBIGUOUS</span>
-                    </span>
-                  ) : overlayResult.status === "face_low_quality" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] uppercase tracking-wider border border-amber-400/40 shrink-0">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                      <span>LOW QUALITY</span>
-                    </span>
-                  ) : overlayResult.status === "person_no_face" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold text-[10px] uppercase tracking-wider border border-cyan-400/40 shrink-0">
-                      <User className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>PERSON DETECTED</span>
-                    </span>
-                  ) : overlayResult.status === "no_person" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold text-[10px] uppercase tracking-wider border border-slate-700 shrink-0">
-                      <Users className="w-3.5 h-3.5 text-slate-400" />
-                      <span>EMPTY FRAME</span>
-                    </span>
-                  ) : overlayResult.status === "unknown" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-bold text-[10px] uppercase tracking-wider border border-rose-500/40 shrink-0">
-                      <HelpCircle className="w-3.5 h-3.5 text-rose-400" />
-                      <span>UNKNOWN</span>
-                    </span>
-                  ) : overlayResult.status === "processing" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold text-[10px] uppercase tracking-wider border border-cyan-400/40 shrink-0">
-                      <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
-                      <span>SCANNING</span>
-                    </span>
-                  ) : overlayResult.status === "error" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
-                      <AlertTriangle className="w-3.5 h-3.5 text-destructive" />
-                      <span>SYSTEM ERROR</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-bold text-[10px] uppercase tracking-wider border border-destructive/40 shrink-0">
-                      <XCircle className="w-3.5 h-3.5 text-destructive" />
-                      <span>DENIED</span>
-                    </span>
-                  )}
-
-                  {/* High-Contrast Individual Name or Primary Message */}
-                  <span className="font-bold text-white text-xs tracking-wide truncate max-w-[110px] sm:max-w-xs drop-shadow-sm">
-                    {overlayResult.status === "granted"
-                      ? overlayResult.name || "Access Allowed"
-                      : overlayResult.status === "deactivated"
-                      ? overlayResult.name || "User Deactivated"
-                      : overlayResult.status === "ambiguous"
-                      ? "Multiple Candidates Matched"
-                      : overlayResult.status === "person_no_face"
-                      ? "No Face Visible"
-                      : overlayResult.status === "no_person"
-                      ? "No Person Detected"
-                      : overlayResult.status === "face_low_quality"
-                      ? "Please Face Camera Directly"
-                      : overlayResult.status === "processing"
-                      ? "Analyzing Biometrics..."
-                      : overlayResult.status === "unknown"
-                      ? "Unregistered Individual"
-                      : overlayResult.status === "error"
-                      ? overlayResult.message || "Camera / System Error"
-                      : "Access Denied"}
-                  </span>
-
-                  {/* Similarity Score Tag */}
-                  {overlayResult.similarity !== undefined &&
-                    overlayResult.status !== "no_person" &&
-                    overlayResult.status !== "person_no_face" && (
-                      <span className="ml-1 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
-                        {(overlayResult.similarity * 100).toFixed(1)}%
-                      </span>
-                    )}
-                </div>
-              ) : isScanning ? (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-950/80 backdrop-blur-md border border-cyan-500/40 text-cyan-200 text-[10px] font-mono">
+              {isScanning || overlayResult?.status === "processing" ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-950/80 backdrop-blur-md border border-cyan-500/40 text-cyan-200 text-[10px] font-mono shadow-sm">
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
                   <span>AI SCANNING ACTIVE</span>
                 </div>
@@ -498,12 +368,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   className={`w-full h-full rounded-[48%_48%_44%_44%/52%_52%_44%_44%] border transition-all duration-300 flex flex-col items-center justify-between py-4 relative overflow-hidden ${
                     isScanning || overlayResult?.status === "processing"
                       ? "border-cyan-400 bg-cyan-500/5 shadow-[0_0_20px_rgba(34,211,238,0.25)] scale-[1.01]"
-                      : overlayResult?.status === "granted"
-                      ? "border-emerald-400/90 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-                      : overlayResult?.status === "denied" || overlayResult?.status === "deactivated" || overlayResult?.status === "unknown"
-                      ? "border-destructive/90 bg-destructive/5 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
-                      : overlayResult?.status === "person_no_face"
-                      ? "border-cyan-400/80 bg-cyan-500/5 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
                       : "border-white/20 hover:border-white/30"
                   }`}
                 >
@@ -520,15 +384,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   <div className="px-3 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-[10px] font-mono tracking-wider uppercase text-white/90 flex items-center gap-1.5 shadow-md">
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${
-                        overlayResult?.status === "granted"
-                          ? "bg-emerald-400 shadow-[0_0_6px_#10b981]"
-                          : overlayResult?.status === "unknown" || overlayResult?.status === "denied"
-                          ? "bg-rose-400 shadow-[0_0_6px_#f43f5e]"
-                          : overlayResult?.status === "face_low_quality" || overlayResult?.status === "ambiguous"
-                          ? "bg-amber-400 shadow-[0_0_6px_#f59e0b]"
-                          : overlayResult?.status === "person_no_face"
-                          ? "bg-cyan-400 shadow-[0_0_6px_#22d3ee]"
-                          : isScanning || overlayResult?.status === "processing"
+                        isScanning || overlayResult?.status === "processing"
                           ? "bg-cyan-400 animate-ping"
                           : "bg-white/60"
                       }`}
@@ -536,22 +392,6 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                     <span>
                       {isScanning || overlayResult?.status === "processing"
                         ? "SCANNING BIOMETRICS..."
-                        : overlayResult?.status === "deactivated"
-                        ? "USER DEACTIVATED"
-                        : overlayResult?.status === "granted"
-                        ? "FACE VERIFIED"
-                        : overlayResult?.status === "no_person"
-                        ? "NO PERSON DETECTED"
-                        : overlayResult?.status === "person_no_face"
-                        ? "FACE NOT VISIBLE"
-                        : overlayResult?.status === "face_low_quality"
-                        ? "POOR BIOMETRIC QUALITY"
-                        : overlayResult?.status === "ambiguous"
-                        ? "AMBIGUOUS MATCH"
-                        : overlayResult?.status === "unknown"
-                        ? "UNKNOWN INDIVIDUAL"
-                        : overlayResult?.status === "denied"
-                        ? "ACCESS DENIED"
                         : "POSITION FACE IN OVAL"}
                     </span>
                   </div>

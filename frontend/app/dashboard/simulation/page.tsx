@@ -237,11 +237,22 @@ export default function WebcamSimulationPage() {
         response.person?.status?.toLowerCase() === "suspended"
       );
 
+      const isSpoof =
+        response.status === "spoof_detected" ||
+        response.reason === "spoof_detected" ||
+        response.liveness?.status === "spoof_detected";
+
+      const isInconclusive =
+        response.status === "liveness_inconclusive" ||
+        response.liveness?.status === "inconclusive";
+
       const isTechnicalError =
-        !response.success ||
-        response.status === "recognition_error" ||
-        response.reason === "system_error" ||
-        response.match_status === "rejected";
+        !isSpoof &&
+        !isInconclusive &&
+        (!response.success ||
+          response.status === "recognition_error" ||
+          response.reason === "system_error" ||
+          (response.match_status === "rejected" && !response.person));
 
       // Auditory Feedback Chime (reading stable ref so callback does not rebind)
       // Only chime for authenticated pass or evaluated unauthorized intruder - NEVER for empty, faceless, or technical error frames
@@ -249,6 +260,7 @@ export default function WebcamSimulationPage() {
         if (response.access_status === "granted") {
           playBiometricSound("granted");
         } else if (
+          isSpoof ||
           response.status === "unknown_individual" ||
           response.status === "ambiguous_match" ||
           response.match_status === "unknown" ||
@@ -259,51 +271,17 @@ export default function WebcamSimulationPage() {
         }
       }
 
-      // Display HUD Banner Overlay for 3.5s
       const personName = response.person
         ? `${response.person.first_name} ${response.person.last_name}`
         : undefined;
-
-      let overlayStatus: CameraOverlayResult["status"] = "denied";
-      if (isTechnicalError) {
-        overlayStatus = "error";
-      } else if (response.status === "no_person") {
-        overlayStatus = "no_person";
-      } else if (response.status === "person_no_face") {
-        overlayStatus = "person_no_face";
-      } else if (response.status === "face_low_quality") {
-        overlayStatus = "face_low_quality";
-      } else if (isDeactivated) {
-        overlayStatus = "deactivated";
-      } else if (response.access_status === "granted") {
-        overlayStatus = "granted";
-      } else if (response.match_status === "ambiguous" || response.status === "ambiguous_match") {
-        overlayStatus = "ambiguous";
-      } else if (response.match_status === "unknown" || response.status === "unknown_individual") {
-        overlayStatus = "unknown";
-      } else {
-        overlayStatus = "denied";
-      }
-
       const unauthorizedStatusTag = isSuspended ? "Suspended" : "Deactivated";
 
-      setCameraOverlay({
-        status: overlayStatus,
-        name: isDeactivated ? `${personName || "User"} (${unauthorizedStatusTag})` : personName,
-        similarity: response.face?.similarity,
-        message: response.message,
-      });
-
+      // Clear camera scanning overlay; full biometric decision is displayed in the right-hand card
+      setCameraOverlay(null);
       if (overlayTimerRef.current) {
         clearTimeout(overlayTimerRef.current);
-      }
-
-      // Display HUD banner for 8s on access granted, or 3.5s for ephemeral/denied states
-      const overlayDisplayMs = !isTechnicalError && response.access_status === "granted" ? 8000 : 3500;
-      overlayTimerRef.current = setTimeout(() => {
-        setCameraOverlay(null);
         overlayTimerRef.current = null;
-      }, overlayDisplayMs);
+      }
 
       // If access is granted, stop continuous monitoring and auto-turn off the camera after 60 seconds
       if (!isTechnicalError && response.access_status === "granted") {
@@ -323,12 +301,18 @@ export default function WebcamSimulationPage() {
       }
 
       // Map history entry using explicit state taxonomy (never falsely reporting unknown individual on technical errors)
-      let historyName = "Recognition Error";
-      let historyMatchStatus: string = "error";
+      let historyName = "Access Denied";
+      let historyMatchStatus: string = "rejected";
 
       if (isTechnicalError) {
         historyName = "Recognition Error";
         historyMatchStatus = "error";
+      } else if (isSpoof) {
+        historyName = "Spoof Attack Detected";
+        historyMatchStatus = "spoof_detected";
+      } else if (isInconclusive) {
+        historyName = "Liveness Inconclusive (Retry)";
+        historyMatchStatus = "liveness_inconclusive";
       } else if (isDeactivated) {
         historyName = `${personName} (User is ${unauthorizedStatusTag.toLowerCase()})`;
         historyMatchStatus = "deactivated";
@@ -359,7 +343,12 @@ export default function WebcamSimulationPage() {
         code: response.person ? response.person.person_code : "N/A",
         status: isTechnicalError ? "denied" : response.access_status,
         matchStatus: historyMatchStatus,
-        similarity: !isTechnicalError && response.face ? response.face.similarity : 0,
+        similarity:
+          !isTechnicalError && response.face
+            ? response.face.similarity
+            : typeof response.liveness?.liveScore === "number"
+            ? response.liveness.liveScore
+            : 0,
       };
 
       setScanHistory((prev) => [historyEntry, ...prev].slice(0, 10));
@@ -458,13 +447,6 @@ export default function WebcamSimulationPage() {
         </span>
       );
     }
-    if (item.matchStatus === "error" || item.matchStatus === "rejected") {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/15 border border-destructive/30 text-destructive font-semibold text-[11px]">
-          <AlertTriangle className="w-3.5 h-3.5" /> ERROR
-        </span>
-      );
-    }
     if (item.matchStatus === "spoof_detected") {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-500 font-semibold text-[11px] animate-pulse">
@@ -476,6 +458,13 @@ export default function WebcamSimulationPage() {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 font-semibold text-[11px]">
           <AlertTriangle className="w-3.5 h-3.5" /> INCONCLUSIVE
+        </span>
+      );
+    }
+    if (item.matchStatus === "error") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/15 border border-destructive/30 text-destructive font-semibold text-[11px]">
+          <AlertTriangle className="w-3.5 h-3.5" /> ERROR
         </span>
       );
     }
@@ -653,8 +642,11 @@ export default function WebcamSimulationPage() {
                     <span className="font-semibold text-foreground">
                       {item.matchStatus === "no_person" ||
                       item.matchStatus === "person_no_face" ||
+                      item.matchStatus === "face_low_quality" ||
                       item.matchStatus === "error" ||
-                      item.matchStatus === "rejected"
+                      item.matchStatus === "rejected" ||
+                      item.matchStatus === "spoof_detected" ||
+                      item.matchStatus === "liveness_inconclusive"
                         ? "—"
                         : item.similarity < 0
                         ? "< 0%"
@@ -687,8 +679,11 @@ export default function WebcamSimulationPage() {
                       <td className="py-3 font-mono text-right font-semibold text-foreground">
                         {item.matchStatus === "no_person" ||
                         item.matchStatus === "person_no_face" ||
+                        item.matchStatus === "face_low_quality" ||
                         item.matchStatus === "error" ||
-                        item.matchStatus === "rejected"
+                        item.matchStatus === "rejected" ||
+                        item.matchStatus === "spoof_detected" ||
+                        item.matchStatus === "liveness_inconclusive"
                           ? "—"
                           : item.similarity < 0
                           ? "< 0%"
