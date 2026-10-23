@@ -19,6 +19,11 @@ const testSuites: TestSuite[] = [
     description: "FastAPI Zod response schemas, 512D vectors, quality thresholds",
   },
   {
+    name: "Presentation Attack Detection (PAD)",
+    file: "tests/liveness-pad.test.ts",
+    description: "MiniFASNet dual-ensemble liveness validation, fail-closed spoof gatekeeper",
+  },
+  {
     name: "ImageKit Storage Verification",
     file: "tests/imagekit-url.test.ts",
     description: "Asset upload, canonical CDN delivery URLs, fileId deletion",

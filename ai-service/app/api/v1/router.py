@@ -1,7 +1,7 @@
 import hmac
 from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from app.api.v1.endpoints import health, detect, embedding, analyze
+from app.api.v1.endpoints import health, detect, embedding, analyze, liveness
 from app.core.config import settings
 
 
@@ -43,5 +43,10 @@ api_router.include_router(
 api_router.include_router(
     embedding.router,
     tags=["Face Embedding"],
+    dependencies=[Depends(verify_service_key)],
+)
+api_router.include_router(
+    liveness.router,
+    tags=["Liveness / Anti-Spoofing"],
     dependencies=[Depends(verify_service_key)],
 )

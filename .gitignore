@@ -66,3 +66,6 @@ alembic/__pycache__/
 # --------------------------
 .DS_Store
 Thumbs.db
+**/.pytest_cache/
+**/__pycache__/
+*.pyc

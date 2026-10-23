@@ -97,22 +97,26 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
     );
   }
 
+  const isSpoof = result.status === "spoof_detected" || result.reason === "spoof_detected";
+  const isInconclusive = result.status === "liveness_inconclusive";
   const isError =
-    result.success === false ||
-    result.status === "recognition_error" ||
-    result.reason === "system_error" ||
-    result.match_status === "rejected";
-  const isGranted = !isError && result.access_status === "granted";
-  const isAmbiguous = !isError && (result.match_status === "ambiguous" || result.status === "ambiguous_match");
-  const isUnknown = !isError && (result.match_status === "unknown" || result.status === "unknown_individual");
-  const isNoPerson = !isError && (result.status === "no_person" || result.reason === "no_person_detected");
-  const isPersonNoFace = !isError && (result.status === "person_no_face" || result.reason === "no_face_detected");
-  const isLowQuality = !isError && (result.status === "face_low_quality" || result.reason === "poor_quality_face");
-  const isSuspended = !isError && Boolean(
+    !isSpoof &&
+    !isInconclusive &&
+    (result.success === false ||
+      result.status === "recognition_error" ||
+      result.reason === "system_error" ||
+      result.match_status === "rejected");
+  const isGranted = !isError && !isSpoof && !isInconclusive && result.access_status === "granted";
+  const isAmbiguous = !isError && !isSpoof && !isInconclusive && (result.match_status === "ambiguous" || result.status === "ambiguous_match");
+  const isUnknown = !isError && !isSpoof && !isInconclusive && (result.match_status === "unknown" || result.status === "unknown_individual");
+  const isNoPerson = !isError && !isSpoof && !isInconclusive && (result.status === "no_person" || result.reason === "no_person_detected");
+  const isPersonNoFace = !isError && !isSpoof && !isInconclusive && (result.status === "person_no_face" || result.reason === "no_face_detected");
+  const isLowQuality = !isError && !isSpoof && !isInconclusive && (result.status === "face_low_quality" || result.reason === "poor_quality_face");
+  const isSuspended = !isError && !isSpoof && !isInconclusive && Boolean(
     result.person?.status?.toLowerCase() === "suspended" ||
     (result.reason === "unauthorized" && result.message?.toLowerCase().includes("suspended"))
   );
-  const isDeactivated = !isError && (
+  const isDeactivated = !isError && !isSpoof && !isInconclusive && (
     result.reason === "unauthorized" ||
     Boolean(
       result.person &&
@@ -123,6 +127,20 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
   );
 
   const getBadgeStyle = () => {
+    if (isSpoof) {
+      return {
+        bg: "bg-destructive/20 border-destructive text-destructive font-bold",
+        icon: <ShieldAlert className="w-4 h-4 text-destructive animate-bounce" />,
+        label: "SPOOF ATTACK DETECTED",
+      };
+    }
+    if (isInconclusive) {
+      return {
+        bg: "bg-amber-500/15 border-amber-500/40 text-amber-500 font-semibold",
+        icon: <AlertTriangle className="w-4 h-4 text-amber-500" />,
+        label: "LIVENESS INCONCLUSIVE",
+      };
+    }
     if (isNoPerson) {
       return {
         bg: "bg-slate-500/10 border-slate-500/30 text-slate-500 dark:text-slate-400",
@@ -145,10 +163,17 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
       };
     }
     if (isError) {
+      const isOffline =
+        result.error === "AI_SERVICE_UNAVAILABLE" ||
+        result.error === "FASTAPI_UNAVAILABLE" ||
+        result.error === "NETWORK_ERROR" ||
+        (result.message?.toLowerCase().includes("unavailable") ?? false) ||
+        (result.message?.toLowerCase().includes("unreachable") ?? false);
+
       return {
         bg: "bg-destructive/15 border-destructive/40 text-destructive",
         icon: <AlertCircle className="w-4 h-4 text-destructive" />,
-        label: "RECOGNITION ERROR",
+        label: isOffline ? "AI SERVICE OFFLINE" : "RECOGNITION ERROR",
       };
     }
     if (isGranted) {
@@ -359,14 +384,18 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
         ) : (
           <div className="p-3 bg-muted/40 rounded-xl border border-border/70 mb-4 text-center">
             <p className="text-xs text-muted-foreground font-medium">
-              {isNoPerson
+              {isSpoof
+                ? (result.message || "Facial presentation attack detected! Access blocked by anti-spoofing engine.")
+                : isInconclusive
+                ? (result.message || "Liveness check inconclusive. Please look directly at the camera in clear lighting.")
+                : isNoPerson
                 ? "No person detected in camera frame. Door remains locked (no action)."
                 : isPersonNoFace
                 ? "Person detected, but face is not visible or obscured. Please face the camera directly."
                 : isLowQuality
-                ? "Face detected, but image quality or lighting is insufficient for biometric verification."
+                ? (result.message || "Face detected, but image quality or lighting is insufficient for biometric verification.")
                 : isError
-                ? "Biometric recognition error encountered. Please check camera feed or try again."
+                ? (result.message || "Biometric recognition error encountered. Please check camera feed or try again.")
                 : isAmbiguous
                 ? "Multiple candidates matched within ambiguity margin."
                 : "Unregistered individual. Access denied by security policy."}
@@ -439,6 +468,45 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
                 </div>
               ))}
             </div>
+          </div>
+        )}
+        {/* Anti-Spoofing / PAD Liveness Inspection */}
+        {result.liveness && (
+          <div className="mb-4 p-3 bg-muted/25 border border-border/80 rounded-xl space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Anti-Spoofing Engine
+              </span>
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                  result.liveness.status === "live"
+                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                    : result.liveness.status === "spoof_detected"
+                    ? "bg-destructive/15 text-destructive border border-destructive/30"
+                    : "bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                }`}
+              >
+                {result.liveness.status.replace("_", " ")}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center text-[11px] text-muted-foreground font-mono">
+              <span>Bona Fide Score:</span>
+              <span className="font-semibold text-foreground">
+                {((result.liveness.live_score ?? result.liveness.liveScore ?? 0) * 100).toFixed(1)}%
+              </span>
+            </div>
+
+            {(result.liveness.individual_scores || result.liveness.individualScores) && (
+              <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-border/50 text-[10px] font-mono text-muted-foreground">
+                {Object.entries(result.liveness.individual_scores || result.liveness.individualScores || {}).map(([model, score]) => (
+                  <div key={model} className="flex justify-between">
+                    <span className="truncate mr-1">{model}:</span>
+                    <span className="font-semibold text-foreground">{((score as number) * 100).toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

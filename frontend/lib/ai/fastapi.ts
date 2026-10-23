@@ -1,6 +1,16 @@
 import "dotenv/config";
 import { z } from "zod";
 
+export interface FastAPILivenessDetail {
+  status: "live" | "spoof_detected" | "inconclusive" | "error";
+  model: string;
+  liveScore: number;
+  threshold?: number | null;
+  individualScores: Record<string, number>;
+  processingTimeMs: number;
+  ensembleMethod?: string;
+}
+
 export interface FastAPIEmbeddingResult {
   success: boolean;
   faceDetected: boolean;
@@ -10,6 +20,7 @@ export interface FastAPIEmbeddingResult {
   qualityScore: number;
   detectionConfidence: number;
   model: string;
+  liveness?: FastAPILivenessDetail | null;
   executionTimeMs: number;
 }
 
@@ -49,6 +60,16 @@ export const faceEmbeddingVectorSchema = z
   .array(z.number().finite())
   .length(512, "Biometric embedding vector must contain exactly 512 dimensions");
 
+export const fastAPILivenessDetailSchema = z.object({
+  status: z.enum(["live", "spoof_detected", "inconclusive", "error"]),
+  model: z.string(),
+  live_score: z.number().finite().min(0.0).max(1.0),
+  threshold: z.number().finite().nullable().optional(),
+  individual_scores: z.record(z.string(), z.number().finite()).default({}),
+  processing_time_ms: z.number().finite().nonnegative().default(0),
+  ensemble_method: z.string().optional(),
+});
+
 export const fastAPIEmbeddingResponseSchema = z.object({
   success: z.boolean(),
   face_detected: z.boolean(),
@@ -59,6 +80,7 @@ export const fastAPIEmbeddingResponseSchema = z.object({
   detection_confidence: z.number().finite().min(0.0).max(1.0),
   model: z.string().optional().default("buffalo_s"),
   model_version: z.string().nullable().optional(),
+  liveness: fastAPILivenessDetailSchema.nullable().optional(),
   execution_time_ms: z.number().finite().nonnegative().default(0),
 });
 
@@ -113,6 +135,8 @@ export const fastAPIAnalysisResponseSchema = z.object({
   execution_time_ms: z.number().finite().nonnegative().default(0),
   yolo_time_ms: z.number().finite().nonnegative().optional(),
   insightface_time_ms: z.number().finite().nonnegative().optional(),
+  antispoof_time_ms: z.number().finite().nonnegative().optional(),
+  liveness: fastAPILivenessDetailSchema.nullable().optional(),
 });
 
 function getServiceHeaders(correlationId?: string): Record<string, string> {
@@ -246,6 +270,17 @@ export async function generateEmbedding(
     qualityScore: data.quality_score,
     detectionConfidence: data.detection_confidence,
     model: data.model,
+    liveness: data.liveness
+      ? {
+          status: data.liveness.status,
+          model: data.liveness.model,
+          liveScore: data.liveness.live_score,
+          threshold: data.liveness.threshold,
+          individualScores: data.liveness.individual_scores,
+          processingTimeMs: data.liveness.processing_time_ms,
+          ensembleMethod: data.liveness.ensemble_method,
+        }
+      : null,
     executionTimeMs: data.execution_time_ms,
   };
 }
@@ -355,6 +390,8 @@ export interface FastAPIAnalysisResult {
   executionTimeMs: number;
   yoloTimeMs?: number;
   insightfaceTimeMs?: number;
+  antispoofTimeMs?: number;
+  liveness?: FastAPILivenessDetail | null;
 }
 
 /**
@@ -475,5 +512,116 @@ export async function analyzeImage(
     executionTimeMs: data.execution_time_ms,
     yoloTimeMs: data.yolo_time_ms || 0,
     insightfaceTimeMs: data.insightface_time_ms || 0,
+    antispoofTimeMs: data.antispoof_time_ms || 0,
+    liveness: data.liveness
+      ? {
+          status: data.liveness.status,
+          model: data.liveness.model,
+          liveScore: data.liveness.live_score,
+          threshold: data.liveness.threshold,
+          individualScores: data.liveness.individual_scores,
+          processingTimeMs: data.liveness.processing_time_ms,
+          ensembleMethod: data.liveness.ensemble_method,
+        }
+      : null,
+  };
+}
+
+export const fastAPILivenessResponseSchema = z.object({
+  success: z.boolean(),
+  liveness: fastAPILivenessDetailSchema,
+  face_detected: z.boolean(),
+  face_count: z.number().int().nonnegative().default(1),
+  primary_face_bbox: z.array(z.number().finite()).length(4).nullable().optional(),
+  execution_time_ms: z.number().finite().nonnegative().default(0),
+});
+
+export interface FastAPILivenessCheckResult {
+  success: boolean;
+  liveness: FastAPILivenessDetail;
+  faceDetected: boolean;
+  faceCount: number;
+  primaryFaceBbox?: number[] | null;
+  executionTimeMs: number;
+}
+
+/**
+ * Server-side client function to run dedicated Anti-Spoofing / Liveness verification on an image.
+ */
+export async function checkLiveness(
+  imageBuffer: Buffer,
+  filename: string = "frame.jpg",
+  correlationId?: string
+): Promise<FastAPILivenessCheckResult> {
+  const baseUrl = process.env.FASTAPI_URL || "http://localhost:8000";
+  const endpoint = `${baseUrl.replace(/\/$/, "")}/api/v1/liveness`;
+
+  const formData = new FormData();
+  const blob = new Blob([new Uint8Array(imageBuffer)], { type: "image/jpeg" });
+  formData.append("file", blob, filename);
+
+  let response: Response;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: getServiceHeaders(correlationId),
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch (err: unknown) {
+    console.error("FastAPI checkLiveness connection error:", err);
+    throw new FastAPIError(
+      "FASTAPI_UNAVAILABLE",
+      "AI anti-spoofing service is currently unavailable or unreachable.",
+      503
+    );
+  }
+
+  if (!response.ok) {
+    let errorDetail = "Failed to evaluate liveness.";
+    try {
+      const errJson = await response.json();
+      if (errJson.detail) {
+        errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+      }
+    } catch {
+      // Ignore
+    }
+    throw new FastAPIError("AI_SERVICE_ERROR", errorDetail, response.status);
+  }
+
+  const rawData = await response.json();
+  const parseResult = fastAPILivenessResponseSchema.safeParse(rawData);
+  if (!parseResult.success) {
+    const issueSummary = parseResult.error.issues
+      .map((i) => `${i.path.join(".") || "root"}: ${i.message}`)
+      .join("; ");
+    throw new FastAPIError(
+      "AI_SERVICE_ERROR",
+      `AI liveness response validation failed: ${issueSummary}`,
+      502
+    );
+  }
+
+  const data = parseResult.data;
+  return {
+    success: data.success,
+    liveness: {
+      status: data.liveness.status,
+      model: data.liveness.model,
+      liveScore: data.liveness.live_score,
+      threshold: data.liveness.threshold,
+      individualScores: data.liveness.individual_scores,
+      processingTimeMs: data.liveness.processing_time_ms,
+      ensembleMethod: data.liveness.ensemble_method,
+    },
+    faceDetected: data.face_detected,
+    faceCount: data.face_count,
+    primaryFaceBbox: data.primary_face_bbox,
+    executionTimeMs: data.execution_time_ms,
   };
 }

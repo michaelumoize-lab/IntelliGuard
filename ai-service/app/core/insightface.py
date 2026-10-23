@@ -77,15 +77,17 @@ def ensure_minimal_models(
                 except OSError:
                     pass
 
-    # Prune any unused models that might exist from previous downloads to prevent FaceAnalysis from loading them
-    for unused in ["1k3d68.onnx", "2d106det.onnx", "genderage.onnx"]:
-        unused_path = os.path.join(models_dir, unused)
-        if os.path.exists(unused_path):
-            try:
-                os.remove(unused_path)
-                logger.info(f"Pruned unused model weight '{unused}' to save memory.")
-            except OSError:
-                pass
+    # For buffalo_s on constrained cloud containers, prune unused 3D landmark weights to conserve RAM.
+    # For buffalo_l, retain downloaded weights as allowed_modules restricts active sessions.
+    if model_name == "buffalo_s":
+        for unused in ["1k3d68.onnx", "2d106det.onnx", "genderage.onnx"]:
+            unused_path = os.path.join(models_dir, unused)
+            if os.path.exists(unused_path):
+                try:
+                    os.remove(unused_path)
+                    logger.info(f"Pruned unused model weight '{unused}' to save memory.")
+                except OSError:
+                    pass
 
     return models_dir
 
@@ -93,14 +95,14 @@ def ensure_minimal_models(
 class InsightFaceManager:
     """Singleton manager responsible for loading and holding the InsightFace model."""
 
-    def __init__(self, model_name: str = "buffalo_s") -> None:
+    def __init__(self, model_name: str = settings.INSIGHTFACE_MODEL) -> None:
         self.model_name: str = model_name
         self.app: Optional[FaceAnalysis] = None
         self.is_loaded: bool = False
         self.active_provider: str = "Unavailable"
         self.error_message: Optional[str] = None
 
-    def initialize(self, det_size: Tuple[int, int] = (320, 320)) -> bool:
+    def initialize(self, det_size: Optional[Tuple[int, int]] = None) -> bool:
         """Initialize the InsightFace FaceAnalysis model.
         
         This method is intended to be called once during FastAPI startup.
@@ -109,8 +111,14 @@ class InsightFaceManager:
             logger.info("InsightFace model is already loaded in memory.")
             return True
 
+        if det_size is None:
+            if hasattr(settings, "INSIGHTFACE_DET_SIZE"):
+                det_size = settings.INSIGHTFACE_DET_SIZE
+            else:
+                det_size = (640, 640) if self.model_name == "buffalo_l" else (320, 320)
+
         try:
-            # 1. Ensure only required models exist to avoid loading unused 143MB landmark weights
+            # 1. Ensure only required models exist to avoid loading unused weights
             ensure_minimal_models(self.model_name)
 
             available_providers = ort.get_available_providers()
@@ -126,15 +134,19 @@ class InsightFaceManager:
             providers.append("CPUExecutionProvider")
 
             logger.info(
-                f"Initializing InsightFace FaceAnalysis (model='{self.model_name}') with providers={providers}, ctx_id={ctx_id}..."
+                f"Initializing InsightFace FaceAnalysis (model='{self.model_name}') with providers={providers}, ctx_id={ctx_id}, det_size={det_size}..."
             )
 
-            # Restrict ONNX Runtime threads and disable memory arena hoarding for low-memory container environments
+            # Restrict ONNX Runtime threads or use configured thread settings
             sess_options = ort.SessionOptions()
-            sess_options.intra_op_num_threads = 1
-            sess_options.inter_op_num_threads = 1
+            if settings.ORT_NUM_THREADS > 0:
+                sess_options.intra_op_num_threads = settings.ORT_NUM_THREADS
+                sess_options.inter_op_num_threads = settings.ORT_NUM_THREADS
+            elif settings.ENVIRONMENT == "production" and self.model_name == "buffalo_s":
+                sess_options.intra_op_num_threads = 1
+                sess_options.inter_op_num_threads = 1
             sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-            sess_options.enable_cpu_mem_arena = False
+            sess_options.enable_cpu_mem_arena = settings.ORT_ENABLE_MEM_ARENA
 
             # Load only detection and recognition modules with optimized session options
             face_app = FaceAnalysis(
