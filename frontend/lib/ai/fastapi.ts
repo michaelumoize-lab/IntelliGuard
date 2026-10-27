@@ -142,6 +142,18 @@ export const fastAPIAnalysisResponseSchema = z.object({
   insightface_time_ms: z.number().finite().nonnegative().optional(),
   antispoof_time_ms: z.number().finite().nonnegative().optional(),
   liveness: fastAPILivenessDetailSchema.nullable().optional(),
+  tailgating_detected: z.boolean().default(false),
+  tailgating: z
+    .object({
+      detected: z.boolean(),
+      trailing_count: z.number().int().default(0),
+      confidence: z.number().finite().default(0),
+      risk_level: z.string().default("none"),
+      message: z.string().nullable().optional(),
+      proximity_ratio: z.number().finite().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 function getServiceHeaders(correlationId?: string): Record<string, string> {
@@ -399,6 +411,15 @@ export interface FastAPIAnalysisResult {
   insightfaceTimeMs?: number;
   antispoofTimeMs?: number;
   liveness?: FastAPILivenessDetail | null;
+  tailgatingDetected: boolean;
+  tailgating?: {
+    detected: boolean;
+    trailingCount: number;
+    confidence: number;
+    riskLevel: string;
+    message?: string | null;
+    proximityRatio?: number | null;
+  } | null;
 }
 
 /**
@@ -531,6 +552,17 @@ export async function analyzeImage(
           individualScores: data.liveness.individual_scores,
           processingTimeMs: data.liveness.processing_time_ms,
           ensembleMethod: data.liveness.ensemble_method,
+        }
+      : null,
+    tailgatingDetected: Boolean(data.tailgating_detected),
+    tailgating: data.tailgating
+      ? {
+          detected: data.tailgating.detected,
+          trailingCount: data.tailgating.trailing_count,
+          confidence: data.tailgating.confidence,
+          riskLevel: data.tailgating.risk_level,
+          message: data.tailgating.message || null,
+          proximityRatio: data.tailgating.proximity_ratio ?? null,
         }
       : null,
   };

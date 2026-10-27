@@ -40,6 +40,7 @@ export default function WebcamSimulationPage() {
 
   const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
+  const [isPausedDueToInactivity, setIsPausedDueToInactivity] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [isMonitoring, setIsMonitoring] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -61,6 +62,7 @@ export default function WebcamSimulationPage() {
   const soundEnabledRef = useRef<boolean>(soundEnabled);
   const overlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoOffTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   useEffect(() => {
     isMonitoringRef.current = isMonitoring;
@@ -76,9 +78,11 @@ export default function WebcamSimulationPage() {
 
   // Turn Camera On / Off
   const handleToggleCamera = useCallback(() => {
+    setIsPausedDueToInactivity(false);
     setIsCameraOn((prev) => {
       const next = !prev;
       if (next) {
+        lastActivityRef.current = Date.now();
         if (autoOffTimerRef.current) {
           clearTimeout(autoOffTimerRef.current);
           autoOffTimerRef.current = null;
@@ -102,6 +106,51 @@ export default function WebcamSimulationPage() {
       return next;
     });
   }, []);
+
+  // Manual Resume / Wake Camera Control after Inactivity Shutdown
+  const handleResumeCamera = useCallback(() => {
+    setIsPausedDueToInactivity(false);
+    lastActivityRef.current = Date.now();
+    setIsCameraOn(true);
+  }, []);
+
+  // 30-Second Inactivity Timer for Automatic Camera Shutdown
+  useEffect(() => {
+    if (!isCameraOn) return;
+
+    lastActivityRef.current = Date.now();
+
+    const onUserActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    window.addEventListener("mousemove", onUserActivity, { passive: true });
+    window.addEventListener("mousedown", onUserActivity, { passive: true });
+    window.addEventListener("keydown", onUserActivity, { passive: true });
+    window.addEventListener("touchstart", onUserActivity, { passive: true });
+
+    const interval = setInterval(() => {
+      // If 30 seconds have elapsed without user activity, shut down camera to save CPU/GPU/battery
+      if (Date.now() - lastActivityRef.current >= 30000) {
+        setIsMonitoring(false);
+        setIsCameraOn(false);
+        setIsCameraReady(false);
+        setCameraOverlay(null);
+        setDetectedPersons([]);
+        setDetectedFaces([]);
+        setImageDimensions(null);
+        setIsPausedDueToInactivity(true);
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("mousemove", onUserActivity);
+      window.removeEventListener("mousedown", onUserActivity);
+      window.removeEventListener("keydown", onUserActivity);
+      window.removeEventListener("touchstart", onUserActivity);
+      clearInterval(interval);
+    };
+  }, [isCameraOn]);
 
   const handleCameraStatusChange = useCallback((ready: boolean) => {
     setIsCameraReady(ready);
@@ -133,6 +182,8 @@ export default function WebcamSimulationPage() {
   // Execute a single face scan
   const executeScan = useCallback(async () => {
     if (!isCameraOnRef.current || !cameraRef.current || inFlightRef.current) return;
+
+    lastActivityRef.current = Date.now();
 
     if (autoOffTimerRef.current) {
       clearTimeout(autoOffTimerRef.current);
@@ -242,6 +293,12 @@ export default function WebcamSimulationPage() {
         response.reason === "spoof_detected" ||
         response.liveness?.status === "spoof_detected";
 
+      const isTailgating = Boolean(
+        response.tailgating_detected ||
+        response.reason === "tailgating_detected" ||
+        response.tailgating?.detected
+      );
+
       const isInconclusive =
         response.status === "liveness_inconclusive" ||
         response.liveness?.status === "inconclusive";
@@ -249,6 +306,7 @@ export default function WebcamSimulationPage() {
       const isTechnicalError =
         !isSpoof &&
         !isInconclusive &&
+        !isTailgating &&
         (!response.success ||
           response.status === "recognition_error" ||
           response.reason === "system_error" ||
@@ -261,6 +319,7 @@ export default function WebcamSimulationPage() {
           playBiometricSound("granted");
         } else if (
           isSpoof ||
+          isTailgating ||
           response.status === "unknown_individual" ||
           response.status === "ambiguous_match" ||
           response.match_status === "unknown" ||
@@ -307,6 +366,11 @@ export default function WebcamSimulationPage() {
       if (isTechnicalError) {
         historyName = "Recognition Error";
         historyMatchStatus = "error";
+      } else if (isTailgating) {
+        historyName = response.person
+          ? `${response.person.first_name} ${response.person.last_name} (Tailgating Denied)`
+          : "Tailgating Violation";
+        historyMatchStatus = "tailgating";
       } else if (isSpoof) {
         historyName = "Spoof Attack Detected";
         historyMatchStatus = "spoof_detected";
@@ -468,6 +532,13 @@ export default function WebcamSimulationPage() {
         </span>
       );
     }
+    if (item.matchStatus === "tailgating") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 font-semibold text-[11px]">
+          <Users className="w-3.5 h-3.5" /> TAILGATING
+        </span>
+      );
+    }
     if (item.matchStatus === "deactivated") {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-destructive/15 border border-destructive/30 text-destructive font-semibold text-[11px]">
@@ -568,6 +639,8 @@ export default function WebcamSimulationPage() {
             imageDimensions={imageDimensions}
             mirrored={true}
             showHud={true}
+            isPausedDueToInactivity={isPausedDueToInactivity}
+            onResumeCamera={handleResumeCamera}
           />
 
           {/* Scan Control Panel directly under Camera Preview */}

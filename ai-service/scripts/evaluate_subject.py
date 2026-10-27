@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import json
+import argparse
 import psutil
 import numpy as np
 import cv2
@@ -46,7 +47,6 @@ def analyze_with_model(model_name: str, det_size: tuple[int, int], img: np.ndarr
     avg_warm_ms = float(np.mean(warm_times))
     std_warm_ms = float(np.std(warm_times))
     min_warm_ms = float(np.min(warm_times))
-    ram_peak = get_ram_mb()
 
     if not faces or len(faces) == 0:
         return {
@@ -99,77 +99,95 @@ def analyze_with_model(model_name: str, det_size: tuple[int, int], img: np.ndarr
             "brightness": round(q_res.brightness, 2),
             "brightness_score": round(q_res.brightness_score, 4),
             "contrast": round(q_res.contrast, 2),
-            "pose_yaw": q_res.pose_yaw,
-            "pose_pitch": q_res.pose_pitch,
-            "pose_roll": q_res.pose_roll,
+            "contrast_score": round(q_res.contrast_score, 4),
+            "pose_yaw": round(q_res.pose_yaw, 2),
+            "pose_pitch": round(q_res.pose_pitch, 2),
+            "pose_roll": round(q_res.pose_roll, 2),
             "pose_score": round(q_res.pose_score, 4),
-            "size_score": round(q_res.size_score, 4),
             "is_valid_enrollment": is_valid,
             "enrollment_rejection_reason": reject_reason,
-            "issues": q_res.issues,
-            "guidance": q_res.guidance,
         }
 
     return {
         "model_name": model_name,
         "face_detected": True,
         "faces_count": len(faces),
-        "load_time_ms": round(load_time_ms, 2),
-        "ram_loaded_mb": round(ram_after_load - ram_before, 2),
-        "ram_peak_mb": round(ram_peak, 2),
-        "cold_time_ms": round(cold_time_ms, 2),
-        "avg_warm_ms": round(avg_warm_ms, 2),
-        "min_warm_ms": round(min_warm_ms, 2),
-        "std_warm_ms": round(std_warm_ms, 2),
         "bbox": bbox,
         "bbox_w": w,
         "bbox_h": h,
         "det_confidence": det_conf,
-        "landmarks": kps,
         "interpupillary_dist_px": ipd,
+        "landmarks_5pt": kps,
+        "load_time_ms": round(load_time_ms, 2),
+        "ram_loaded_mb": round(ram_after_load - ram_before, 2),
+        "cold_infer_ms": round(cold_time_ms, 2),
+        "avg_warm_ms": round(avg_warm_ms, 2),
+        "std_warm_ms": round(std_warm_ms, 2),
+        "min_warm_ms": round(min_warm_ms, 2),
         "embedding_stats": emb_stats,
-        "normalized_vector": norm_emb,
         "quality_info": quality_info,
+        "normalized_vector": [float(v) for v in norm_emb],
     }
 
 
 def main():
-    img_path = os.path.join(parent_dir, "michael.JPG")
-    if not os.path.exists(img_path):
-        img_path = "michael.JPG"
-    if not os.path.exists(img_path):
-        print("Error: michael.JPG not found at", img_path)
+    parser = argparse.ArgumentParser(description="Evaluate biometric subject across Buffalo_S and Buffalo_L backbones.")
+    parser.add_argument("--image", default=None, help="Path to input test image")
+    parser.add_argument("--iterations", type=int, default=10, help="Number of benchmark iterations")
+    parser.add_argument("--output", default=None, help="Path to output JSON report")
+    args = parser.parse_args()
+
+    img_path = args.image
+    if not img_path:
+        default_candidates = [
+            os.path.join(parent_dir, "test.jpg"),
+            os.path.join(current_dir, "..", "test.jpg"),
+            os.path.join(current_dir, "..", "michael.JPG"),
+        ]
+        for candidate in default_candidates:
+            if os.path.exists(candidate):
+                img_path = candidate
+                break
+
+    if not img_path or not os.path.exists(img_path):
+        print(f"Error: Target image file not found. Please provide --image path/to/image.jpg")
         sys.exit(1)
 
     img = cv2.imread(img_path)
     if img is None:
-        print("Error: Could not decode image", img_path)
+        print(f"Error: OpenCV could not read image at {img_path}")
         sys.exit(1)
 
     h, w = img.shape[:2]
+    filename = os.path.basename(img_path)
+
     print("\n" + "=" * 84)
-    print("      INTELLIGUARD BIOMETRIC EXPERIMENT: EVALUATING MICHAEL.JPG")
-    print(f"      Image Resolution: {w} x {h} px | File: michael.JPG")
+    print("      INTELLIGUARD BIOMETRIC EXPERIMENT: SUBJECT COMPARISON")
+    print(f"      Image Resolution: {w} x {h} px | File: {filename}")
     print("=" * 84 + "\n")
 
     print("[Step 1/2] Running Buffalo_S (SCRFD-500M + MobileFaceNet 512D ArcFace)...")
-    res_s = analyze_with_model("buffalo_s", (320, 320), img, iterations=10)
+    res_s = analyze_with_model("buffalo_s", (320, 320), img, iterations=args.iterations)
 
     print("[Step 2/2] Running Buffalo_L (SCRFD-10G + ResNet-50 512D ArcFace)...")
-    res_l = analyze_with_model("buffalo_l", (640, 640), img, iterations=10)
+    res_l = analyze_with_model("buffalo_l", (640, 640), img, iterations=args.iterations)
+
+    if not res_s.get("face_detected") or not res_l.get("face_detected"):
+        print("Warning: One or both models failed to detect a face in the provided image.")
+        return
 
     vec_s = res_s["normalized_vector"]
     vec_l = res_l["normalized_vector"]
     cross_cos_sim = float(np.dot(vec_s, vec_l))
     cross_cos_dist = 1.0 - cross_cos_sim
 
-    report_json_path = os.path.join(current_dir, "michael_comparison_report.json")
+    report_json_path = args.output or os.path.join(current_dir, f"{os.path.splitext(filename)[0]}_comparison_report.json")
     json_summary = {
         "image": {"width": w, "height": h, "path": img_path},
         "cross_model": {
             "cosine_similarity": round(cross_cos_sim, 5),
             "cosine_distance": round(cross_cos_dist, 5),
-            "verdict": "Mathematically incompatible vector spaces (different neural backbones)"
+            "verdict": "Mathematically incompatible vector spaces (different neural backbones)",
         },
         "buffalo_s": {k: v for k, v in res_s.items() if k != "normalized_vector"},
         "buffalo_l": {k: v for k, v in res_l.items() if k != "normalized_vector"},
@@ -200,7 +218,7 @@ def main():
     print(f"{'Bounding Box [x1, y1, x2, y2]':<34} | {str(res_s['bbox']):<22} | {str(res_l['bbox']):<22}")
     print(f"{'Face Crop Size (W x H px)':<34} | {crop_s_str:<22} | {crop_l_str:<22}")
     print(f"{'Inter-Pupillary Distance (IPD)':<34} | {ipd_s_str:<22} | {ipd_l_str:<22}")
-    print(f"{'Avg Inference Latency (10 runs)':<34} | {time_s_str:<22} | {time_l_str:<22}")
+    print(f"{'Avg Inference Latency (ms)':<34} | {time_s_str:<22} | {time_l_str:<22}")
     print(f"{'Min Inference Latency (CPU)':<34} | {min_s_str:<22} | {min_l_str:<22}")
     print(f"{'Std Dev Latency':<34} | {std_s_str:<22} | {std_l_str:<22}")
     print(f"{'RAM Usage Increment':<34} | {ram_s_str:<22} | {ram_l_str:<22}")
@@ -250,7 +268,7 @@ def main():
     print("-" * 84)
     print(f"{'Cosine Similarity (S vs L)':<34} | {cross_cos_sim:<22.5f} | (Orthogonal / Noise space)")
     print(f"{'Cosine Distance (S vs L)':<34} | {cross_cos_dist:<22.5f} | (Distance ~1.0 confirms divergence)")
-    print("=" * 84 + "\n")
+    print("=" * 84 + f"\nFull experiment report saved to: {report_json_path}\n")
 
 
 if __name__ == "__main__":

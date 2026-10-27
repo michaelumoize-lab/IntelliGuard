@@ -12,14 +12,14 @@ IntelliGuard is an intelligent edge-to-cloud access control and security monitor
 | :--- | :--- | :--- |
 | **Presentation Attack Detection (PAD)** | Working | Dual MiniFASNet Ensemble (V2 2.7x + V1SE 4.0x) ONNX Runtime |
 | **Face Detection & Quality** | Working | SCRFD + Composite Quality Assessment (pose, blur, illumination) |
-| **Person Detection** | Working | YOLOv8 Nano (`yolov8n.onnx`) |
-| **Facial Embedding** | Working | InsightFace ArcFace 512D (`buffalo_s` & `buffalo_l` ONNX Runtime) |
+| **Person & Tailgating Detection** | Working | YOLOv8 Nano (`yolov8n.onnx`) with multi-person proximity & centroid tracking |
+| **Facial Embedding** | Working | InsightFace ArcFace 512D (`buffalo_s` & `buffalo_l` dynamic runtime switching) |
 | **Vector Similarity Search** | Working | PostgreSQL + `pgvector` HNSW Cosine Index (`<=>`) |
 | **Access Decision Engine** | Working | Next.js API Gateway, Ambiguity Margin (`0.05`), Fail-Closed Guard |
-| **Admin Dashboard & Management** | Working | Next.js App Router, PAD Inspector, Prisma, ImageKit |
+| **Admin Dashboard & Management** | Working | Next.js App Router, PAD Inspector, Tailgating HUD, Prisma, ImageKit |
 | **Edge Hardware Interface** | Ready | ESP32-S3 CAM (`POST /api/access` contract, PIR, Relay lock) |
 
-**Test Results:** **68 passed, 0 failed** (55 AI service pytest + 13 Frontend integration test suites).
+**Test Results:** **70 passed, 0 failed** (57 AI service pytest + 13 Frontend integration test suites).
 
 > 📘 **See [ANTISPOOFING.md](./ANTISPOOFING.md) for full Presentation Attack Detection architecture, mathematical formulations, and benchmarks.**
 
@@ -45,11 +45,18 @@ python -m venv .venv
 pip install -r requirements.txt
 cp .env.example .env
 
-# Run AI test suite (55 tests)
+# Configure Biometric Model in .env:
+# INSIGHTFACE_MODEL=buffalo_s (Default: ultra-fast MobileNet backbone, ~120MB RAM, 320x320 det size)
+# INSIGHTFACE_MODEL=buffalo_l (High-accuracy: ResNet-50 backbone, 640x640 det size)
+# (Note: Switching the model in .env triggers automatic live hot-reloading without service downtime!)
+
+# Run AI test suite (57 tests covering detect, embedding, quality, PAD, tailgating)
 pytest -v
 
-# Start FastAPI service (port 8000)
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Start FastAPI service with automatic .env reload watching (port 8000)
+python run.py
+# Or via uvicorn CLI:
+# uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-include .env
 ```
 
 ### 3. Frontend & Gateway Setup (Next.js)

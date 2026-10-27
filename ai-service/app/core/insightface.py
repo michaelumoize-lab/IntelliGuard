@@ -188,6 +188,20 @@ class InsightFaceManager:
             logger.error(f"Failed to initialize InsightFace model '{self.model_name}': {err}", exc_info=True)
             return False
 
+    def reload(self, new_model_name: Optional[str] = None, det_size: Optional[Tuple[int, int]] = None) -> bool:
+        """Safely reload InsightFace model into memory with the specified model name and det_size."""
+        import gc
+
+        target_model = (new_model_name or settings.INSIGHTFACE_MODEL).strip().lower()
+        logger.info(f"Reloading InsightFace model from '{self.model_name}' to '{target_model}'...")
+
+        self.app = None
+        self.is_loaded = False
+        self.model_name = target_model
+        gc.collect()
+
+        return self.initialize(det_size=det_size)
+
 
 # Shared model manager instance initialized with model name from settings
 insightface_manager = InsightFaceManager(model_name=settings.INSIGHTFACE_MODEL)

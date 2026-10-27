@@ -25,7 +25,8 @@ export interface AccessScanResponse {
     | "insufficient_confidence"
     | "time_restriction"
     | "manual_override"
-    | "system_error";
+    | "system_error"
+    | "tailgating_detected";
   door_action: "unlock" | "lock" | "no_action";
   match_status?: "matched" | "unknown" | "ambiguous" | "rejected" | null;
   person?: {
@@ -62,6 +63,17 @@ export interface AccessScanResponse {
   face_bbox?: number[] | null;
   image_width?: number;
   image_height?: number;
+  tailgating_detected?: boolean;
+  tailgating?: {
+    detected: boolean;
+    trailing_count?: number;
+    trailingCount?: number;
+    confidence: number;
+    risk_level?: string;
+    riskLevel?: string;
+    message?: string | null;
+    proximity_ratio?: number | null;
+  } | null;
   persons?: Array<{ bbox: number[]; confidence: number; is_primary: boolean }>;
   faces?: Array<{ bbox: number[]; confidence: number; landmarks?: number[][] }>;
   device?: {

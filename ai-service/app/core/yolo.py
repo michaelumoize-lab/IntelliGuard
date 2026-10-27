@@ -80,6 +80,108 @@ class DetectedPersonData:
         }
 
 
+class TailgatingResult:
+    """Detailed tailgating / piggybacking risk analysis."""
+
+    def __init__(
+        self,
+        detected: bool,
+        trailing_count: int,
+        confidence: float,
+        risk_level: str,  # "none", "warning", "critical"
+        message: str,
+        proximity_ratio: Optional[float] = None,
+    ):
+        self.detected = detected
+        self.trailing_count = trailing_count
+        self.confidence = confidence
+        self.risk_level = risk_level
+        self.message = message
+        self.proximity_ratio = proximity_ratio
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "detected": self.detected,
+            "trailing_count": self.trailing_count,
+            "confidence": self.confidence,
+            "risk_level": self.risk_level,
+            "message": self.message,
+            "proximity_ratio": self.proximity_ratio,
+        }
+
+
+def analyze_tailgating(
+    persons: List[DetectedPersonData],
+    img_shape: Tuple[int, int],
+    tailgating_conf_threshold: float = 0.35,
+    critical_proximity: float = 0.45,
+) -> TailgatingResult:
+    """Analyze detected persons for tailgating / piggybacking physical security violations."""
+    if not persons:
+        return TailgatingResult(
+            detected=False,
+            trailing_count=0,
+            confidence=0.0,
+            risk_level="none",
+            message="No persons detected in zone.",
+            proximity_ratio=None,
+        )
+
+    # Filter persons meeting minimum confidence threshold
+    valid_persons = [p for p in persons if p.confidence >= tailgating_conf_threshold]
+    if len(valid_persons) <= 1:
+        return TailgatingResult(
+            detected=False,
+            trailing_count=0,
+            confidence=0.0,
+            risk_level="none",
+            message="Single individual in frame. No tailgating detected.",
+            proximity_ratio=None,
+        )
+
+    # Identify primary individual (first item or largest bounding box)
+    primary = next((p for p in valid_persons if p.is_primary), valid_persons[0])
+    trailing = [p for p in valid_persons if p is not primary]
+
+    trailing_count = len(trailing)
+    max_trailing_conf = round(max((p.confidence for p in trailing), default=0.0), 4)
+
+    # Calculate spatial proximity to primary individual
+    h, w = img_shape[:2]
+    diag = (float(w) ** 2 + float(h) ** 2) ** 0.5
+
+    p_cx = (primary.bbox[0] + primary.bbox[2]) / 2.0
+    p_cy = (primary.bbox[1] + primary.bbox[3]) / 2.0
+
+    min_dist = float("inf")
+    for t in trailing:
+        t_cx = (t.bbox[0] + t.bbox[2]) / 2.0
+        t_cy = (t.bbox[1] + t.bbox[3]) / 2.0
+        dist = ((p_cx - t_cx) ** 2 + (p_cy - t_cy) ** 2) ** 0.5
+        if dist < min_dist:
+            min_dist = dist
+
+    proximity_ratio = round(min_dist / diag, 4) if diag > 0 else 1.0
+
+    # Risk level classification:
+    # If proximity_ratio < critical_proximity (close following) or max_trailing_conf >= 0.60 -> critical
+    risk_level = "critical" if (proximity_ratio <= critical_proximity or max_trailing_conf >= 0.60) else "warning"
+
+    msg = (
+        f"Tailgating alert: {trailing_count} unauthorized trailing individual(s) detected "
+        f"in threshold zone (proximity: {round(proximity_ratio * 100, 1)}%, risk: {risk_level.upper()})."
+    )
+
+    return TailgatingResult(
+        detected=True,
+        trailing_count=trailing_count,
+        confidence=max_trailing_conf,
+        risk_level=risk_level,
+        message=msg,
+        proximity_ratio=proximity_ratio,
+    )
+
+
 class YoloPersonDetector:
     """ONNX-based YOLO detector specialized for COCO Class 0 (Person)."""
 

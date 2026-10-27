@@ -56,6 +56,16 @@ class DetectedPerson(BaseModel):
     )
 
 
+class TailgatingDetail(BaseModel):
+    """Detailed tailgating / piggybacking risk analysis."""
+    detected: bool = Field(..., description="Whether tailgating / multiple persons were detected in zone")
+    trailing_count: int = Field(default=0, description="Number of secondary trailing individuals")
+    confidence: float = Field(default=0.0, description="Highest confidence among trailing individuals")
+    risk_level: str = Field(default="none", description="Risk severity: 'none', 'warning', or 'critical'")
+    message: Optional[str] = Field(default=None, description="Contextual tailgating explanation")
+    proximity_ratio: Optional[float] = Field(default=None, description="Normalized spatial distance ratio to primary person")
+
+
 class Base64DetectRequest(BaseModel):
     """Schema for detecting faces from a base64 encoded image string."""
     image_base64: str = Field(
@@ -113,6 +123,14 @@ class UnifiedAnalysisResponse(BaseModel):
     liveness: Optional[LivenessDetail] = Field(
         default=None,
         description="Anti-spoofing presentation attack detection evaluation details",
+    )
+    tailgating_detected: bool = Field(
+        default=False,
+        description="Whether multiple persons / tailgating was detected in the camera view",
+    )
+    tailgating: Optional[TailgatingDetail] = Field(
+        default=None,
+        description="Detailed tailgating presentation attack diagnostics",
     )
     model: Optional[str] = Field(default=None, description="Active InsightFace recognition model name")
     image_width: int = Field(..., description="Source image width in pixels")
