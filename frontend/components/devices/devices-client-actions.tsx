@@ -34,6 +34,7 @@ export function AddDeviceButton() {
 
   // API Key dialog state
   const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
+  const [createdDeviceId, setCreatedDeviceId] = useState<number | null>(null);
   const [createdDeviceName, setCreatedDeviceName] = useState<string>("");
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
 
@@ -54,6 +55,7 @@ export function AddDeviceButton() {
 
     if (json.apiKey) {
       setCreatedApiKey(json.apiKey);
+      setCreatedDeviceId(json.device?.id || null);
       setCreatedDeviceName(json.device?.deviceName || data.deviceName);
       setApiKeyDialogOpen(true);
     }
@@ -77,10 +79,12 @@ export function AddDeviceButton() {
       <DeviceApiKeyDialog
         open={apiKeyDialogOpen}
         apiKey={createdApiKey}
+        deviceId={createdDeviceId}
         deviceName={createdDeviceName}
         onClose={() => {
           setApiKeyDialogOpen(false);
           setCreatedApiKey(null);
+          setCreatedDeviceId(null);
         }}
       />
     </>
@@ -263,6 +267,7 @@ export function DevicesTableInteractive({
 
   // API Key dialog state
   const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
+  const [createdDeviceId, setCreatedDeviceId] = useState<number | null>(null);
   const [createdDeviceName, setCreatedDeviceName] = useState<string>("");
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
 
@@ -302,6 +307,7 @@ export function DevicesTableInteractive({
       }
       if (json.apiKey) {
         setCreatedApiKey(json.apiKey);
+        setCreatedDeviceId(device.id);
         setCreatedDeviceName(device.deviceName);
         setApiKeyDialogOpen(true);
         toast.success(`New API Key generated for ${device.deviceName}`);
@@ -346,10 +352,12 @@ export function DevicesTableInteractive({
       <DeviceApiKeyDialog
         open={apiKeyDialogOpen}
         apiKey={createdApiKey}
+        deviceId={createdDeviceId}
         deviceName={createdDeviceName}
         onClose={() => {
           setApiKeyDialogOpen(false);
           setCreatedApiKey(null);
+          setCreatedDeviceId(null);
         }}
       />
     </>
@@ -380,6 +388,7 @@ export function DeviceDetailHeaderActions({
   const [editingDevice, setEditingDevice] = useState<DeviceFormData | null>(null);
 
   const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
+  const [createdDeviceId, setCreatedDeviceId] = useState<number | null>(null);
   const [createdDeviceName, setCreatedDeviceName] = useState<string>("");
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
 
@@ -417,6 +426,7 @@ export function DeviceDetailHeaderActions({
       }
       if (json.apiKey) {
         setCreatedApiKey(json.apiKey);
+        setCreatedDeviceId(device.id);
         setCreatedDeviceName(device.deviceName || "Device");
         setApiKeyDialogOpen(true);
         toast.success("New API key generated.");
@@ -456,10 +466,12 @@ export function DeviceDetailHeaderActions({
       <DeviceApiKeyDialog
         open={apiKeyDialogOpen}
         apiKey={createdApiKey}
+        deviceId={createdDeviceId}
         deviceName={createdDeviceName}
         onClose={() => {
           setApiKeyDialogOpen(false);
           setCreatedApiKey(null);
+          setCreatedDeviceId(null);
         }}
       />
     </>

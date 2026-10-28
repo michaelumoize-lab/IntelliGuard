@@ -17,6 +17,7 @@ import { Copy, Check, Eye, EyeOff, ShieldAlert, Key } from "lucide-react";
 interface DeviceApiKeyDialogProps {
   open: boolean;
   apiKey: string | null;
+  deviceId?: number | string | null;
   deviceName?: string;
   onClose: () => void;
 }
@@ -24,21 +25,34 @@ interface DeviceApiKeyDialogProps {
 export function DeviceApiKeyDialog({
   open,
   apiKey,
+  deviceId,
   deviceName,
   onClose,
 }: DeviceApiKeyDialogProps) {
-  const [copied, setCopied] = React.useState(false);
+  const [copiedKey, setCopiedKey] = React.useState(false);
+  const [copiedId, setCopiedId] = React.useState(false);
   const [showKey, setShowKey] = React.useState(true);
 
   if (!apiKey) return null;
 
-  const handleCopy = async () => {
+  const handleCopyKey = async () => {
     try {
       await navigator.clipboard.writeText(apiKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2500);
     } catch (err) {
       console.error("Failed to copy API key:", err);
+    }
+  };
+
+  const handleCopyId = async () => {
+    if (!deviceId) return;
+    try {
+      await navigator.clipboard.writeText(String(deviceId));
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy Device ID:", err);
     }
   };
 
@@ -73,9 +87,43 @@ export function DeviceApiKeyDialog({
             </AlertDescription>
           </Alert>
 
+          {deviceId && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Device ID (Required for X-Device-Id)
+              </label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  type="text"
+                  readOnly
+                  value={String(deviceId)}
+                  className="font-mono text-sm bg-muted/40 font-semibold"
+                />
+                <Button
+                  type="button"
+                  variant={copiedId ? "secondary" : "outline"}
+                  onClick={handleCopyId}
+                  className="shrink-0"
+                >
+                  {copiedId ? (
+                    <>
+                      <Check className="mr-1.5 h-4 w-4 text-emerald-500" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-1.5 h-4 w-4" />
+                      Copy ID
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              Plaintext Device API Key
+              Plaintext Device API Key (Required for X-Api-Key)
             </label>
             <div className="flex items-center space-x-2">
               <div className="relative flex-1">
@@ -100,11 +148,11 @@ export function DeviceApiKeyDialog({
               </div>
               <Button
                 type="button"
-                variant={copied ? "secondary" : "default"}
-                onClick={handleCopy}
+                variant={copiedKey ? "secondary" : "default"}
+                onClick={handleCopyKey}
                 className="shrink-0"
               >
-                {copied ? (
+                {copiedKey ? (
                   <>
                     <Check className="mr-1.5 h-4 w-4 text-emerald-500" />
                     Copied
@@ -112,7 +160,7 @@ export function DeviceApiKeyDialog({
                 ) : (
                   <>
                     <Copy className="mr-1.5 h-4 w-4" />
-                    Copy
+                    Copy Key
                   </>
                 )}
               </Button>
