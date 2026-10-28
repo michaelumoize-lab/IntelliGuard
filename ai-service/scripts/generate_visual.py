@@ -101,7 +101,10 @@ def main():
     # Stack side-by-side
     combined = np.hstack([canvas_s, canvas_l])
     output_path = args.output
-    cv2.imwrite(output_path, combined)
+    success = cv2.imwrite(output_path, combined)
+    if not success:
+        print(f"Error: Failed to save visual comparison to '{output_path}'.")
+        sys.exit(1)
     print(f"Visual comparison successfully saved to: {output_path}")
 
 

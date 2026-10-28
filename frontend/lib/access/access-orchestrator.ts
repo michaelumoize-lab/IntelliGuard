@@ -522,7 +522,7 @@ export async function handleAccessRequest(req: NextRequest): Promise<NextRespons
       !isTailgating;
 
     const decisionReason = isTailgating
-      ? "unauthorized"
+      ? "tailgating_detected"
       : isDeactivated && recognition.matchStatus === "matched"
       ? "unauthorized"
       : rawDecision.reason;

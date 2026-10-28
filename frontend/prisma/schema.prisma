@@ -204,6 +204,7 @@ enum AccessReason {
   system_error
   spoof_detected
   unauthorized
+  tailgating_detected
 }
 
 enum DoorAction {

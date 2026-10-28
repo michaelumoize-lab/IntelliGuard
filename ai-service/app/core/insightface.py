@@ -189,18 +189,37 @@ class InsightFaceManager:
             return False
 
     def reload(self, new_model_name: Optional[str] = None, det_size: Optional[Tuple[int, int]] = None) -> bool:
-        """Safely reload InsightFace model into memory with the specified model name and det_size."""
+        """Safely reload InsightFace model into memory with the specified model name and det_size.
+        
+        If initializing the target model fails, restores and initializes the previous working model,
+        preserving target failure details in error_message and returning False.
+        """
         import gc
 
+        prev_model = self.model_name
         target_model = (new_model_name or settings.INSIGHTFACE_MODEL).strip().lower()
-        logger.info(f"Reloading InsightFace model from '{self.model_name}' to '{target_model}'...")
+        logger.info(f"Reloading InsightFace model from '{prev_model}' to '{target_model}'...")
 
         self.app = None
         self.is_loaded = False
         self.model_name = target_model
         gc.collect()
 
-        return self.initialize(det_size=det_size)
+        success = self.initialize(det_size=det_size)
+        if not success:
+            target_err = self.error_message
+            logger.warning(
+                f"Failed to initialize target InsightFace model '{target_model}': {target_err}. "
+                f"Attempting rollback to previous model '{prev_model}'..."
+            )
+            self.model_name = prev_model
+            gc.collect()
+            prev_det_size = (640, 640) if prev_model == "buffalo_l" else (320, 320)
+            self.initialize(det_size=prev_det_size)
+            self.error_message = target_err
+            return False
+
+        return True
 
 
 # Shared model manager instance initialized with model name from settings

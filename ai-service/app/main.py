@@ -71,17 +71,24 @@ async def _watch_env_changes(app: FastAPI) -> None:
                             f"🔄 Live .env change detected: Switching InsightFace model from '{current_model}' to '{target_model}'..."
                         )
                         det_size = settings.INSIGHTFACE_DET_SIZE
-                        success = manager.reload(
-                            new_model_name=target_model,
-                            det_size=det_size,
-                        )
-                        if success:
+                        app.state.insightface_app = None
+                        try:
+                            success = await asyncio.to_thread(
+                                manager.reload,
+                                new_model_name=target_model,
+                                det_size=det_size,
+                            )
+                        finally:
                             app.state.insightface_app = manager.app
+
+                        if success:
                             logger.info(
-                                f"✅ InsightFace live hot-reload complete: Active model is now '{target_model}' (det_size={det_size})."
+                                f"✅ InsightFace live hot-reload complete: Active model is now '{manager.model_name}' (det_size={det_size})."
                             )
                         else:
-                            logger.error(f"❌ Failed to live-reload InsightFace model '{target_model}'.")
+                            logger.error(
+                                f"❌ Failed to live-reload InsightFace model '{target_model}'. Active model remains '{manager.model_name}'."
+                            )
         except asyncio.CancelledError:
             break
         except Exception as e:

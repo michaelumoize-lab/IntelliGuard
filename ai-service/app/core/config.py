@@ -2,8 +2,9 @@ import os
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 
-# Load environment variables from .env file (override=True ensures changes in .env take precedence)
-load_dotenv(override=True)
+# Preserve existing runtime environment variables by default; enable override only in development
+_env_mode = os.getenv("ENVIRONMENT", "development").strip().lower()
+load_dotenv(override=(_env_mode == "development"))
 
 
 class Settings:
@@ -89,12 +90,14 @@ class Settings:
     
     def reload(self) -> None:
         """Reload environment variables from .env and recompute configuration values."""
-        load_dotenv(override=True)
+        env_mode = os.getenv("ENVIRONMENT", self.ENVIRONMENT).strip().lower()
+        load_dotenv(override=(env_mode == "development"))
         self.INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_s").strip().lower()
         is_buffalo_l = self.INSIGHTFACE_MODEL == "buffalo_l"
         default_det_size = "640" if is_buffalo_l else "320"
         self.INSIGHTFACE_DET_SIZE_W = int(os.getenv("INSIGHTFACE_DET_SIZE_W", default_det_size))
         self.INSIGHTFACE_DET_SIZE_H = int(os.getenv("INSIGHTFACE_DET_SIZE_H", default_det_size))
+        self.INSIGHTFACE_DET_SIZE = (self.INSIGHTFACE_DET_SIZE_W, self.INSIGHTFACE_DET_SIZE_H)
         self.INSIGHTFACE_CHECKSUM = os.getenv(
             "INSIGHTFACE_CHECKSUM", os.getenv("INSIGHTFACE_ZIP_CHECKSUM", None)
         )
