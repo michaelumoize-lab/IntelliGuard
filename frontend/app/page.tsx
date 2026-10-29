@@ -47,7 +47,7 @@ export default async function Home() {
             <div>
               <span className="font-bold tracking-tight text-base block text-foreground">IntelliGuard</span>
               <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
-                Biometric Defense Engine
+                Security System
               </span>
             </div>
           </div>
@@ -67,7 +67,7 @@ export default async function Home() {
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-medium">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>InsightFace 512D ArcFace + pgvector Similarity</span>
+                <span>Enterprise Biometric Access Control</span>
               </div>
 
               {/* Title */}
@@ -133,7 +133,7 @@ export default async function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-muted-foreground">pgvector Search:</span>
+                    <span className="text-muted-foreground">Vector Search:</span>
                     <span className="font-mono font-semibold text-foreground">Operational</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -280,9 +280,9 @@ export default async function Home() {
                 <div className="p-2.5 w-fit rounded-xl bg-primary/10 text-primary border border-primary/20">
                   <Scan className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-semibold text-foreground">512D ArcFace Inference</h3>
+                <h3 className="text-sm font-semibold text-foreground">Deep Neural Vision</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  InsightFace buffalo_s deep neural network crops, normalizes, and embeds faces with extreme fidelity.
+                  High-speed neural networks detect, align, and extract biometric facial embeddings with extreme fidelity.
                 </p>
               </div>
 
@@ -290,9 +290,9 @@ export default async function Home() {
                 <div className="p-2.5 w-fit rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
                   <Database className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-semibold text-foreground">pgvector Similarity Index</h3>
+                <h3 className="text-sm font-semibold text-foreground">High-Speed Vector Search</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  PostgreSQL native vector similarity queries execute across thousands of identities in milliseconds.
+                  Real-time vector similarity matching verifies identities against authorized database profiles in milliseconds.
                 </p>
               </div>
 
@@ -321,27 +321,20 @@ export default async function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8 bg-background">
+      <footer className="border-t border-border/80 py-8 bg-background/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-primary" />
             <span className="font-semibold text-foreground">IntelliGuard Security Platform</span>
-            <span>&copy; {new Date().getFullYear()}</span>
+            <span className="text-muted-foreground/60">•</span>
+            <span>&copy; {new Date().getFullYear()} All rights reserved.</span>
           </div>
 
-          <div className="flex items-center gap-4 font-mono text-[11px]">
-            <Link href="/dashboard" className="hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/dashboard/simulation" className="hover:text-foreground transition-colors">
-              Simulation
-            </Link>
-            <Link href="/dashboard/persons" className="hover:text-foreground transition-colors">
-              Personnel
-            </Link>
-            <Link href="/settings/account" className="hover:text-foreground transition-colors">
-              Settings
-            </Link>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>Designed &amp; Built by</span>
+            <span className="font-semibold text-foreground hover:text-primary transition-colors cursor-default">
+              Michael Eneyufoh Umoize
+            </span>
           </div>
         </div>
       </footer>

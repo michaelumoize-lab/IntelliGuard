@@ -142,7 +142,7 @@ export function PersonDetailsDrawer({
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Active Enrolled Biometric
             </span>
             <p className="text-[11px] font-mono text-muted-foreground">
-              InsightFace 512D ArcFace Vector (pgvector)
+              Enrolled 512D Biometric Vector
             </p>
           </div>
         </div>

@@ -80,8 +80,8 @@ export default async function DashboardLayout({
                   <Link href="/dashboard/alerts" title="Security Alerts">
                     <Bell className="w-4 h-4" />
                     {unresolvedAlertsCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold font-mono text-destructive-foreground ring-2 ring-background">
-                        {unresolvedAlertsCount > 9 ? "9+" : unresolvedAlertsCount}
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-rose-600 dark:bg-rose-500 text-[10px] font-bold font-mono text-white ring-2 ring-background leading-none shadow-xs pointer-events-none">
+                        {unresolvedAlertsCount}
                       </span>
                     )}
                   </Link>
