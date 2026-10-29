@@ -197,6 +197,23 @@ function runAccessControlUnitTests() {
     process.exitCode = 1;
   }
 
+  // Test 15: Tailgating Detected -> Lock & Deny with tailgating_detected
+  console.log("\n[Test 15] Tailgating Detected (Multiple Persons in Zone)...");
+  const res15 = evaluateAccess({
+    matchStatus: "matched",
+    person: mockPerson,
+    similarity: 0.95,
+    distance: 0.05,
+    tailgatingDetected: true,
+    trailingCount: 1,
+  });
+  if (res15.accessStatus === "denied" && res15.reason === "tailgating_detected" && res15.doorAction === "lock") {
+    console.log("✅ PASSED: Tailgating correctly overrides matched person with lock & tailgating_detected denial.");
+  } else {
+    console.error("❌ FAILED: Unexpected decision for tailgating:", res15);
+    process.exitCode = 1;
+  }
+
   console.log("\n==================================================");
   if (process.exitCode === 1) {
     console.error("  Some Decision Engine Unit Tests Failed!");

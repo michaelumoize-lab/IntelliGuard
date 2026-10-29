@@ -99,24 +99,30 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
 
   const isSpoof = result.status === "spoof_detected" || result.reason === "spoof_detected";
   const isInconclusive = result.status === "liveness_inconclusive";
+  const isTailgating = Boolean(
+    result.tailgating_detected ||
+    result.reason === "tailgating_detected" ||
+    result.tailgating?.detected
+  );
   const isError =
     !isSpoof &&
     !isInconclusive &&
+    !isTailgating &&
     (result.success === false ||
       result.status === "recognition_error" ||
       result.reason === "system_error" ||
       result.match_status === "rejected");
-  const isGranted = !isError && !isSpoof && !isInconclusive && result.access_status === "granted";
-  const isAmbiguous = !isError && !isSpoof && !isInconclusive && (result.match_status === "ambiguous" || result.status === "ambiguous_match");
-  const isUnknown = !isError && !isSpoof && !isInconclusive && (result.match_status === "unknown" || result.status === "unknown_individual");
-  const isNoPerson = !isError && !isSpoof && !isInconclusive && (result.status === "no_person" || result.reason === "no_person_detected");
-  const isPersonNoFace = !isError && !isSpoof && !isInconclusive && (result.status === "person_no_face" || result.reason === "no_face_detected");
-  const isLowQuality = !isError && !isSpoof && !isInconclusive && (result.status === "face_low_quality" || result.reason === "poor_quality_face");
-  const isSuspended = !isError && !isSpoof && !isInconclusive && Boolean(
+  const isGranted = !isError && !isSpoof && !isInconclusive && !isTailgating && result.access_status === "granted";
+  const isAmbiguous = !isError && !isSpoof && !isInconclusive && !isTailgating && (result.match_status === "ambiguous" || result.status === "ambiguous_match");
+  const isUnknown = !isError && !isSpoof && !isInconclusive && !isTailgating && (result.match_status === "unknown" || result.status === "unknown_individual");
+  const isNoPerson = !isError && !isSpoof && !isInconclusive && !isTailgating && (result.status === "no_person" || result.reason === "no_person_detected");
+  const isPersonNoFace = !isError && !isSpoof && !isInconclusive && !isTailgating && (result.status === "person_no_face" || result.reason === "no_face_detected");
+  const isLowQuality = !isError && !isSpoof && !isInconclusive && !isTailgating && (result.status === "face_low_quality" || result.reason === "poor_quality_face");
+  const isSuspended = !isError && !isSpoof && !isInconclusive && !isTailgating && Boolean(
     result.person?.status?.toLowerCase() === "suspended" ||
     (result.reason === "unauthorized" && result.message?.toLowerCase().includes("suspended"))
   );
-  const isDeactivated = !isError && !isSpoof && !isInconclusive && (
+  const isDeactivated = !isError && !isSpoof && !isInconclusive && !isTailgating && (
     result.reason === "unauthorized" ||
     Boolean(
       result.person &&
@@ -127,6 +133,13 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
   );
 
   const getBadgeStyle = () => {
+    if (isTailgating) {
+      return {
+        bg: "bg-amber-500/20 border-amber-500/50 text-amber-500 font-bold",
+        icon: <Users className="w-4 h-4 text-amber-500 animate-pulse" />,
+        label: "TAILGATING VIOLATION DETECTED",
+      };
+    }
     if (isSpoof) {
       return {
         bg: "bg-destructive/20 border-destructive text-destructive font-bold",
@@ -251,6 +264,29 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
             </span>
           </div>
         </div>
+
+        {/* Tailgating Security Warning Banner */}
+        {isTailgating && (
+          <div className="mb-4 p-3.5 sm:p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs flex items-start gap-3 shadow-sm animate-in fade-in duration-200">
+            <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 text-amber-500 animate-pulse" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-xs uppercase tracking-wider text-amber-500">
+                  Tailgating / Piggybacking Detected
+                </span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-amber-500/20 border border-amber-500/30">
+                  {result.tailgating?.trailing_count || result.tailgating?.trailingCount || 1} TRAILING
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {result.tailgating?.message ||
+                  "Multiple individuals detected in the access threshold zone during biometric verification. Physical barrier secured fail-closed to prevent unauthorized trailing entry."}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Welcome Greeting Hero Banner (Active when Access is Granted) */}
         {isGranted && result.person && (

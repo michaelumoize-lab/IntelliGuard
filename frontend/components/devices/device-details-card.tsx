@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { DeviceStatusBadge } from "./device-status-badge";
 import { DeviceTypeBadge } from "./device-type-badge";
 import { Button } from "@/components/ui/button";
-import { Edit, KeyRound, Calendar, HardDrive, MapPin, Network, Code2 } from "lucide-react";
+import { Edit, KeyRound, Calendar, HardDrive, MapPin, Network, Code2, Copy, Check, Hash } from "lucide-react";
 
 interface DeviceDetailsCardProps {
   device: {
@@ -24,6 +24,18 @@ interface DeviceDetailsCardProps {
 }
 
 export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDetailsCardProps) {
+  const [copiedId, setCopiedId] = React.useState(false);
+
+  const handleCopyId = async () => {
+    try {
+      await navigator.clipboard.writeText(String(device.id));
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy device ID:", err);
+    }
+  };
+
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
@@ -33,6 +45,20 @@ export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDet
             <DeviceStatusBadge status={device.status} />
           </div>
           <CardDescription className="mt-1 flex items-center space-x-2 text-xs">
+            <button
+              type="button"
+              onClick={handleCopyId}
+              className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
+              title="Copy numeric Device ID for ESP32 config"
+            >
+              <span>ID: #{device.id}</span>
+              {copiedId ? (
+                <Check className="h-3 w-3 text-emerald-500" />
+              ) : (
+                <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
+              )}
+            </button>
+            <span>•</span>
             <span className="font-mono text-muted-foreground">{device.serialNumber}</span>
             <span>•</span>
             <DeviceTypeBadge type={device.deviceType} />

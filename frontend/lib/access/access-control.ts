@@ -23,6 +23,8 @@ export interface RecognitionInput {
   similarity: number;
   distance: number;
   qualityScore?: number | null;
+  tailgatingDetected?: boolean;
+  trailingCount?: number;
 }
 
 export interface AccessDecisionResult {
@@ -37,7 +39,8 @@ export interface AccessDecisionResult {
     | "insufficient_confidence"
     | "time_restriction"
     | "manual_override"
-    | "system_error";
+    | "system_error"
+    | "tailgating_detected";
   doorAction: "unlock" | "lock" | "no_action";
 }
 
@@ -92,6 +95,15 @@ export function evaluateAccess(input: RecognitionInput): AccessDecisionResult {
         accessStatus: "denied",
         reason: "poor_quality_face",
         doorAction: "no_action",
+      };
+    }
+
+    // Rule 0T: Tailgating Detected (Multiple persons detected in entry portal - Fail Closed)
+    if (input.tailgatingDetected) {
+      return {
+        accessStatus: "denied",
+        reason: "tailgating_detected",
+        doorAction: "lock",
       };
     }
 

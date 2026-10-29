@@ -179,6 +179,49 @@ assert.strictEqual(errService.code, "AI_SERVICE_ERROR");
 assert.strictEqual(errService.statusCode, 502);
 console.log("✅ PASSED: FastAPIError codes and status codes behave as expected.\n");
 
+// ---------------------------------------------------------------------------
+// Test 10: Zod Unified Analysis - Tailgating Detection Payload Validation
+// ---------------------------------------------------------------------------
+console.log("[Test 10] Valid Unified Analysis with Tailgating Payload...");
+const tailgatingPayload = {
+  success: true,
+  status: "face_detected_processing",
+  person_detected: true,
+  face_detected: true,
+  person_count: 2,
+  face_count: 1,
+  persons: [
+    { bbox: [100, 50, 350, 550], confidence: 0.94, is_primary: true },
+    { bbox: [300, 80, 500, 520], confidence: 0.87, is_primary: false },
+  ],
+  faces: [{ bbox: [150, 100, 250, 220], confidence: 0.95 }],
+  primary_person_bbox: [100, 50, 350, 550],
+  primary_face_bbox: [150, 100, 250, 220],
+  embedding: validEmbedding,
+  embedding_size: 512,
+  quality_score: 0.91,
+  detection_confidence: 0.95,
+  tailgating_detected: true,
+  tailgating: {
+    detected: true,
+    trailing_count: 1,
+    confidence: 0.87,
+    risk_level: "critical",
+    message: "Tailgating alert: 1 trailing individual detected in threshold zone.",
+    proximity_ratio: 0.28,
+  },
+  model: "buffalo_s",
+  image_width: 640,
+  image_height: 480,
+  execution_time_ms: 145.2,
+};
+const parsedTailgating = fastAPIAnalysisResponseSchema.safeParse(tailgatingPayload);
+assert.strictEqual(parsedTailgating.success, true, "Tailgating payload must pass schema validation");
+assert.strictEqual(parsedTailgating.data?.tailgating_detected, true);
+assert.strictEqual(parsedTailgating.data?.tailgating?.trailing_count, 1);
+assert.strictEqual(parsedTailgating.data?.tailgating?.risk_level, "critical");
+console.log("✅ PASSED: Tailgating analysis payload parsed and validated correctly.\n");
+
 console.log("==================================================");
 console.log("  All Phase 3 AI Reliability Tests Passed!       ");
 console.log("==================================================");

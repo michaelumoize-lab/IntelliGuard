@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -35,6 +36,63 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         response: Response = await call_next(request)
         response.headers["X-Correlation-ID"] = correlation_id
         return response
+
+
+async def _watch_env_changes(app: FastAPI) -> None:
+    """Watches the .env file for changes to INSIGHTFACE_MODEL and hot-reloads the active model without restarting."""
+    import os
+    import asyncio
+    from app.core.config import settings
+
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if not os.path.exists(env_path):
+        env_path = ".env"
+
+    last_mtime = os.path.getmtime(env_path) if os.path.exists(env_path) else 0.0
+
+    while True:
+        try:
+            await asyncio.sleep(1.5)
+            if not os.path.exists(env_path):
+                continue
+
+            current_mtime = os.path.getmtime(env_path)
+            if current_mtime > last_mtime:
+                last_mtime = current_mtime
+                settings.reload()
+
+                manager = getattr(app.state, "insightface_manager", None)
+                if manager is not None:
+                    current_model = manager.model_name
+                    target_model = settings.INSIGHTFACE_MODEL
+
+                    if current_model != target_model:
+                        logger.info(
+                            f"🔄 Live .env change detected: Switching InsightFace model from '{current_model}' to '{target_model}'..."
+                        )
+                        det_size = settings.INSIGHTFACE_DET_SIZE
+                        app.state.insightface_app = None
+                        try:
+                            success = await asyncio.to_thread(
+                                manager.reload,
+                                new_model_name=target_model,
+                                det_size=det_size,
+                            )
+                        finally:
+                            app.state.insightface_app = manager.app
+
+                        if success:
+                            logger.info(
+                                f"✅ InsightFace live hot-reload complete: Active model is now '{manager.model_name}' (det_size={det_size})."
+                            )
+                        else:
+                            logger.error(
+                                f"❌ Failed to live-reload InsightFace model '{target_model}'. Active model remains '{manager.model_name}'."
+                            )
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"Notice from .env file watcher: {e}")
 
 
 @asynccontextmanager
@@ -78,9 +136,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.yolo_detector = yolo_detector
     app.state.antispoof_manager = antispoof_manager
 
+    # Start live .env watcher task to support instant hot-reloading when INSIGHTFACE_MODEL changes
+    watcher_task = asyncio.create_task(_watch_env_changes(app))
+
     yield  # Serve requests
 
     logger.info("Shutting down IntelliGuard AI Service...")
+    watcher_task.cancel()
+    try:
+        await watcher_task
+    except asyncio.CancelledError:
+        pass
 
 
 # Instantiate FastAPI application

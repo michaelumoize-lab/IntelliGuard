@@ -11,11 +11,13 @@ from app.schemas.detection import (
     DetectedFace,
     Base64DetectRequest,
     LivenessDetail,
+    TailgatingDetail,
 )
 from app.core.config import settings
 from app.core.image import read_image_bytes_to_cv2, decode_base64_to_cv2
 from app.core.quality import calculate_face_quality_score, assess_face_quality
 from app.core.insightface import inference_semaphore
+from app.core.yolo import analyze_tailgating, TailgatingResult
 
 router = APIRouter()
 logger = logging.getLogger("intelliguard.analyze")
@@ -139,6 +141,8 @@ async def _execute_analysis(
             quality_score=None,
             detection_confidence=None,
             liveness=None,
+            tailgating_detected=False,
+            tailgating=None,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -148,6 +152,34 @@ async def _execute_analysis(
             insightface_time_ms=0.0,
             antispoof_time_ms=0.0,
         )
+
+    # Stage 1.5: Tailgating & Multi-Person Physical Access Analysis
+    tailgating_res = (
+        analyze_tailgating(
+            persons_raw,
+            (img_h, img_w),
+            tailgating_conf_threshold=settings.TAILGATING_CONFIDENCE_THRESHOLD,
+            critical_proximity=settings.TAILGATING_CRITICAL_DISTANCE,
+        )
+        if settings.TAILGATING_DETECTION_ENABLED
+        else TailgatingResult(
+            detected=False,
+            trailing_count=0,
+            confidence=0.0,
+            risk_level="none",
+            message="Tailgating detection disabled.",
+            proximity_ratio=None,
+        )
+    )
+
+    tailgating_detail = TailgatingDetail(
+        detected=tailgating_res.detected,
+        trailing_count=tailgating_res.trailing_count,
+        confidence=tailgating_res.confidence,
+        risk_level=tailgating_res.risk_level,
+        message=tailgating_res.message,
+        proximity_ratio=tailgating_res.proximity_ratio,
+    )
 
     primary_person = next((p for p in persons if p.is_primary), persons[0])
 
@@ -181,6 +213,8 @@ async def _execute_analysis(
             quality_score=None,
             detection_confidence=None,
             liveness=None,
+            tailgating_detected=tailgating_detail.detected,
+            tailgating=tailgating_detail,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -226,6 +260,8 @@ async def _execute_analysis(
             quality_score=quality_score,
             detection_confidence=face_conf,
             liveness=None,
+            tailgating_detected=tailgating_detail.detected,
+            tailgating=tailgating_detail,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -286,6 +322,8 @@ async def _execute_analysis(
                 quality_score=quality_score,
                 detection_confidence=face_conf,
                 liveness=liveness_detail,
+                tailgating_detected=tailgating_detail.detected,
+                tailgating=tailgating_detail,
                 model=model_name,
                 image_width=img_w,
                 image_height=img_h,
@@ -319,6 +357,8 @@ async def _execute_analysis(
                 quality_score=quality_score,
                 detection_confidence=face_conf,
                 liveness=liveness_detail,
+                tailgating_detected=tailgating_detail.detected,
+                tailgating=tailgating_detail,
                 model=model_name,
                 image_width=img_w,
                 image_height=img_h,
@@ -349,6 +389,8 @@ async def _execute_analysis(
                 quality_score=quality_score,
                 detection_confidence=face_conf,
                 liveness=liveness_detail,
+                tailgating_detected=tailgating_detail.detected,
+                tailgating=tailgating_detail,
                 model=model_name,
                 image_width=img_w,
                 image_height=img_h,
@@ -383,6 +425,8 @@ async def _execute_analysis(
             quality_score=quality_score,
             detection_confidence=face_conf,
             liveness=liveness_detail,
+            tailgating_detected=tailgating_detail.detected,
+            tailgating=tailgating_detail,
             model=model_name,
             image_width=img_w,
             image_height=img_h,
@@ -413,6 +457,8 @@ async def _execute_analysis(
         quality_score=quality_score,
         detection_confidence=face_conf,
         liveness=liveness_detail,
+        tailgating_detected=tailgating_detail.detected,
+        tailgating=tailgating_detail,
         model=model_name,
         image_width=img_w,
         image_height=img_h,

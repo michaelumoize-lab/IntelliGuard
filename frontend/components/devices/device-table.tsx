@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DeviceStatusBadge } from "./device-status-badge";
 import { DeviceTypeBadge } from "./device-type-badge";
-import { MoreHorizontal, Eye, Edit, KeyRound, Trash2, Cpu } from "lucide-react";
+import { MoreHorizontal, Eye, Edit, KeyRound, Trash2, Cpu, Copy, Check } from "lucide-react";
 
 export interface DeviceTableItem {
   id: number;
@@ -66,6 +66,18 @@ export function DeviceTable({
 }: DeviceTableProps) {
   const [deleteId, setDeleteId] = React.useState<number | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [copiedId, setCopiedId] = React.useState<number | null>(null);
+
+  const handleCopyId = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(String(id));
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy device ID:", err);
+    }
+  };
 
   const confirmDelete = async () => {
     if (!deleteId || !onDelete) return;
@@ -94,6 +106,7 @@ export function DeviceTable({
       <Table className="min-w-[800px]">
         <TableHeader>
           <TableRow className="border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px] tracking-wider hover:bg-transparent">
+            <TableHead className="w-[80px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ID</TableHead>
             <TableHead className="w-[120px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</TableHead>
             <TableHead className="w-[200px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Device Name</TableHead>
             <TableHead className="w-[140px] py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Type</TableHead>
@@ -108,7 +121,7 @@ export function DeviceTable({
         <TableBody className="divide-y divide-border/40">
           {devices.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="h-48 text-center">
+              <TableCell colSpan={10} className="h-48 text-center">
                 <div className="flex flex-col items-center justify-center text-muted-foreground">
                   <Cpu className="h-10 w-10 mb-2 opacity-40" />
                   <p className="font-semibold text-base">No registered devices found</p>
@@ -121,6 +134,21 @@ export function DeviceTable({
           ) : (
             devices.map((device) => (
               <TableRow key={device.id} className="hover:bg-muted/40 transition-colors">
+                <TableCell className="py-3 font-mono text-xs">
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopyId(device.id, e)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
+                    title="Click to copy Device ID"
+                  >
+                    <span>#{device.id}</span>
+                    {copiedId === device.id ? (
+                      <Check className="h-3 w-3 text-emerald-500" />
+                    ) : (
+                      <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
+                    )}
+                  </button>
+                </TableCell>
                 <TableCell className="py-3">
                   <DeviceStatusBadge status={device.status} />
                 </TableCell>

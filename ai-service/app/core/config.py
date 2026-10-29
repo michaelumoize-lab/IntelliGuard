@@ -1,9 +1,10 @@
 import os
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Preserve existing runtime environment variables by default; enable override only in development
+_env_mode = os.getenv("ENVIRONMENT", "development").strip().lower()
+load_dotenv(override=(_env_mode == "development"))
 
 
 class Settings:
@@ -11,9 +12,10 @@ class Settings:
 
     APP_NAME: str = os.getenv("APP_NAME", "IntelliGuard AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s")
-    INSIGHTFACE_DET_SIZE_W: int = int(os.getenv("INSIGHTFACE_DET_SIZE_W", "640" if os.getenv("INSIGHTFACE_MODEL") == "buffalo_l" else "320"))
-    INSIGHTFACE_DET_SIZE_H: int = int(os.getenv("INSIGHTFACE_DET_SIZE_H", "640" if os.getenv("INSIGHTFACE_MODEL") == "buffalo_l" else "320"))
+    INSIGHTFACE_MODEL: str = os.getenv("INSIGHTFACE_MODEL", "buffalo_s").strip().lower()
+    INSIGHTFACE_DET_SIZE_W: int = int(os.getenv("INSIGHTFACE_DET_SIZE_W", "640" if os.getenv("INSIGHTFACE_MODEL", "buffalo_s").strip().lower() == "buffalo_l" else "320"))
+    INSIGHTFACE_DET_SIZE_H: int = int(os.getenv("INSIGHTFACE_DET_SIZE_H", "640" if os.getenv("INSIGHTFACE_MODEL", "buffalo_s").strip().lower() == "buffalo_l" else "320"))
+    INSIGHTFACE_DET_SIZE: Tuple[int, int] = (INSIGHTFACE_DET_SIZE_W, INSIGHTFACE_DET_SIZE_H)
     INSIGHTFACE_CHECKSUM: Optional[str] = os.getenv(
         "INSIGHTFACE_CHECKSUM", os.getenv("INSIGHTFACE_ZIP_CHECKSUM", None)
     )
@@ -33,6 +35,11 @@ class Settings:
     YOLO_CONFIDENCE_THRESHOLD: float = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.40"))
     YOLO_IOU_THRESHOLD: float = float(os.getenv("YOLO_IOU_THRESHOLD", "0.45"))
     AI_SERVICE_API_KEY: str = os.getenv("AI_SERVICE_API_KEY", "").strip()
+
+    # Tailgating & Multi-Person Physical Access Configuration
+    TAILGATING_DETECTION_ENABLED: bool = os.getenv("TAILGATING_DETECTION_ENABLED", "true").lower() in ("true", "1", "yes")
+    TAILGATING_CONFIDENCE_THRESHOLD: float = float(os.getenv("TAILGATING_CONFIDENCE_THRESHOLD", "0.35"))
+    TAILGATING_CRITICAL_DISTANCE: float = float(os.getenv("TAILGATING_CRITICAL_DISTANCE", "0.45"))
 
     # Anti-Spoofing Configuration (MiniFASNet Dual-Model Ensemble)
     ANTISPOOF_ENABLED: bool = os.getenv("ANTISPOOF_ENABLED", "true").lower() in ("true", "1", "yes")
@@ -81,6 +88,23 @@ class Settings:
                 f"ANTISPOOF_SPOOF_THRESHOLD ({self.ANTISPOOF_SPOOF_THRESHOLD})"
             )
     
+    def reload(self) -> None:
+        """Reload environment variables from .env and recompute configuration values."""
+        env_mode = os.getenv("ENVIRONMENT", self.ENVIRONMENT).strip().lower()
+        load_dotenv(override=(env_mode == "development"))
+        self.INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_s").strip().lower()
+        is_buffalo_l = self.INSIGHTFACE_MODEL == "buffalo_l"
+        default_det_size = "640" if is_buffalo_l else "320"
+        self.INSIGHTFACE_DET_SIZE_W = int(os.getenv("INSIGHTFACE_DET_SIZE_W", default_det_size))
+        self.INSIGHTFACE_DET_SIZE_H = int(os.getenv("INSIGHTFACE_DET_SIZE_H", default_det_size))
+        self.INSIGHTFACE_DET_SIZE = (self.INSIGHTFACE_DET_SIZE_W, self.INSIGHTFACE_DET_SIZE_H)
+        self.INSIGHTFACE_CHECKSUM = os.getenv(
+            "INSIGHTFACE_CHECKSUM", os.getenv("INSIGHTFACE_ZIP_CHECKSUM", None)
+        )
+        self.INSIGHTFACE_ZIP_CHECKSUM = os.getenv(
+            "INSIGHTFACE_ZIP_CHECKSUM", os.getenv("INSIGHTFACE_CHECKSUM", None)
+        )
+
     # Raw CORS string
     _allowed_origins_raw: str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
     

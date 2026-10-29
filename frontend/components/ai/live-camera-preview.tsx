@@ -7,6 +7,8 @@ import {
   VideoOff,
   CameraOff,
   Video,
+  Clock,
+  Power,
 } from "lucide-react";
 import { useWebcam } from "@/hooks/use-webcam";
 import { cn } from "@/lib/utils";
@@ -60,6 +62,8 @@ export interface LiveCameraPreviewProps {
   imageDimensions?: { width: number; height: number } | null;
   showHud?: boolean;
   className?: string;
+  isPausedDueToInactivity?: boolean;
+  onResumeCamera?: () => void;
 }
 
 export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPreviewProps>(
@@ -77,6 +81,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       imageDimensions = null,
       showHud = true,
       className,
+      isPausedDueToInactivity = false,
+      onResumeCamera,
     },
     ref
   ) => {
@@ -406,8 +412,35 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
           </div>
         )}
 
+        {/* Inactivity Pause Overlay (30s Timeout Shutdown) */}
+        {!isCameraOn && isPausedDueToInactivity && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-gradient-to-b from-card/95 via-card/85 to-background/95 p-6 text-center gap-4 select-none backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-inner">
+              <Clock className="w-8 h-8 opacity-90 animate-pulse" />
+            </div>
+            <div className="space-y-1.5 max-w-xs">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-[10px] font-mono uppercase tracking-wider text-amber-500 border border-amber-500/20 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                <span>ENERGY SAVER ACTIVE</span>
+              </div>
+              <h4 className="text-sm font-semibold text-foreground tracking-tight">Camera Paused (30s Inactivity)</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Camera paused due to 30s inactivity. Click to resume.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onResumeCamera ?? onToggleCamera}
+              className="mt-1 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer hover:shadow-primary/20 active:scale-[0.98]"
+            >
+              <Power className="w-4 h-4" />
+              <span>Wake / Resume Camera</span>
+            </button>
+          </div>
+        )}
+
         {/* OFF State Container (Modern Terminal Standby) */}
-        {!isCameraOn && !isLoading && (
+        {!isCameraOn && !isPausedDueToInactivity && !isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-card/90 via-card/60 to-background/95 p-6 text-center gap-4 select-none">
             <div className="w-16 h-16 rounded-2xl bg-muted/60 border border-border/80 flex items-center justify-center text-muted-foreground shadow-inner">
               <CameraOff className="w-8 h-8 opacity-75" />

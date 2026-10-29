@@ -159,3 +159,90 @@ def test_analyze_face_low_quality(client: TestClient, monkeypatch):
         yolo.detect = orig_detect
         client.app.state.insightface_app = orig_face_app
 
+
+def test_analyze_tailgating_detected(client: TestClient):
+    """Scenario 6: Multiple persons detected -> Tailgating security violation flagged."""
+    from app.core.yolo import DetectedPersonData
+
+    class MockFace:
+        def __init__(self):
+            self.bbox = np.array([120.0, 80.0, 220.0, 220.0])
+            self.det_score = 0.95
+            self.kps = np.array([[140, 120], [180, 120], [160, 150], [145, 180], [175, 180]])
+            self.normed_embedding = np.ones(512, dtype=np.float32) / np.sqrt(512)
+
+    def mock_detect_multiple(img, conf=None, iou=None):
+        return [
+            DetectedPersonData(bbox=[100.0, 50.0, 350.0, 550.0], confidence=0.94, is_primary=True),
+            DetectedPersonData(bbox=[300.0, 80.0, 500.0, 520.0], confidence=0.87, is_primary=False),
+        ]
+
+    class MockFaceApp:
+        def get(self, img):
+            return [MockFace()]
+
+    yolo = client.app.state.yolo_detector
+    orig_detect = yolo.detect
+    orig_face_app = client.app.state.insightface_app
+
+    try:
+        yolo.detect = mock_detect_multiple
+        client.app.state.insightface_app = MockFaceApp()
+
+        blank = np.zeros((480, 640, 3), dtype=np.uint8)
+        _, img_bytes = cv2.imencode(".jpg", blank)
+
+        response = client.post(
+            "/api/v1/analyze",
+            files={"file": ("tailgating.jpg", img_bytes.tobytes(), "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["person_count"] == 2
+        assert data["tailgating_detected"] is True
+        assert data["tailgating"] is not None
+        assert data["tailgating"]["detected"] is True
+        assert data["tailgating"]["trailing_count"] == 1
+        assert data["tailgating"]["confidence"] >= 0.80
+        assert data["tailgating"]["risk_level"] in ["warning", "critical"]
+        assert "tailgating" in data["tailgating"]["message"].lower()
+    finally:
+        yolo.detect = orig_detect
+        client.app.state.insightface_app = orig_face_app
+
+
+def test_analyze_tailgating_single_person_clean(client: TestClient):
+    """Scenario 7: Single person detected -> No tailgating detected."""
+    from app.core.yolo import DetectedPersonData
+
+    def mock_detect_single(img, conf=None, iou=None):
+        return [
+            DetectedPersonData(bbox=[100.0, 50.0, 350.0, 550.0], confidence=0.95, is_primary=True),
+        ]
+
+    yolo = client.app.state.yolo_detector
+    orig_detect = yolo.detect
+
+    try:
+        yolo.detect = mock_detect_single
+        blank = np.zeros((480, 640, 3), dtype=np.uint8)
+        _, img_bytes = cv2.imencode(".jpg", blank)
+
+        response = client.post(
+            "/api/v1/analyze",
+            files={"file": ("single.jpg", img_bytes.tobytes(), "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["person_count"] == 1
+        assert data["tailgating_detected"] is False
+        assert data["tailgating"] is not None
+        assert data["tailgating"]["detected"] is False
+        assert data["tailgating"]["trailing_count"] == 0
+    finally:
+        yolo.detect = orig_detect
+

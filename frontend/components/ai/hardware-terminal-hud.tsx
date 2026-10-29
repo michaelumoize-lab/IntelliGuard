@@ -33,7 +33,18 @@ export function HardwareTerminalHUD({
     ledLabel = "SCANNING (CYAN)";
     buzzerState = "PULSE";
   } else if (result) {
-    if (result.access_status === "granted") {
+    if (
+      result.tailgating_detected ||
+      result.reason === "tailgating_detected" ||
+      result.tailgating?.detected
+    ) {
+      oledLine1 = "TAILGATING ALERT";
+      oledLine2 = "2+ PERSONS IN ZONE";
+      oledLine3 = "DOOR: LOCKED";
+      ledColor = "bg-amber-500 shadow-[0_0_16px_#f59e0b] animate-ping";
+      ledLabel = "TAILGATING (AMBER FLASH)";
+      buzzerState = "SECURITY SIREN";
+    } else if (result.access_status === "granted") {
       oledLine1 = "ACCESS GRANTED";
       oledLine2 = result.person ? `${result.person.first_name.toUpperCase()} ${result.person.last_name.toUpperCase()}` : "VERIFIED";
       oledLine3 = "DOOR: UNLOCKED";

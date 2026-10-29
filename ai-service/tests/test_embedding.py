@@ -42,7 +42,7 @@ def test_embedding_single_face(client: TestClient):
     assert data["face_detected"] is True
     assert "embedding" in data
     assert isinstance(data["embedding"], list)
-    assert data["model"] == "buffalo_s"
+    assert data["model"] in ("buffalo_s", "buffalo_l")
 
 
 def test_embedding_dimensions(client: TestClient):
