@@ -27,12 +27,13 @@ import {
   Laptop,
   Search,
   ExternalLink,
+  Check,
 } from "lucide-react";
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -130,24 +131,33 @@ export function CommandPalette() {
           <CommandGroup heading="Theme Preferences">
             <CommandItem
               onSelect={() => runCommand(() => setTheme("light"))}
-              className="gap-2.5 cursor-pointer"
+              className="gap-2.5 cursor-pointer flex items-center justify-between"
             >
-              <Sun className="w-4 h-4 text-amber-500" />
-              <span>Light Mode</span>
+              <div className="flex items-center gap-2.5">
+                <Sun className="w-4 h-4 text-amber-500" />
+                <span>Light Mode</span>
+              </div>
+              {theme === "light" && <Check className="w-3.5 h-3.5 text-primary" />}
             </CommandItem>
             <CommandItem
               onSelect={() => runCommand(() => setTheme("dark"))}
-              className="gap-2.5 cursor-pointer"
+              className="gap-2.5 cursor-pointer flex items-center justify-between"
             >
-              <Moon className="w-4 h-4 text-blue-400" />
-              <span>Dark Mode</span>
+              <div className="flex items-center gap-2.5">
+                <Moon className="w-4 h-4 text-primary" />
+                <span>Dark Mode</span>
+              </div>
+              {theme === "dark" && <Check className="w-3.5 h-3.5 text-primary" />}
             </CommandItem>
             <CommandItem
               onSelect={() => runCommand(() => setTheme("system"))}
-              className="gap-2.5 cursor-pointer"
+              className="gap-2.5 cursor-pointer flex items-center justify-between"
             >
-              <Laptop className="w-4 h-4 text-muted-foreground" />
-              <span>System Default</span>
+              <div className="flex items-center gap-2.5">
+                <Laptop className="w-4 h-4 text-muted-foreground" />
+                <span>System Default</span>
+              </div>
+              {theme === "system" && <Check className="w-3.5 h-3.5 text-primary" />}
             </CommandItem>
           </CommandGroup>
         </CommandList>

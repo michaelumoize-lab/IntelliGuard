@@ -121,7 +121,7 @@ export function DevicesStatCards({
         title="Total Devices"
         value={stats.total}
         icon={Cpu}
-        iconColor="text-blue-500"
+        iconColor="text-primary"
         description="Administrative device count"
         active={!currentStatus || currentStatus === "all"}
         onClick={() => handleStatClick("all")}
@@ -200,7 +200,7 @@ export function DevicesClientFilters({
   };
 
   return (
-    <Card className="border border-border shadow-sm">
+    <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card text-card-foreground">
       <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
           <DataTableSearch

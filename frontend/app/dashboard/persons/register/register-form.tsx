@@ -270,7 +270,7 @@ export function RegisterPersonForm() {
 
   return (
     <>
-      <Card className="border border-border shadow-sm max-w-3xl mx-auto">
+      <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card text-card-foreground max-w-3xl mx-auto">
         <CardHeader className="border-b border-border pb-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -295,10 +295,10 @@ export function RegisterPersonForm() {
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-6 pt-6">
             {/* AI Face Requirement Alert */}
-            <Alert className="border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300">
-              <InfoIcon className="h-4 w-4 text-blue-500 shrink-0" />
+            <Alert className="border-primary/25 bg-primary/5 text-foreground">
+              <InfoIcon className="h-4 w-4 text-primary shrink-0" />
               <AlertTitle className="text-xs font-semibold">Face Photo Quality Guidelines</AlertTitle>
-              <AlertDescription className="text-xs opacity-90">
+              <AlertDescription className="text-xs text-muted-foreground">
                 Ensure exactly <strong>one front-facing face</strong> is clearly visible and well-lit. The biometric system automatically detects, aligns, and verifies the identity.
               </AlertDescription>
             </Alert>
@@ -369,7 +369,7 @@ export function RegisterPersonForm() {
                     precheckStatus === "optimal"
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100"
                       : precheckStatus === "acceptable"
-                      ? "border-blue-500/30 bg-blue-500/10 text-blue-950 dark:text-blue-100"
+                      ? "border-primary/30 bg-primary/10 text-foreground"
                       : precheckStatus === "duplicate" || precheckStatus === "error"
                       ? "border-destructive/40 bg-destructive/10 text-destructive dark:text-destructive"
                       : "border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100"

@@ -120,18 +120,18 @@ export function AccessOverviewChart({
                   <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.5)" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" strokeOpacity={0.6} />
               <XAxis
                 dataKey="time"
                 tickLine={false}
                 axisLine={false}
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
               />
               <YAxis
                 allowDecimals={false}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
               />
               <Tooltip
                 content={({ active, payload, label }) => {

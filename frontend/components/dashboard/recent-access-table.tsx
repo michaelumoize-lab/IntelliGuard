@@ -76,20 +76,20 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
   };
 
   return (
-    <div className="bg-card text-card-foreground border border-border rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
+    <div className="bg-card text-card-foreground border border-border/80 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
       {/* Header and Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <History className="w-4 h-4 text-muted-foreground" />
+          <History className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">Recent Access Events</h3>
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
           {/* Quick-filter Chips */}
-          <div className="flex items-center bg-muted/40 p-0.5 rounded-lg border border-border text-xs">
+          <div className="flex items-center bg-muted/50 p-1 rounded-xl border border-border text-xs">
             <button
               onClick={() => setFilter("all")}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 filter === "all"
                   ? "bg-background text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -99,7 +99,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
             </button>
             <button
               onClick={() => setFilter("granted")}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 filter === "granted"
                   ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -110,7 +110,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
             </button>
             <button
               onClick={() => setFilter("denied")}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 filter === "denied"
                   ? "bg-background text-destructive shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"

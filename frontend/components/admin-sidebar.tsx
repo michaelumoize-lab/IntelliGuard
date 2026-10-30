@@ -22,7 +22,12 @@ import {
   ChevronRight,
   Cpu,
   Sparkles,
+  Sun,
+  Moon,
+  Monitor,
+  Check,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { signOut } from "@/lib/auth-client";
 
 import { UserAvatar } from "@/components/user-avatar";
@@ -53,6 +58,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 
 type UserRole = "CUSTOMER" | "CRAFTSMAN" | "ADMIN" | string;
@@ -139,6 +147,7 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
   const [isLoading, setIsLoading] = React.useState(false);
   const [openSubmenus, setOpenSubmenus] = React.useState<Record<string, boolean>>({
     "Person Management": true,
@@ -333,7 +342,7 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center hover:bg-sidebar-accent"
+                  className="w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center hover:bg-sidebar-accent outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                   tooltip={user.name || user.email}
                 >
                   <UserAvatar user={user} className="h-8 w-8 shrink-0 rounded-lg" />
@@ -378,6 +387,51 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2">
+                    <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-amber-500" />
+                    <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-primary" />
+                    <span className="ml-5">Theme</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="rounded-xl border border-border shadow-md min-w-36">
+                    <DropdownMenuItem
+                      onClick={() => setTheme("light")}
+                      className={`cursor-pointer flex items-center justify-between text-xs rounded-lg px-2.5 py-1.5 ${
+                        theme === "light" ? "font-semibold text-primary bg-primary/10" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sun className="size-3.5 text-amber-500" />
+                        <span>Light</span>
+                      </div>
+                      {theme === "light" && <Check className="size-3.5 text-primary" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTheme("dark")}
+                      className={`cursor-pointer flex items-center justify-between text-xs rounded-lg px-2.5 py-1.5 ${
+                        theme === "dark" ? "font-semibold text-primary bg-primary/10" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Moon className="size-3.5 text-primary" />
+                        <span>Dark</span>
+                      </div>
+                      {theme === "dark" && <Check className="size-3.5 text-primary" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTheme("system")}
+                      className={`cursor-pointer flex items-center justify-between text-xs rounded-lg px-2.5 py-1.5 ${
+                        theme === "system" ? "font-semibold text-primary bg-primary/10" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Monitor className="size-3.5 text-muted-foreground" />
+                        <span>System</span>
+                      </div>
+                      {theme === "system" && <Check className="size-3.5 text-primary" />}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuItem asChild className="cursor-pointer">
                   <Link href="/settings/account" className="flex items-center gap-2">
                     <Settings className="size-4 text-muted-foreground" />

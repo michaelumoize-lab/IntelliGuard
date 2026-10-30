@@ -132,7 +132,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
       </div>
 
       {/* Standardized Search & Filter Header Bar */}
-      <Card className="border border-border shadow-sm">
+      <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card text-card-foreground">
         <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <DataTableSearch
             placeholder="Search logs by name or person code..."
@@ -143,7 +143,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
             {/* Access Status Filter */}
             <Link
               href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=&matchStatus=${matchFilter}${deviceIdParam}`}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 !statusFilter ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -151,7 +151,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
             </Link>
             <Link
               href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=granted&matchStatus=${matchFilter}${deviceIdParam}`}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 statusFilter === "granted" ? "bg-emerald-600 text-white border-emerald-600" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -159,7 +159,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
             </Link>
             <Link
               href={`/dashboard/access-logs?page=1&search=${encodeURIComponent(search)}&status=denied&matchStatus=${matchFilter}${deviceIdParam}`}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 statusFilter === "denied" ? "bg-destructive text-destructive-foreground border-destructive" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -170,7 +170,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
       </Card>
 
       {/* Standardized Logs Table */}
-      <Card className="border border-border shadow-sm overflow-hidden bg-card text-card-foreground rounded-2xl">
+      <Card className="border border-border/80 shadow-xs overflow-hidden bg-card text-card-foreground rounded-2xl">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

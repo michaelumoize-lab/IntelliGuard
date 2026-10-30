@@ -191,7 +191,7 @@ export default function LivenessInspectorPage() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Upload className="w-4 h-4" /> Choose Photo
           </button>
@@ -199,10 +199,10 @@ export default function LivenessInspectorPage() {
             type="button"
             disabled={!selectedFile || isLoading}
             onClick={() => handleRunAnalysis()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {isLoading ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin motion-reduce:animate-none" />
             ) : (
               <Sparkles className="w-4 h-4" />
             )}
