@@ -229,11 +229,11 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                   }}
                   className={`absolute border-2 rounded-xl transition-all duration-150 ${
                     person.isPrimary
-                      ? "border-primary/80 shadow-[0_0_12px_rgba(217,119,6,0.35)]"
-                      : "border-primary/40 shadow-[0_0_6px_rgba(217,119,6,0.2)]"
+                      ? "border-cyan-400/80 shadow-[0_0_12px_rgba(34,211,238,0.4)]"
+                      : "border-cyan-500/40 shadow-[0_0_6px_rgba(34,211,238,0.2)]"
                   }`}
                 >
-                  <div className="absolute -top-5 left-0 bg-primary text-primary-foreground text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-1">
+                  <div className="absolute -top-5 left-0 bg-cyan-600 text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-1">
                     <span>PERSON {(person.confidence * 100).toFixed(0)}%</span>
                     {person.isPrimary && <span className="opacity-75 text-[8px]">• PRIMARY</span>}
                   </div>
@@ -319,7 +319,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                         <div
                           key={`lm-${pIdx}`}
                           style={{ left: `${ptX}%`, top: `${ptY}%` }}
-                          className="absolute w-1.5 h-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]"
+                          className="absolute w-1.5 h-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]"
                         />
                       );
                     })}
@@ -335,8 +335,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
             {/* Top HUD Bar: Live Camera / Scanning Status */}
             <div className="flex items-center justify-between w-full z-10 gap-2">
               {isScanning || overlayResult?.status === "processing" ? (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-950/80 backdrop-blur-md border border-amber-500/40 text-amber-200 text-[10px] font-mono shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping motion-reduce:animate-none" />
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-950/80 backdrop-blur-md border border-cyan-500/40 text-cyan-200 text-[10px] font-mono shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping motion-reduce:animate-none" />
                   <span>AI SCANNING ACTIVE</span>
                 </div>
               ) : (
@@ -373,7 +373,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                 <div
                   className={`w-full h-full rounded-[48%_48%_44%_44%/52%_52%_44%_44%] border transition-all duration-300 flex flex-col items-center justify-between py-4 relative overflow-hidden ${
                     isScanning || overlayResult?.status === "processing"
-                      ? "border-amber-400 bg-amber-500/5 shadow-[0_0_20px_rgba(245,158,11,0.25)] scale-[1.01]"
+                      ? "border-cyan-400 bg-cyan-500/5 shadow-[0_0_20px_rgba(34,211,238,0.25)] scale-[1.01]"
                       : "border-white/20 hover:border-white/30"
                   }`}
                 >
@@ -391,7 +391,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${
                         isScanning || overlayResult?.status === "processing"
-                          ? "bg-amber-400 animate-ping motion-reduce:animate-none"
+                          ? "bg-cyan-400 animate-ping motion-reduce:animate-none"
                           : "bg-white/60"
                       }`}
                     />
@@ -404,7 +404,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
 
                   {/* Animated Laser Scanning Beam */}
                   {(isScanning || overlayResult?.status === "processing") && (
-                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_16px_#f59e0b] animate-pulse motion-reduce:animate-none top-1/2 -translate-y-1/2" />
+                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_16px_#22d3ee] animate-pulse motion-reduce:animate-none top-1/2 -translate-y-1/2" />
                   )}
                 </div>
               </div>

@@ -12,7 +12,7 @@ interface StatCardProps {
     value: string;
     isPositive?: boolean;
   };
-  variant?: "default" | "emerald" | "destructive" | "amber" | "primary" | "copper" | "purple";
+  variant?: "default" | "emerald" | "destructive" | "amber" | "primary" | "purple";
   active?: boolean;
   onClick?: () => void;
   className?: string;
@@ -49,12 +49,11 @@ export function StatCard({
           iconBg: "bg-amber-500/10 text-amber-500 border-amber-500/20",
           glow: "from-amber-500/10 to-transparent",
         };
-      case "copper":
       case "purple":
         return {
-          border: "hover:border-amber-500/40",
-          iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25",
-          glow: "from-amber-500/15 to-transparent",
+          border: "hover:border-purple-500/40",
+          iconBg: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+          glow: "from-purple-500/10 to-transparent",
         };
       case "primary":
         return {

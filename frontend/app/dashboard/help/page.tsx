@@ -132,7 +132,7 @@ export default function HelpPage() {
               </div>
               <div className="p-3 rounded-lg border border-border bg-card/50">
                 <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1">
-                  <FileText className="w-3.5 h-3.5 text-primary" /> Live Audit Trail
+                  <FileText className="w-3.5 h-3.5 text-cyan-500" /> Live Audit Trail
                 </h4>
                 <p className="text-xs">
                   Inspect the latest access verification events with timestamp, confidence, and door actuator actions.
