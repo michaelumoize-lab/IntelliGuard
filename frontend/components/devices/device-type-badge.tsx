@@ -15,21 +15,21 @@ export function DeviceTypeBadge({ type, className = "" }: DeviceTypeBadgeProps) 
     case "camera":
       return (
         <Badge variant="secondary" className={`gap-1 font-normal ${className}`}>
-          <Camera className="h-3 w-3 text-primary" />
+          <Camera className="h-3 w-3 text-blue-500" />
           Camera
         </Badge>
       );
     case "access_control":
       return (
         <Badge variant="secondary" className={`gap-1 font-normal ${className}`}>
-          <ShieldCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+          <ShieldCheck className="h-3 w-3 text-indigo-500" />
           Access Control
         </Badge>
       );
     case "sensor":
       return (
         <Badge variant="secondary" className={`gap-1 font-normal ${className}`}>
-          <Activity className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+          <Activity className="h-3 w-3 text-purple-500" />
           Sensor
         </Badge>
       );
@@ -37,7 +37,7 @@ export function DeviceTypeBadge({ type, className = "" }: DeviceTypeBadgeProps) 
     default:
       return (
         <Badge variant="secondary" className={`gap-1 font-normal ${className}`}>
-          <Cpu className="h-3 w-3 text-primary" />
+          <Cpu className="h-3 w-3 text-cyan-500" />
           IoT
         </Badge>
       );

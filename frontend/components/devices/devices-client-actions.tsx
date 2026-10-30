@@ -121,7 +121,7 @@ export function DevicesStatCards({
         title="Total Devices"
         value={stats.total}
         icon={Cpu}
-        iconColor="text-primary"
+        iconColor="text-blue-500"
         description="Administrative device count"
         active={!currentStatus || currentStatus === "all"}
         onClick={() => handleStatClick("all")}

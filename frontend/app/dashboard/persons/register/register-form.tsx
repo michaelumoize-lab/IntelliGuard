@@ -295,10 +295,10 @@ export function RegisterPersonForm() {
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-6 pt-6">
             {/* AI Face Requirement Alert */}
-            <Alert className="border-primary/25 bg-primary/5 text-foreground">
-              <InfoIcon className="h-4 w-4 text-primary shrink-0" />
+            <Alert className="border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300">
+              <InfoIcon className="h-4 w-4 text-blue-500 shrink-0" />
               <AlertTitle className="text-xs font-semibold">Face Photo Quality Guidelines</AlertTitle>
-              <AlertDescription className="text-xs text-muted-foreground">
+              <AlertDescription className="text-xs opacity-90">
                 Ensure exactly <strong>one front-facing face</strong> is clearly visible and well-lit. The biometric system automatically detects, aligns, and verifies the identity.
               </AlertDescription>
             </Alert>
@@ -369,7 +369,7 @@ export function RegisterPersonForm() {
                     precheckStatus === "optimal"
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100"
                       : precheckStatus === "acceptable"
-                      ? "border-primary/30 bg-primary/10 text-foreground"
+                      ? "border-blue-500/30 bg-blue-500/10 text-blue-950 dark:text-blue-100"
                       : precheckStatus === "duplicate" || precheckStatus === "error"
                       ? "border-destructive/40 bg-destructive/10 text-destructive dark:text-destructive"
                       : "border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100"

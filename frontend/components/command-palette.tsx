@@ -144,7 +144,7 @@ export function CommandPalette() {
               className="gap-2.5 cursor-pointer flex items-center justify-between"
             >
               <div className="flex items-center gap-2.5">
-                <Moon className="w-4 h-4 text-primary" />
+                <Moon className="w-4 h-4 text-blue-400" />
                 <span>Dark Mode</span>
               </div>
               {theme === "dark" && <Check className="w-3.5 h-3.5 text-primary" />}

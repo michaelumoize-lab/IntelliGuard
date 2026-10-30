@@ -197,7 +197,7 @@ export default async function AdminDashboardPage() {
           value={todayTotalAccess}
           icon={<History className="w-4 h-4" />}
           description="Access attempts today"
-          variant="copper"
+          variant="purple"
         />
         <StatCard
           title="Access Granted Today"

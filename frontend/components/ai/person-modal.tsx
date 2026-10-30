@@ -262,10 +262,10 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
 
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           {!isEditing && (
-            <Alert className="border-primary/25 bg-primary/5 text-foreground">
-              <InfoIcon className="h-4 w-4 text-primary" />
-              <AlertTitle className="text-xs font-semibold text-foreground">Face Requirements</AlertTitle>
-              <AlertDescription className="text-muted-foreground text-xs">
+            <Alert className="border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20">
+              <InfoIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <AlertTitle className="text-blue-900 dark:text-blue-300 font-semibold text-xs">Face Requirements</AlertTitle>
+              <AlertDescription className="text-blue-800 dark:text-blue-400 text-xs">
                 Exactly <strong>one face</strong> must be clearly visible, front-facing, and well-lit.
               </AlertDescription>
             </Alert>

@@ -390,7 +390,7 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2">
                     <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-amber-500" />
-                    <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-primary" />
+                    <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />
                     <span className="ml-5">Theme</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="rounded-xl border border-border shadow-md min-w-36">
@@ -413,7 +413,7 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <Moon className="size-3.5 text-primary" />
+                        <Moon className="size-3.5 text-blue-400" />
                         <span>Dark</span>
                       </div>
                       {theme === "dark" && <Check className="size-3.5 text-primary" />}

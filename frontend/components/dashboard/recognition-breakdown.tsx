@@ -188,7 +188,7 @@ export function RecognitionBreakdown({
         {/* Latency Gauge */}
         <div className="p-2 sm:p-2.5 bg-muted/20 hover:bg-muted/40 transition-colors rounded-xl border border-border/60 text-center flex flex-col items-center">
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1 font-medium">
-            <Clock className="w-3 h-3 text-amber-500 shrink-0" /> Latency
+            <Clock className="w-3 h-3 text-blue-500 shrink-0" /> Latency
           </div>
           <span className="text-base font-bold font-mono text-foreground">
             {avgLatencySec.toFixed(2)}s
@@ -196,7 +196,7 @@ export function RecognitionBreakdown({
           <div className="w-full bg-muted h-1 rounded-full mt-1.5 overflow-hidden">
             <div
               style={{ width: `${Math.min(100, (avgLatencySec / 1.0) * 100)}%` }}
-              className="bg-amber-500 h-full transition-all duration-500"
+              className="bg-blue-500 h-full transition-all duration-500"
             />
           </div>
         </div>

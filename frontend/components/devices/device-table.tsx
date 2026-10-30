@@ -206,7 +206,7 @@ export function DeviceTable({
                       <DropdownMenuLabel>Device Actions</DropdownMenuLabel>
                       <DropdownMenuItem asChild>
                         <Link href={`/dashboard/devices/${device.id}`} className="cursor-pointer">
-                          <Eye className="mr-2 h-4 w-4 text-primary" />
+                          <Eye className="mr-2 h-4 w-4 text-blue-500" />
                           View Details & Stats
                         </Link>
                       </DropdownMenuItem>

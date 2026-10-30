@@ -562,7 +562,7 @@ export default function WebcamSimulationPage() {
     }
     if (item.matchStatus === "person_no_face") {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-semibold text-[11px]">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-semibold text-[11px]">
           <User className="w-3.5 h-3.5" /> NO FACE
         </span>
       );
