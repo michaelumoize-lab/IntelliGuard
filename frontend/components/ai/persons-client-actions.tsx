@@ -8,6 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -81,7 +88,7 @@ export function PersonsClientFilters({
   };
 
   return (
-    <Card>
+    <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card text-card-foreground">
       <CardContent className="p-4 flex flex-col md:flex-row gap-3 sm:gap-4 items-stretch md:items-center">
         {/* Debounced Search-as-you-type Input */}
         <DataTableSearch
@@ -91,40 +98,36 @@ export function PersonsClientFilters({
 
         {/* Status & Category Filters */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-1.5 border border-input rounded-md px-2.5 py-1.5 text-xs bg-background">
-            <div className="flex items-center gap-1.5">
-              <FilterIcon className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground font-medium">Status:</span>
-            </div>
-            <select
-              value={initialStatus}
-              onChange={(e) => updateFilters({ status: e.target.value })}
-              className="bg-transparent border-none focus:outline-none cursor-pointer font-medium"
-            >
-              <option value="all">All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
-            </select>
-          </div>
+          <Select
+            value={initialStatus || "all"}
+            onValueChange={(val) => updateFilters({ status: val })}
+          >
+            <SelectTrigger className="w-full sm:w-[140px] text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="suspended">Suspended</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-1.5 border border-input rounded-md px-2.5 py-1.5 text-xs bg-background">
-            <div className="flex items-center gap-1.5">
-              <FilterIcon className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground font-medium">Category:</span>
-            </div>
-            <select
-              value={initialCategory}
-              onChange={(e) => updateFilters({ category: e.target.value })}
-              className="bg-transparent border-none focus:outline-none cursor-pointer font-medium"
-            >
-              <option value="all">All</option>
-              <option value="employee">Employee</option>
-              <option value="student">Student</option>
-              <option value="visitor">Visitor</option>
-              <option value="contractor">Contractor</option>
-            </select>
-          </div>
+          <Select
+            value={initialCategory || "all"}
+            onValueChange={(val) => updateFilters({ category: val })}
+          >
+            <SelectTrigger className="w-full sm:w-[150px] text-xs">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="employee">Employee</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+              <SelectItem value="visitor">Visitor</SelectItem>
+              <SelectItem value="contractor">Contractor</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
     </Card>

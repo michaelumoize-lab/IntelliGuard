@@ -147,7 +147,7 @@ export default async function DeviceDetailPage({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-            <Link href="/dashboard/devices">
+            <Link href="/dashboard/devices" aria-label="Back to Devices">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>

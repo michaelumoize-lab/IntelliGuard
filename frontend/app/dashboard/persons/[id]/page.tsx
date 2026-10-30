@@ -61,7 +61,7 @@ export default async function PersonDetailsPage({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-            <Link href="/dashboard/persons">
+            <Link href="/dashboard/persons" aria-label="Back to Persons Directory">
               <ArrowLeftIcon className="h-4 w-4" />
             </Link>
           </Button>

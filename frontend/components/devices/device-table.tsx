@@ -197,7 +197,7 @@ export function DeviceTable({
                 <TableCell className="py-3 text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
+                      <Button variant="ghost" className="h-8 w-8 p-0" aria-label={`Open actions for ${device.deviceName}`}>
                         <span className="sr-only">Open menu</span>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
@@ -206,7 +206,7 @@ export function DeviceTable({
                       <DropdownMenuLabel>Device Actions</DropdownMenuLabel>
                       <DropdownMenuItem asChild>
                         <Link href={`/dashboard/devices/${device.id}`} className="cursor-pointer">
-                          <Eye className="mr-2 h-4 w-4 text-blue-500" />
+                          <Eye className="mr-2 h-4 w-4 text-primary" />
                           View Details & Stats
                         </Link>
                       </DropdownMenuItem>

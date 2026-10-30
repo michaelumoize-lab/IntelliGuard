@@ -1,13 +1,13 @@
-import type { Metadata } from "next"
-import { Geist } from "next/font/google"
+import type { Metadata } from "next";
+import { Geist } from "next/font/google";
 import "./globals.css";
-import type { ReactNode } from "react"
+import type { ReactNode } from "react";
 
-import { ThemeProvider } from "next-themes"
-import { Providers } from "@/components/providers"
-import { cn } from "@/lib/utils"
+import { ThemeProvider } from "next-themes";
+import { Providers } from "@/components/providers";
+import { cn } from "@/lib/utils";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: {
@@ -29,12 +29,12 @@ export const metadata: Metadata = {
     "Vector Search",
     "IoT",
   ],
-}
+};
 
 export default function RootLayout({
-  children
+  children,
 }: Readonly<{
-  children: ReactNode
+  children: ReactNode;
 }>) {
   return (
     <html
@@ -49,11 +49,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Providers>
-            {children}
-          </Providers>
+          <Providers>{children}</Providers>
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

@@ -66,7 +66,7 @@ export default async function ProjectOverviewPage() {
   ]);
 
   return (
-    <div className="container max-w-7xl mx-auto p-4 sm:p-6 md:p-10 space-y-10 bg-background text-foreground">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-10 space-y-8 sm:space-y-10 bg-background text-foreground">
       {/* 1. Hero / Executive Engineering Showcase Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-background to-card border border-primary/30 p-6 sm:p-8 md:p-12 shadow-md">
         <div className="relative z-10 max-w-4xl space-y-4">

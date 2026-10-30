@@ -110,7 +110,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
       </div>
 
       {/* Standardized Search & Filter Header Bar */}
-      <Card className="border border-border shadow-sm">
+      <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card text-card-foreground">
         <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <DataTableSearch
             placeholder="Search alerts by title or message..."
@@ -121,7 +121,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
             {/* Resolution Filter Pills */}
             <Link
               href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=false${deviceIdParam}`}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 resolvedFilter === "false" ? "bg-amber-500/10 text-amber-500 border-amber-500/30 font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -129,7 +129,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
             </Link>
             <Link
               href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=true${deviceIdParam}`}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 resolvedFilter === "true" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -137,7 +137,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
             </Link>
             <Link
               href={`/dashboard/alerts?page=1&search=${encodeURIComponent(search)}&severity=${severityFilter}&resolved=${deviceIdParam}`}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 resolvedFilter === "" ? "bg-primary text-primary-foreground border-primary font-semibold" : "bg-background border-input text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -148,7 +148,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
       </Card>
 
       {/* Alerts Panel & Pagination Container */}
-      <Card className="border border-border shadow-sm overflow-hidden space-y-0">
+      <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card text-card-foreground space-y-0">
         <CardContent className="p-4 sm:p-6">
           <SecurityAlertsPanel alerts={alerts} showResolveAll={true} />
         </CardContent>

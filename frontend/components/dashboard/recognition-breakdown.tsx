@@ -43,7 +43,7 @@ export function RecognitionBreakdown({
   const displayDonutData =
     donutData.length > 0
       ? donutData
-      : [{ name: "No Data", value: 1, color: "hsl(var(--muted))" }];
+      : [{ name: "No Data", value: 1, color: "var(--muted)" }];
 
   return (
     <div className="bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col justify-between space-y-4 sm:space-y-5 h-full min-w-0">
@@ -188,7 +188,7 @@ export function RecognitionBreakdown({
         {/* Latency Gauge */}
         <div className="p-2 sm:p-2.5 bg-muted/20 hover:bg-muted/40 transition-colors rounded-xl border border-border/60 text-center flex flex-col items-center">
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1 font-medium">
-            <Clock className="w-3 h-3 text-blue-500 shrink-0" /> Latency
+            <Clock className="w-3 h-3 text-amber-500 shrink-0" /> Latency
           </div>
           <span className="text-base font-bold font-mono text-foreground">
             {avgLatencySec.toFixed(2)}s
@@ -196,7 +196,7 @@ export function RecognitionBreakdown({
           <div className="w-full bg-muted h-1 rounded-full mt-1.5 overflow-hidden">
             <div
               style={{ width: `${Math.min(100, (avgLatencySec / 1.0) * 100)}%` }}
-              className="bg-blue-500 h-full transition-all duration-500"
+              className="bg-amber-500 h-full transition-all duration-500"
             />
           </div>
         </div>

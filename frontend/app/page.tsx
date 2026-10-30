@@ -73,7 +73,7 @@ export default async function Home() {
               {/* Title */}
               <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-foreground leading-[1.15]">
                 Intelligent Biometric <br className="hidden sm:inline" />
-                <span className="bg-gradient-to-r from-primary via-blue-500 to-indigo-500 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-primary via-amber-600 to-orange-500 dark:from-primary dark:via-amber-400 dark:to-orange-400 bg-clip-text text-transparent">
                   Access Control Intelligence
                 </span>
               </h1>
@@ -166,7 +166,7 @@ export default async function Home() {
                   <div className="p-3 rounded-xl border border-border/80 bg-background/40">
                     <div className="flex items-center justify-between text-muted-foreground mb-1">
                       <span className="text-[11px]">Today Attempts</span>
-                      <History className="w-3.5 h-3.5 text-purple-400" />
+                      <History className="w-3.5 h-3.5 text-primary" />
                     </div>
                     <div className="text-lg font-bold font-mono text-foreground">3,492</div>
                     <span className="text-[10px] text-muted-foreground">Total scans</span>
@@ -287,7 +287,7 @@ export default async function Home() {
               </div>
 
               <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-3">
-                <div className="p-2.5 w-fit rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                <div className="p-2.5 w-fit rounded-xl bg-primary/10 text-primary border border-primary/20">
                   <Database className="w-5 h-5" />
                 </div>
                 <h3 className="text-sm font-semibold text-foreground">High-Speed Vector Search</h3>

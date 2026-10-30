@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, LayoutDashboard, LogIn } from "lucide-react";
 import { UserButton } from "@/components/auth/user/user-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useSession } from "@/lib/auth-client";
 
 import type { User } from "better-auth";
@@ -32,15 +33,18 @@ export function LandingHeaderAuth({ user }: LandingHeaderAuthProps) {
   const isAuthenticated = !!effectiveUser;
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-2 sm:gap-2.5">
+      <ThemeToggle />
+
       {isAuthenticated ? (
         <>
           <Link
             href="/dashboard"
-            className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Command Center</span>
+            <span className="hidden xs:inline">Command Center</span>
+            <span className="xs:hidden">Dashboard</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
           <UserButton size="icon" user={effectiveUser as User} />
@@ -49,7 +53,7 @@ export function LandingHeaderAuth({ user }: LandingHeaderAuthProps) {
         <>
           <Link
             href="/auth/sign-in"
-            className="px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted border border-border rounded-xl transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted border border-border rounded-xl transition-colors flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>

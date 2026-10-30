@@ -163,8 +163,8 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
     }
     if (isPersonNoFace) {
       return {
-        bg: "bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400",
-        icon: <User className="w-4 h-4 text-cyan-500" />,
+        bg: "bg-muted border-border text-muted-foreground",
+        icon: <User className="w-4 h-4 text-muted-foreground" />,
         label: "PERSON DETECTED — NO FACE",
       };
     }
@@ -322,7 +322,7 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
           {/* Left: Live Captured Frame */}
           <div className="flex flex-col items-center text-center">
             <span className="text-[10px] font-mono font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1">
-              <Camera className="w-3 h-3 text-cyan-500" /> Live Capture
+              <Camera className="w-3 h-3 text-primary" /> Live Capture
             </span>
             <div
               className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-black border overflow-hidden flex items-center justify-center shadow-inner transition-all ${

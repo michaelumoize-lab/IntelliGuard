@@ -49,6 +49,7 @@ export function DataTablePagination({
           size="sm"
           disabled={page <= 1}
           onClick={() => navigateToPage(page - 1)}
+          aria-label="Go to previous page"
           className="h-8 px-2.5 text-xs flex items-center gap-1 cursor-pointer"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -64,6 +65,7 @@ export function DataTablePagination({
           size="sm"
           disabled={page >= totalPages}
           onClick={() => navigateToPage(page + 1)}
+          aria-label="Go to next page"
           className="h-8 px-2.5 text-xs flex items-center gap-1 cursor-pointer"
         >
           <span>Next</span>
