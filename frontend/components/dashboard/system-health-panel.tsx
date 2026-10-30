@@ -166,19 +166,19 @@ export function SystemHealthPanel() {
             </div>
           </div>
 
-          {/* pgvector Extension */}
+          {/* Vector Database Engine */}
           <div className="p-3.5 sm:p-4 bg-muted/30 hover:bg-muted/50 rounded-xl border border-border/80 transition-all flex flex-col justify-between space-y-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="p-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-500 shrink-0">
                 <Database className="w-4 h-4" />
               </div>
-              <span className="text-xs font-semibold text-foreground truncate">pgvector</span>
+              <span className="text-xs font-semibold text-foreground truncate">Vector Engine</span>
             </div>
 
             <div className="flex flex-col gap-1 min-w-0">
               {getStatusBadge(health.services.pgvector.status)}
               <span className="text-[11px] font-mono text-muted-foreground pt-0.5 truncate">
-                Native Vector Engine
+                Similarity Search
               </span>
             </div>
           </div>

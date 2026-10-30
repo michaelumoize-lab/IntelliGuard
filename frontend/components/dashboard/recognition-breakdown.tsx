@@ -55,7 +55,7 @@ export function RecognitionBreakdown({
           </div>
           <div>
             <h3 className="text-sm font-semibold text-foreground tracking-tight">Recognition Distribution</h3>
-            <p className="text-[11px] text-muted-foreground font-mono">InsightFace AI Match Analytics</p>
+            <p className="text-[11px] text-muted-foreground font-mono">Biometric Match Analytics</p>
           </div>
         </div>
         <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/60">

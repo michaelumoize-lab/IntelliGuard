@@ -15,18 +15,18 @@ export const metadata: Metadata = {
     template: "%s | IntelliGuard",
   },
   description:
-    "AI-powered intelligent access control and security monitoring system using ESP32-S3 CAM, InsightFace, Next.js, FastAPI, and PostgreSQL.",
+    "AI-powered intelligent access control and security monitoring system with real-time biometric verification and edge device management.",
   keywords: [
     "IntelliGuard",
     "Access Control",
     "Security Monitoring",
     "Facial Recognition",
     "ESP32-S3 CAM",
-    "InsightFace",
+    "Biometrics",
     "Next.js",
     "FastAPI",
     "PostgreSQL",
-    "pgvector",
+    "Vector Search",
     "IoT",
   ],
 }
