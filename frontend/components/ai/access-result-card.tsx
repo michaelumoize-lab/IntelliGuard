@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { AccessScanResponse } from "@/lib/access/access-client";
 import { VectorInspectorModal } from "@/components/ai/vector-inspector-modal";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   CheckCircle2,
   XCircle,
@@ -446,15 +447,20 @@ export function AccessResultCard({ result, isLoading, capturedImageUrl }: Access
               <span className="text-muted-foreground font-medium flex items-center gap-1">
                 <Zap className="w-3.5 h-3.5 text-primary" /> Cosine Similarity
               </span>
-              <button
-                type="button"
-                onClick={() => setIsInspectorOpen(true)}
-                className="font-mono font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1 cursor-pointer underline decoration-dotted"
-                title="Click to inspect vector breakdown"
-              >
-                <span>{similarityPct}</span>
-                <span className="text-[10px] text-primary">(Inspect)</span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setIsInspectorOpen(true)}
+                    className="font-mono font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1 cursor-pointer underline decoration-dotted"
+                    aria-label="Inspect face embedding vector breakdown"
+                  >
+                    <span>{similarityPct}</span>
+                    <span className="text-[10px] text-primary">(Inspect)</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Click to inspect vector breakdown</TooltipContent>
+              </Tooltip>
             </div>
             <div className="relative w-full h-2.5 bg-muted rounded-full overflow-hidden flex">
               {/* 0.50 Threshold Marker */}

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, ShieldAlert, Clock, ArrowRight, UserCheck } from "lucide-react";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 
 export interface AccessSummaryLog {
   id: number;
@@ -105,13 +106,7 @@ export function DeviceAccessSummary({ stats, recentLogs, deviceId }: DeviceAcces
                 {recentLogs.map((log) => (
                   <TableRow key={log.id} className="text-xs hover:bg-muted/40 transition-colors">
                     <TableCell className="text-muted-foreground font-mono whitespace-nowrap py-3">
-                      {new Date(log.timestamp).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
+                      <FormattedTimestamp date={log.timestamp} mode="datetime" />
                     </TableCell>
                     <TableCell className="font-medium py-3">
                       {log.person ? (

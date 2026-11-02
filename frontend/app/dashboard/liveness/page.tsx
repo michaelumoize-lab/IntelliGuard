@@ -18,6 +18,7 @@ import {
   HelpCircle,
   Layers,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface LivenessData {
   status: "live" | "spoof_detected" | "inconclusive" | "error";
@@ -323,18 +324,30 @@ export default function LivenessInspectorPage() {
                     <div className="relative w-full h-3.5 bg-muted rounded-full overflow-hidden flex">
                       {/* Active threshold markers */}
                       {spoofThresh !== null && (
-                        <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10"
-                          style={{ left: `${Math.max(0, Math.min(100, spoofThresh * 100))}%` }}
-                          title={`Active Spoof Threshold: ${(spoofThresh * 100).toFixed(0)}%`}
-                        />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="absolute top-0 bottom-0 w-1 bg-destructive z-10 cursor-help"
+                              style={{ left: `${Math.max(0, Math.min(100, spoofThresh * 100))}%` }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Active Spoof Threshold: {(spoofThresh * 100).toFixed(0)}%
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                       {liveThresh !== null && (
-                        <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-emerald-500 z-10"
-                          style={{ left: `${Math.max(0, Math.min(100, liveThresh * 100))}%` }}
-                          title={`Active Live Threshold: ${(liveThresh * 100).toFixed(0)}%`}
-                        />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="absolute top-0 bottom-0 w-1 bg-emerald-500 z-10 cursor-help"
+                              style={{ left: `${Math.max(0, Math.min(100, liveThresh * 100))}%` }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Active Live Threshold: {(liveThresh * 100).toFixed(0)}%
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                       <div
                         style={{ width: `${Math.max(0, Math.min(100, result.liveness.liveScore * 100))}%` }}

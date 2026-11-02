@@ -13,6 +13,8 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export interface AccessEventItem {
   id: number;
@@ -64,15 +66,6 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
     }
     if (matchStatus === "unknown") return "No Match";
     return "N/A";
-  };
-
-  const formatTime = (iso: string) => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      timeZone: "UTC",
-    }).format(new Date(iso));
   };
 
   return (
@@ -145,7 +138,6 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
               const isGranted = evt.accessStatus === "granted";
               const isDataInconsistency = isGranted && !evt.person;
               const similarityDisplay = formatSimilarity(evt.confidenceScore, evt.matchStatus);
-              const timeDisplay = formatTime(evt.createdAt);
 
               return (
                 <div
@@ -181,14 +173,20 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                             )}
                           </div>
                         ) : isDataInconsistency ? (
-                          <span className="text-xs text-destructive font-medium flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> Unknown (Inconsistent)
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-xs text-destructive font-medium flex items-center gap-1 cursor-help">
+                                <AlertCircle className="w-3 h-3" /> Unknown (Inconsistent)
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Access granted without matched person record</TooltipContent>
+                          </Tooltip>
                         ) : (
                           <span className="text-xs text-muted-foreground italic">Unknown Face</span>
                         )}
                         <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" /> {timeDisplay}
+                          <Clock className="w-2.5 h-2.5 shrink-0" />
+                          <FormattedTimestamp date={evt.createdAt} mode="time" />
                         </span>
                       </div>
                     </div>
@@ -242,14 +240,15 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
               </thead>
               <tbody className="divide-y divide-border/40">
                 {filteredEvents.map((evt) => {
-                  const dateStr = formatTime(evt.createdAt);
                   const isGranted = evt.accessStatus === "granted";
                   const isDataInconsistency = isGranted && !evt.person;
                   const similarityDisplay = formatSimilarity(evt.confidenceScore, evt.matchStatus);
 
                   return (
                     <tr key={evt.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="py-3.5 font-mono text-muted-foreground whitespace-nowrap">{dateStr}</td>
+                      <td className="py-3.5 font-mono text-muted-foreground whitespace-nowrap">
+                        <FormattedTimestamp date={evt.createdAt} mode="datetime" />
+                      </td>
                       <td className="py-3.5">
                         {evt.person ? (
                           <Link
@@ -273,12 +272,14 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                             )}
                           </Link>
                         ) : isDataInconsistency ? (
-                          <span
-                            className="inline-flex items-center gap-1 text-destructive font-medium"
-                            title="Access granted without matched person record"
-                          >
-                            <AlertCircle className="w-3.5 h-3.5" /> Unknown (Inconsistent)
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center gap-1 text-destructive font-medium cursor-help">
+                                <AlertCircle className="w-3.5 h-3.5" /> Unknown (Inconsistent)
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Access granted without matched person record</TooltipContent>
+                          </Tooltip>
                         ) : (
                           <span className="text-muted-foreground italic">Unknown</span>
                         )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2, ShieldAlert, ArrowRight, Loader2 } from "lucide-react";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 
 export interface SecurityAlertItem {
   id: number;
@@ -222,9 +223,9 @@ export function SecurityAlertsPanel({
                     <h4 className="text-xs font-semibold text-foreground">{alert.title}</h4>
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
-                  <p className="text-[10px] font-mono text-muted-foreground/70 pt-1">
-                    {new Date(alert.createdAt).toLocaleString()}
-                  </p>
+                  <div className="text-[10px] font-mono text-muted-foreground/70 pt-1">
+                    <FormattedTimestamp date={alert.createdAt} mode="datetime" />
+                  </div>
                 </div>
 
                 <div className="w-full sm:w-auto shrink-0 flex justify-end">

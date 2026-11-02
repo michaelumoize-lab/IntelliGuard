@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -135,19 +137,26 @@ export function DeviceTable({
             devices.map((device) => (
               <TableRow key={device.id} className="hover:bg-muted/40 transition-colors">
                 <TableCell className="py-3 font-mono text-xs">
-                  <button
-                    type="button"
-                    onClick={(e) => handleCopyId(device.id, e)}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
-                    title="Click to copy Device ID"
-                  >
-                    <span>#{device.id}</span>
-                    {copiedId === device.id ? (
-                      <Check className="h-3 w-3 text-emerald-500" />
-                    ) : (
-                      <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
-                    )}
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyId(device.id, e)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
+                        aria-label="Click to copy Device ID"
+                      >
+                        <span>#{device.id}</span>
+                        {copiedId === device.id ? (
+                          <Check className="h-3 w-3 text-emerald-500" />
+                        ) : (
+                          <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {copiedId === device.id ? "Copied!" : "Click to copy Device ID"}
+                    </TooltipContent>
+                  </Tooltip>
                 </TableCell>
                 <TableCell className="py-3">
                   <DeviceStatusBadge status={device.status} />
@@ -185,14 +194,11 @@ export function DeviceTable({
                   )}
                 </TableCell>
                 <TableCell className="py-3 text-xs text-muted-foreground font-mono">
-                  {device.lastSeen
-                    ? new Date(device.lastSeen).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "Never"}
+                  {device.lastSeen ? (
+                    <FormattedTimestamp date={device.lastSeen} mode="datetime" />
+                  ) : (
+                    "Never"
+                  )}
                 </TableCell>
                 <TableCell className="py-3 text-right">
                   <DropdownMenu>

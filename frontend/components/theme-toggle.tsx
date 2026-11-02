@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface ThemeToggleProps {
@@ -59,51 +60,61 @@ export function ThemeToggle({
     };
 
     return (
-      <Button
-        variant="ghost"
-        size={size}
-        onClick={handleCycle}
-        className={cn(
-          "cursor-pointer text-muted-foreground hover:text-foreground relative shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary",
-          className
-        )}
-        aria-label={`Current theme is ${theme}. Click to switch to ${
-          resolvedTheme === "dark" ? "light" : "dark"
-        } mode.`}
-        title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
-      >
-        <Sun className="h-4 w-4 rotate-0 scale-100 transition-all duration-200 dark:-rotate-90 dark:scale-0 text-amber-500" />
-        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all duration-200 dark:rotate-0 dark:scale-100 text-blue-400" />
-        <span className="sr-only">Toggle theme</span>
-        {showLabel && (
-          <span className="ml-2 text-xs capitalize text-foreground">{theme}</span>
-        )}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size={size}
+            onClick={handleCycle}
+            className={cn(
+              "cursor-pointer text-muted-foreground hover:text-foreground relative shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary",
+              className
+            )}
+            aria-label={`Current theme is ${theme}. Click to switch to ${
+              resolvedTheme === "dark" ? "light" : "dark"
+            } mode.`}
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all duration-200 dark:-rotate-90 dark:scale-0 text-amber-500" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all duration-200 dark:rotate-0 dark:scale-100 text-blue-400" />
+            <span className="sr-only">Toggle theme</span>
+            {showLabel && (
+              <span className="ml-2 text-xs capitalize text-foreground">{theme}</span>
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          Switch to {resolvedTheme === "dark" ? "light" : "dark"} mode
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
   // Dropdown menu mode: choose between Light, Dark, or System
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size={size}
-          className={cn(
-            "cursor-pointer text-muted-foreground hover:text-foreground relative shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary",
-            className
-          )}
-          aria-label="Select color theme (Light, Dark, System)"
-          title="Theme settings"
-        >
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all duration-200 dark:-rotate-90 dark:scale-0 text-amber-500" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all duration-200 dark:rotate-0 dark:scale-100 text-blue-400" />
-          <span className="sr-only">Toggle theme</span>
-          {showLabel && (
-            <span className="ml-2 text-xs capitalize text-foreground">{theme}</span>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size={size}
+              className={cn(
+                "cursor-pointer text-muted-foreground hover:text-foreground relative shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                className
+              )}
+              aria-label="Select color theme (Light, Dark, System)"
+            >
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all duration-200 dark:-rotate-90 dark:scale-0 text-amber-500" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all duration-200 dark:rotate-0 dark:scale-100 text-blue-400" />
+              <span className="sr-only">Toggle theme</span>
+              {showLabel && (
+                <span className="ml-2 text-xs capitalize text-foreground">{theme}</span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Theme settings</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align={align} className="min-w-36 rounded-xl border border-border shadow-md">
         <DropdownMenuItem
           onClick={() => setTheme("light")}

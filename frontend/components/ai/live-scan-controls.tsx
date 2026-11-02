@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Camera, Play, Square, Loader2, Activity, Video, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface LiveScanControlsProps {
   isCameraOn: boolean;
@@ -103,23 +104,30 @@ export function LiveScanControls({
 
         {/* 4. Audio Feedback Toggle */}
         {onToggleSound && (
-          <button
-            type="button"
-            onClick={onToggleSound}
-            className={`h-11 sm:h-10 px-3.5 sm:px-3 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 border cursor-pointer select-none active:scale-[0.98] ${
-              soundEnabled
-                ? "bg-primary/10 border-primary/25 text-primary hover:bg-primary/20"
-                : "bg-muted/60 border-border/70 text-muted-foreground hover:bg-muted"
-            }`}
-            title={soundEnabled ? "Audio Chime: Active" : "Audio Chime: Muted"}
-          >
-            {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-primary shrink-0" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-muted-foreground/70 shrink-0" />
-            )}
-            <span className="text-[11px]">{soundEnabled ? "Audio On" : "Muted"}</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onToggleSound}
+                className={`h-11 sm:h-10 px-3.5 sm:px-3 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 border cursor-pointer select-none active:scale-[0.98] ${
+                  soundEnabled
+                    ? "bg-primary/10 border-primary/25 text-primary hover:bg-primary/20"
+                    : "bg-muted/60 border-border/70 text-muted-foreground hover:bg-muted"
+                }`}
+                aria-label={soundEnabled ? "Mute audio feedback" : "Enable audio feedback"}
+              >
+                {soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-primary shrink-0" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-muted-foreground/70 shrink-0" />
+                )}
+                <span className="text-[11px]">{soundEnabled ? "Audio On" : "Muted"}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {soundEnabled ? "Audio Chime: Active (Click to mute)" : "Audio Chime: Muted (Click to enable)"}
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
 

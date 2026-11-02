@@ -28,6 +28,7 @@ import {
   Layers,
 } from "lucide-react";
 import { toast } from "sonner";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import { useRouter } from "next/navigation";
 
 export interface PersonDrawerData {
@@ -187,7 +188,7 @@ export function PersonDetailsDrawer({
                   <Calendar className="w-3.5 h-3.5 text-primary" /> Enrolled On
                 </span>
                 <span className="font-mono text-foreground">
-                  {new Date(person.createdAt).toLocaleDateString()}
+                  <FormattedTimestamp date={person.createdAt} mode="date" />
                 </span>
               </div>
             )}
