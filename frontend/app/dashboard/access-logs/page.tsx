@@ -5,6 +5,7 @@ import type { Prisma, AccessStatus, MatchStatus } from "@prisma/client";
 import { DataTableSearch } from "@/components/dashboard/data-table-search";
 import { DataTablePagination } from "@/components/dashboard/data-table-pagination";
 import { ExportLogsButton } from "@/components/dashboard/export-logs-button";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -211,7 +212,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                     <TableRow key={log.id} className="hover:bg-muted/40 transition-colors">
                       <TableCell className="py-3.5 font-mono text-muted-foreground">#{log.id}</TableCell>
                       <TableCell className="py-3.5 font-mono text-muted-foreground whitespace-nowrap">
-                        {new Date(log.createdAt).toLocaleString()}
+                        <FormattedTimestamp date={log.createdAt} mode="datetime" />
                       </TableCell>
                       <TableCell className="py-3.5">
                         {log.person ? (

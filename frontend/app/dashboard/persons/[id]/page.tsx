@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import {
   PersonDetailsClientHeaderActions,
   PersonDetailsStatusToggle,
@@ -149,7 +150,7 @@ export default async function PersonDetailsPage({
                 <div className="flex justify-between items-center py-1">
                   <span className="text-muted-foreground">Registered Date</span>
                   <span className="font-mono text-[11px]">
-                    {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(activeEmbedding.createdAt))}
+                    <FormattedTimestamp date={activeEmbedding.createdAt} mode="date" />
                   </span>
                 </div>
               </div>
@@ -285,7 +286,7 @@ export default async function PersonDetailsPage({
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(emb.createdAt))}
+                          <FormattedTimestamp date={emb.createdAt} mode="datetime" />
                         </TableCell>
                       </TableRow>
                     ))

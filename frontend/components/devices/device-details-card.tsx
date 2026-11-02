@@ -4,6 +4,8 @@ import { DeviceStatusBadge } from "./device-status-badge";
 import { DeviceTypeBadge } from "./device-type-badge";
 import { Button } from "@/components/ui/button";
 import { Edit, KeyRound, Calendar, HardDrive, MapPin, Network, Code2, Copy, Check, Hash } from "lucide-react";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface DeviceDetailsCardProps {
   device: {
@@ -45,19 +47,26 @@ export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDet
             <DeviceStatusBadge status={device.status} />
           </div>
           <CardDescription className="mt-1 flex items-center space-x-2 text-xs">
-            <button
-              type="button"
-              onClick={handleCopyId}
-              className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
-              title="Copy numeric Device ID for ESP32 config"
-            >
-              <span>ID: #{device.id}</span>
-              {copiedId ? (
-                <Check className="h-3 w-3 text-emerald-500" />
-              ) : (
-                <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleCopyId}
+                  className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
+                  aria-label="Copy numeric Device ID for ESP32 config"
+                >
+                  <span>ID: #{device.id}</span>
+                  {copiedId ? (
+                    <Check className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {copiedId ? "Copied!" : "Copy numeric Device ID for ESP32 config"}
+              </TooltipContent>
+            </Tooltip>
             <span>•</span>
             <span className="font-mono text-muted-foreground">{device.serialNumber}</span>
             <span>•</span>
@@ -115,11 +124,13 @@ export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDet
             <HardDrive className="h-4 w-4 shrink-0 text-primary" />
             <div>
               <p className="text-xs text-muted-foreground">Last Seen</p>
-              <p className="font-medium text-foreground text-xs">
-                {device.lastSeen
-                  ? new Date(device.lastSeen).toLocaleString()
-                  : "Never recorded"}
-              </p>
+              <div className="font-medium text-foreground text-xs">
+                {device.lastSeen ? (
+                  <FormattedTimestamp date={device.lastSeen} mode="datetime" />
+                ) : (
+                  "Never recorded"
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -127,9 +138,9 @@ export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDet
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t">
           <div className="flex items-center space-x-1">
             <Calendar className="h-3.5 w-3.5" />
-            <span>Registered: {new Date(device.createdAt).toLocaleDateString()}</span>
+            <span>Registered: <FormattedTimestamp date={device.createdAt} mode="date" /></span>
           </div>
-          <div>Updated: {new Date(device.updatedAt).toLocaleDateString()}</div>
+          <div>Updated: <FormattedTimestamp date={device.updatedAt} mode="date" /></div>
         </div>
       </CardContent>
     </Card>

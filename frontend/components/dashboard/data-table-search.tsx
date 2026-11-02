@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Search, X, Loader2 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface DataTableSearchProps {
   placeholder?: string;
@@ -88,14 +89,19 @@ export function DataTableSearch({
         {isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
         ) : searchTerm ? (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
-            title="Clear search"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Clear search</TooltipContent>
+          </Tooltip>
         ) : null}
       </div>
     </div>

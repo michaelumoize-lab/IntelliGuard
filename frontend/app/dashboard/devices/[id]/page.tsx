@@ -8,6 +8,7 @@ import { DeviceHealthCard } from "@/components/devices/device-health-card";
 import { DeviceAccessSummary } from "@/components/devices/device-access-summary";
 import { DeviceAlerts } from "@/components/devices/device-alerts";
 import { DeviceDetailHeaderActions } from "@/components/devices/devices-client-actions";
+import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -158,7 +159,7 @@ export default async function DeviceDetailPage({
               </h1>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Serial: <span className="font-mono text-foreground font-medium">{device.serialNumber}</span> • Registered {new Date(device.createdAt).toLocaleDateString()}
+              Serial: <span className="font-mono text-foreground font-medium">{device.serialNumber}</span> • Registered <FormattedTimestamp date={device.createdAt} mode="date" />
             </p>
           </div>
         </div>

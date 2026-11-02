@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Activity, Server, Database, Cpu, Cloud, RefreshCw, AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useSystemHealth } from "@/hooks/use-system-health";
 
 export function SystemHealthPanel() {
@@ -84,15 +85,20 @@ export function SystemHealthPanel() {
               Checked: {lastChecked}
             </span>
           )}
-          <button
-            onClick={() => refresh()}
-            disabled={isRefreshing}
-            className="px-3 py-1.5 bg-secondary hover:bg-muted text-secondary-foreground text-xs font-medium rounded-lg transition-all border border-border flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
-            title="Refresh all system service health checks"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => refresh()}
+                disabled={isRefreshing}
+                className="px-3 py-1.5 bg-secondary hover:bg-muted text-secondary-foreground text-xs font-medium rounded-lg transition-all border border-border flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
+                aria-label="Refresh all system service health checks"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                <span>Refresh</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Refresh all system service health checks</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
