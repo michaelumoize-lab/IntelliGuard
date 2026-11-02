@@ -40,21 +40,22 @@ export async function GET(
     }
 
     const resolvedParams = await params;
-    const personId = parseInt(resolvedParams.id, 10);
-    if (isNaN(personId)) {
+    const personId = resolvedParams.id;
+    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
       return NextResponse.json(
-        { success: false, error: "INVALID_ID", message: "Invalid person ID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
         { status: 400 }
       );
     }
 
     const person = await prisma.person.findUnique({
-      where: { id: personId },
+      where: { uuidId: personId },
       include: {
         faceEmbeddings: {
           orderBy: { createdAt: "desc" },
           select: {
-            id: true,
+            uuidId: true,
+            embeddingCode: true,
             embeddingModel: true,
             imagePath: true,
             qualityScore: true,
@@ -84,7 +85,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       person: {
-        id: person.id,
+        id: person.uuidId,
+        uuidId: person.uuidId,
         personCode: person.personCode,
         firstName: person.firstName,
         lastName: person.lastName,
@@ -131,16 +133,16 @@ export async function PATCH(
     }
 
     const resolvedParams = await params;
-    const personId = parseInt(resolvedParams.id, 10);
-    if (isNaN(personId)) {
+    const personId = resolvedParams.id;
+    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
       return NextResponse.json(
-        { success: false, error: "INVALID_ID", message: "Invalid person ID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
         { status: 400 }
       );
     }
 
     const existingPerson = await prisma.person.findUnique({
-      where: { id: personId },
+      where: { uuidId: personId },
     });
 
     if (!existingPerson) {
@@ -235,14 +237,29 @@ export async function PATCH(
     }
 
     const updatedPerson = await prisma.person.update({
-      where: { id: personId },
+      where: { uuidId: personId },
       data: updateData,
     });
 
     return NextResponse.json({
       success: true,
       message: "Person updated successfully",
-      person: updatedPerson,
+      person: {
+        id: updatedPerson.uuidId,
+        uuidId: updatedPerson.uuidId,
+        personCode: updatedPerson.personCode,
+        firstName: updatedPerson.firstName,
+        lastName: updatedPerson.lastName,
+        email: updatedPerson.email,
+        phone: updatedPerson.phone,
+        category: updatedPerson.category,
+        department: updatedPerson.department,
+        status: updatedPerson.status,
+        faceImageUrl: updatedPerson.faceImageUrl,
+        notes: updatedPerson.notes,
+        createdAt: updatedPerson.createdAt,
+        updatedAt: updatedPerson.updatedAt,
+      },
     });
   } catch (error: unknown) {
     console.error("Failed to update person:", error);
@@ -295,17 +312,17 @@ export async function DELETE(
     }
 
     const resolvedParams = await params;
-    const personId = parseInt(resolvedParams.id, 10);
-    if (isNaN(personId)) {
+    const personId = resolvedParams.id;
+    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
       return NextResponse.json(
-        { success: false, error: "INVALID_ID", message: "Invalid person ID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
         { status: 400 }
       );
     }
 
     const person = await prisma.person.findUnique({
-      where: { id: personId },
-      select: { id: true, faceImageFileId: true },
+      where: { uuidId: personId },
+      select: { uuidId: true, faceImageFileId: true },
     });
 
     if (!person) {
@@ -318,18 +335,18 @@ export async function DELETE(
     // 1. Perform transactional deletion in PostgreSQL (nullify access logs/alerts, delete embeddings, delete person)
     await prisma.$transaction([
       prisma.accessLog.updateMany({
-        where: { personId },
-        data: { personId: null },
+        where: { personUuidId: personId },
+        data: { personUuidId: null },
       }),
       prisma.alert.updateMany({
-        where: { personId },
-        data: { personId: null },
+        where: { personUuidId: personId },
+        data: { personUuidId: null },
       }),
       prisma.faceEmbedding.deleteMany({
-        where: { personId },
+        where: { personUuidId: personId },
       }),
       prisma.person.delete({
-        where: { id: personId },
+        where: { uuidId: personId },
       }),
     ]);
 

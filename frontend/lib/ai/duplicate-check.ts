@@ -13,7 +13,8 @@ export const DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD = Number.isFinite(parsedThre
 export interface DuplicateCheckResult {
   isDuplicate: boolean;
   matchingPerson?: {
-    personId: number;
+    personId: string;
+    personUuidId?: string;
     personCode: string;
     firstName: string;
     lastName: string;
@@ -64,7 +65,7 @@ export function validateEmbeddingVector(embedding: unknown): asserts embedding i
 export async function checkForDuplicateFace(
   embedding: number[],
   similarityThreshold: number = DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
-  excludePersonId?: number,
+  excludePersonId?: string,
   modelName: string = "buffalo_s",
   dbClient: DuplicateCheckDbClient = prisma
 ): Promise<DuplicateCheckResult> {
@@ -79,7 +80,7 @@ export async function checkForDuplicateFace(
 
   try {
     let results: Array<{
-      personId: number;
+      personId: string;
       personCode: string;
       firstName: string;
       lastName: string;
@@ -99,15 +100,15 @@ export async function checkForDuplicateFace(
         },
       },
       select: {
-        id: true,
+        uuidId: true,
         embeddingModel: true,
-        personId: true,
+        personUuidId: true,
       },
     });
 
     if (mismatchedEmbedding) {
       console.warn(
-        `Active face embedding #${mismatchedEmbedding.id} for person #${mismatchedEmbedding.personId} uses model '${mismatchedEmbedding.embeddingModel}', which does not match active duplicate-check model '${modelName}'. Active embeddings must be re-embedded with '${modelName}'.`
+        `Active face embedding #${mismatchedEmbedding.uuidId} for person #${mismatchedEmbedding.personUuidId} uses model '${mismatchedEmbedding.embeddingModel}', which does not match active duplicate-check model '${modelName}'. Active embeddings must be re-embedded with '${modelName}'.`
       );
     }
 
@@ -115,17 +116,17 @@ export async function checkForDuplicateFace(
       results = await dbClient.$queryRawUnsafe(
         `
         SELECT 
-          fe.person_id AS "personId", 
+          fe.person_uuid_id::text AS "personId", 
           p.person_code AS "personCode",
           p.first_name AS "firstName", 
           p.last_name AS "lastName", 
           p.status::text AS "status",
           (1 - (fe.embedding <=> $1::vector)) AS "similarity"
         FROM face_embeddings fe
-        JOIN persons p ON fe.person_id = p.id
+        JOIN persons p ON fe.person_uuid_id = p.uuid_id
         WHERE fe.is_active = true 
           AND LOWER(fe.embedding_model) = LOWER($3)
-          AND fe.person_id != $2
+          AND fe.person_uuid_id != $2::uuid
         ORDER BY fe.embedding <=> $1::vector ASC
         LIMIT 1;
         `,
@@ -137,14 +138,14 @@ export async function checkForDuplicateFace(
       results = await dbClient.$queryRawUnsafe(
         `
         SELECT 
-          fe.person_id AS "personId", 
+          fe.person_uuid_id::text AS "personId", 
           p.person_code AS "personCode",
           p.first_name AS "firstName", 
           p.last_name AS "lastName", 
           p.status::text AS "status",
           (1 - (fe.embedding <=> $1::vector)) AS "similarity"
         FROM face_embeddings fe
-        JOIN persons p ON fe.person_id = p.id
+        JOIN persons p ON fe.person_uuid_id = p.uuid_id
         WHERE fe.is_active = true 
           AND LOWER(fe.embedding_model) = LOWER($2)
         ORDER BY fe.embedding <=> $1::vector ASC
@@ -163,7 +164,8 @@ export async function checkForDuplicateFace(
         return {
           isDuplicate: true,
           matchingPerson: {
-            personId: Number(topMatch.personId),
+            personId: String(topMatch.personId),
+            personUuidId: String(topMatch.personId),
             personCode: topMatch.personCode,
             firstName: topMatch.firstName,
             lastName: topMatch.lastName,

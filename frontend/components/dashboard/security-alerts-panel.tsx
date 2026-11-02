@@ -8,7 +8,8 @@ import { CheckCircle2, ShieldAlert, ArrowRight, Loader2 } from "lucide-react";
 import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 
 export interface SecurityAlertItem {
-  id: number;
+  id: string | number;
+  alertCode?: string;
   alertType: string;
   title: string;
   message: string;
@@ -16,7 +17,7 @@ export interface SecurityAlertItem {
   resolved: boolean;
   createdAt: string;
   person?: {
-    id: number;
+    id: string | number;
     personCode: string;
     firstName: string;
     lastName: string;
@@ -31,7 +32,7 @@ interface SecurityAlertsPanelProps {
     medium: number;
     low: number;
   };
-  onAlertResolved?: (id: number) => void;
+  onAlertResolved?: (id: string | number) => void;
   showResolveAll?: boolean;
 }
 
@@ -42,9 +43,9 @@ export function SecurityAlertsPanel({
   showResolveAll = false,
 }: SecurityAlertsPanelProps) {
   const router = useRouter();
-  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | number | null>(null);
   const [isResolvingAll, setIsResolvingAll] = useState(false);
-  const [resolvedIds, setResolvedIds] = useState<number[]>([]);
+  const [resolvedIds, setResolvedIds] = useState<(string | number)[]>([]);
 
   const unresolvedAlerts = alerts.filter(
     (a) => !a.resolved && !resolvedIds.includes(a.id)
@@ -220,6 +221,11 @@ export function SecurityAlertsPanel({
                     >
                       {alert.severity}
                     </span>
+                    {alert.alertCode && (
+                      <span className="text-[10px] font-mono font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border">
+                        {alert.alertCode}
+                      </span>
+                    )}
                     <h4 className="text-xs font-semibold text-foreground">{alert.title}</h4>
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>

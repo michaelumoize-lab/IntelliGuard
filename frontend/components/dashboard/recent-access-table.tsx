@@ -17,7 +17,9 @@ import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export interface AccessEventItem {
-  id: number;
+  id: string | number;
+  uuidId?: string;
+  accessCode?: string;
   matchStatus: string;
   accessStatus: string;
   reason: string;
@@ -26,7 +28,8 @@ export interface AccessEventItem {
   processingTimeMs: number | null;
   createdAt: string;
   person?: {
-    id: number;
+    id: string | number;
+    uuidId?: string;
     personCode: string;
     firstName: string;
     lastName: string;
@@ -35,7 +38,8 @@ export interface AccessEventItem {
     faceImageUrl?: string | null;
   } | null;
   device?: {
-    id: number;
+    id: string | number;
+    uuidId?: string;
     deviceName: string;
     serialNumber: string;
   } | null;
@@ -248,6 +252,11 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                     <tr key={evt.id} className="hover:bg-muted/40 transition-colors">
                       <td className="py-3.5 font-mono text-muted-foreground whitespace-nowrap">
                         <FormattedTimestamp date={evt.createdAt} mode="datetime" />
+                        {evt.accessCode && (
+                          <div className="text-[10px] text-muted-foreground/80 font-mono tracking-tight">
+                            {evt.accessCode}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5">
                         {evt.person ? (

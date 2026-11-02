@@ -35,16 +35,16 @@ export async function PATCH(
 
   try {
     const resolvedParams = await params;
-    const alertId = parseInt(resolvedParams.id, 10);
-    if (isNaN(alertId)) {
+    const alertId = resolvedParams.id;
+    if (!alertId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(alertId)) {
       return NextResponse.json(
-        { success: false, error: "INVALID_ID", message: "Invalid alert ID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid alert ID. Expected a valid UUID." },
         { status: 400 }
       );
     }
 
     const alert = await prisma.alert.findUnique({
-      where: { id: alertId },
+      where: { uuidId: alertId },
     });
 
     if (!alert) {
@@ -64,7 +64,7 @@ export async function PATCH(
     let updatedAlert;
     try {
       updatedAlert = await prisma.alert.update({
-        where: { id: alertId },
+        where: { uuidId: alertId },
         data: {
           resolved: resolvedValue,
           resolvedAt: resolvedValue ? new Date() : null,
@@ -78,7 +78,7 @@ export async function PATCH(
         updateErr.code === "P2003"
       ) {
         updatedAlert = await prisma.alert.update({
-          where: { id: alertId },
+          where: { uuidId: alertId },
           data: {
             resolved: resolvedValue,
             resolvedAt: resolvedValue ? new Date() : null,
@@ -93,7 +93,11 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       message: resolvedValue ? "Alert resolved successfully." : "Alert status updated.",
-      alert: updatedAlert,
+      alert: {
+        ...updatedAlert,
+        id: updatedAlert.uuidId,
+        uuidId: updatedAlert.uuidId,
+      },
     });
   } catch (error: unknown) {
     console.error("Failed to update alert:", error);

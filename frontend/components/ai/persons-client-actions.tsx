@@ -145,7 +145,8 @@ export function RegisterPersonButton() {
 }
 
 export interface PersonRowData {
-  id: number;
+  id: string | number;
+  uuidId?: string;
   personCode: string;
   firstName: string;
   lastName: string;

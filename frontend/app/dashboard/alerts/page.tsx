@@ -28,14 +28,18 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const search = (params.search || "").trim();
   const severityFilter = (params.severity || "").trim().toLowerCase();
   const resolvedFilter = params.resolved === undefined ? "false" : params.resolved;
-  const rawDeviceId = params.deviceId ? parseInt(params.deviceId, 10) : NaN;
-  const parsedDeviceId = !isNaN(rawDeviceId) && rawDeviceId > 0 ? rawDeviceId : undefined;
-  const deviceIdParam = parsedDeviceId ? `&deviceId=${parsedDeviceId}` : "";
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const rawDeviceId = params.deviceId ? String(params.deviceId).trim() : undefined;
+  const deviceIdParam = rawDeviceId ? `&deviceId=${encodeURIComponent(rawDeviceId)}` : "";
 
   const where: Prisma.AlertWhereInput = {};
 
-  if (parsedDeviceId !== undefined) {
-    where.deviceId = parsedDeviceId;
+  if (rawDeviceId) {
+    if (UUID_REGEX.test(rawDeviceId)) {
+      where.deviceUuidId = rawDeviceId;
+    } else {
+      where.device = { deviceCode: rawDeviceId };
+    }
   }
 
   if (severityFilter && ["low", "medium", "high", "critical"].includes(severityFilter)) {
@@ -72,7 +76,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     include: {
       person: {
         select: {
-          id: true,
+          uuidId: true,
           personCode: true,
           firstName: true,
           lastName: true,
@@ -82,14 +86,22 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   });
 
   const alerts: SecurityAlertItem[] = rawAlerts.map((alt) => ({
-    id: alt.id,
+    id: alt.uuidId,
+    alertCode: alt.alertCode,
     alertType: alt.alertType,
     title: alt.title,
     message: alt.message,
     severity: alt.severity,
     resolved: alt.resolved,
     createdAt: alt.createdAt.toISOString(),
-    person: alt.person,
+    person: alt.person
+      ? {
+          id: alt.person.uuidId,
+          personCode: alt.person.personCode,
+          firstName: alt.person.firstName,
+          lastName: alt.person.lastName,
+        }
+      : null,
   }));
 
   return (

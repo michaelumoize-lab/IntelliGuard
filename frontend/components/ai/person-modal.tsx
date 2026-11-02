@@ -19,7 +19,8 @@ import { UploadIcon, InfoIcon, Loader2Icon, Camera, ShieldAlert, Sparkles } from
 import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
 export interface PersonModalInitialData {
-  id?: number;
+  id?: string | number;
+  uuidId?: string;
   firstName?: string;
   lastName?: string;
   category?: string;

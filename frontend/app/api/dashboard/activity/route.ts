@@ -46,7 +46,8 @@ export async function GET(req: NextRequest) {
       take: limit,
       orderBy: { createdAt: "desc" },
       select: {
-        id: true,
+        uuidId: true,
+        accessCode: true,
         matchStatus: true,
         accessStatus: true,
         reason: true,
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         person: {
           select: {
-            id: true,
+            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -67,7 +68,8 @@ export async function GET(req: NextRequest) {
         },
         device: {
           select: {
-            id: true,
+            uuidId: true,
+            deviceCode: true,
             deviceName: true,
             serialNumber: true,
             location: true,
@@ -76,9 +78,29 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const mappedEvents = events.map((event) => ({
+      ...event,
+      id: event.uuidId,
+      uuidId: event.uuidId,
+      person: event.person
+        ? {
+            ...event.person,
+            id: event.person.uuidId,
+            uuidId: event.person.uuidId,
+          }
+        : null,
+      device: event.device
+        ? {
+            ...event.device,
+            id: event.device.uuidId,
+            uuidId: event.device.uuidId,
+          }
+        : null,
+    }));
+
     return NextResponse.json({
       success: true,
-      events,
+      events: mappedEvents,
     });
   } catch (error: unknown) {
     console.error("Failed to retrieve dashboard activity events:", error);

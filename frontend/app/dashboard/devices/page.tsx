@@ -109,7 +109,9 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
 
   // Map Prisma data to clean serializable items for client table
   const devices: DeviceTableItem[] = rawDevices.map((device) => ({
-    id: device.id,
+    id: device.uuidId,
+    uuidId: device.uuidId,
+    deviceCode: device.deviceCode,
     deviceName: device.deviceName,
     serialNumber: device.serialNumber,
     location: device.location,

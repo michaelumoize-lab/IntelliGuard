@@ -30,7 +30,8 @@ interface ReplaceFaceModalProps {
   onClose: () => void;
   onSuccess: () => void;
   person: {
-    id: number;
+    id: string | number;
+    uuidId?: string;
     firstName: string;
     lastName: string;
     personCode: string;

@@ -1,5 +1,5 @@
 export interface DeviceTelemetryData {
-  deviceId: number;
+  deviceId: string | number;
   ipAddress?: string;
   firmwareVersion?: string;
   wifiRssi?: number; // Wi-Fi Signal Strength in dBm (e.g., -55 dBm)
@@ -10,19 +10,19 @@ export interface DeviceTelemetryData {
 }
 
 // In-memory telemetry cache for active IoT edge nodes
-const telemetryMap = new Map<number, DeviceTelemetryData>();
+const telemetryMap = new Map<string, DeviceTelemetryData>();
 
 export const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes threshold before flagging offline
 
 export function recordDeviceHeartbeat(data: DeviceTelemetryData): void {
-  telemetryMap.set(data.deviceId, {
+  telemetryMap.set(String(data.deviceId), {
     ...data,
     lastPing: Date.now(),
   });
 }
 
-export function getDeviceTelemetry(deviceId: number): DeviceTelemetryData | null {
-  const telemetry = telemetryMap.get(deviceId);
+export function getDeviceTelemetry(deviceId: string | number): DeviceTelemetryData | null {
+  const telemetry = telemetryMap.get(String(deviceId));
   if (!telemetry) return null;
   return telemetry;
 }

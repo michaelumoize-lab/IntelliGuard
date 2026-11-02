@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { generateDeviceCode, generateUniqueBusinessIdentifier } from "@/lib/identifiers";
 import { DeviceType, DeviceStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +91,8 @@ export async function GET(req: NextRequest) {
       const { apiKeyHash, accessLogs, _count, ...safeDevice } = device;
       return {
         ...safeDevice,
+        id: device.uuidId,
+        uuidId: device.uuidId,
         accessLogCount: _count.accessLogs,
         alertCount: _count.alerts,
         lastAccessAt: accessLogs[0]?.createdAt || null,
@@ -218,10 +221,17 @@ export async function POST(req: NextRequest) {
     const rawApiKey = `ig_dev_${crypto.randomBytes(24).toString("hex")}`;
     const apiKeyHash = crypto.createHash("sha256").update(rawApiKey).digest("hex");
 
+    const deviceCode = await generateUniqueBusinessIdentifier(
+      generateDeviceCode,
+      async (candidate) => Boolean(await prisma.device.findUnique({ where: { deviceCode: candidate } })),
+      { maxRetries: 5, entityName: "Device" }
+    );
+
     let newDevice;
     try {
       newDevice = await prisma.device.create({
         data: {
+          deviceCode,
           deviceName,
           serialNumber,
           location,
@@ -247,7 +257,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        device: safeDevice,
+        device: {
+          ...safeDevice,
+          id: newDevice.uuidId,
+          uuidId: newDevice.uuidId,
+        },
         apiKey: rawApiKey,
       },
       { status: 201 }

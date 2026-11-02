@@ -7,7 +7,7 @@ import { ShieldAlert, ArrowRight, CheckCircle2 } from "lucide-react";
 import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 
 export interface DeviceAlertItem {
-  id: number;
+  id: string | number;
   alertType: string;
   title: string;
   message: string;
@@ -16,7 +16,7 @@ export interface DeviceAlertItem {
   createdAt: string | Date;
   resolvedAt?: string | Date | null;
   person?: {
-    id: number;
+    id: string | number;
     firstName: string;
     lastName: string;
   } | null;
@@ -24,7 +24,7 @@ export interface DeviceAlertItem {
 
 interface DeviceAlertsProps {
   alerts: DeviceAlertItem[];
-  deviceId: number;
+  deviceId: string | number;
 }
 
 export function DeviceAlerts({ alerts, deviceId }: DeviceAlertsProps) {

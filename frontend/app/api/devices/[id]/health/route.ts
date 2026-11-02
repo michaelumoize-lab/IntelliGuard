@@ -11,6 +11,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function checkAdminAuth() {
   const session = await getServerSession();
   if (!session || !session.user) {
@@ -34,19 +36,18 @@ export async function GET(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  const deviceId = parseInt(idParam, 10);
-  if (isNaN(deviceId)) {
+  if (!idParam || !UUID_REGEX.test(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID format. Expected UUIDv7." },
       { status: 400 }
     );
   }
 
   try {
     const device = await prisma.device.findUnique({
-      where: { id: deviceId },
+      where: { uuidId: idParam },
       select: {
-        id: true,
+        uuidId: true,
         deviceName: true,
         serialNumber: true,
         status: true,
@@ -65,20 +66,20 @@ export async function GET(
     }
 
     const liveOnline = isDeviceOnline(device.lastSeen);
-    const telemetry = getDeviceTelemetry(deviceId);
+    const telemetry = getDeviceTelemetry(idParam);
 
     // If device was recorded as online but has not sent a heartbeat within threshold, update status
     let currentStatus = device.status;
     if (!liveOnline && device.status === "online") {
       currentStatus = "offline";
       prisma.device
-        .update({ where: { id: device.id }, data: { status: "offline" } })
+        .update({ where: { uuidId: device.uuidId }, data: { status: "offline" } })
         .catch((err) => console.error("Failed to mark expired device offline:", err));
     }
 
     return NextResponse.json({
       success: true,
-      deviceId: device.id,
+      deviceId: device.uuidId,
       deviceName: device.deviceName,
       serialNumber: device.serialNumber,
       status: currentStatus,
@@ -119,10 +120,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: idParam } = await params;
-  const deviceId = parseInt(idParam, 10);
-  if (isNaN(deviceId)) {
+  if (!idParam || !UUID_REGEX.test(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID format. Expected UUIDv7." },
       { status: 400 }
     );
   }
@@ -138,7 +138,7 @@ export async function POST(
     );
   }
 
-  const authResult = await authenticateDevice(deviceId, apiKey, { timestamp, nonce });
+  const authResult = await authenticateDevice(idParam, apiKey, { timestamp, nonce });
   if (!authResult.isValid) {
     return NextResponse.json(
       {
@@ -187,7 +187,7 @@ export async function POST(
 
     // Record live in-memory telemetry
     recordDeviceHeartbeat({
-      deviceId,
+      deviceId: idParam,
       ipAddress: clientIp,
       firmwareVersion,
       wifiRssi,
@@ -198,11 +198,11 @@ export async function POST(
     });
 
     // Update persistent database record: set online only if current status is offline or online (preserving maintenance/error)
-    const currentDevice = authResult.device || (await prisma.device.findUnique({ where: { id: deviceId } }));
+    const currentDevice = authResult.device || (await prisma.device.findUnique({ where: { uuidId: idParam } }));
     const shouldSetOnline = currentDevice?.status === "online" || currentDevice?.status === "offline";
 
     const updatedDevice = await prisma.device.update({
-      where: { id: deviceId },
+      where: { uuidId: idParam },
       data: {
         ...(shouldSetOnline ? { status: "online" } : {}),
         lastSeen: new Date(),
@@ -217,7 +217,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       acknowledged: true,
-      deviceId,
+      deviceId: idParam,
       status: updatedDevice.status,
       serverTime: new Date().toISOString(),
     });

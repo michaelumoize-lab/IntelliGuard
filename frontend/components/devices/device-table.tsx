@@ -36,7 +36,9 @@ import { DeviceTypeBadge } from "./device-type-badge";
 import { MoreHorizontal, Eye, Edit, KeyRound, Trash2, Cpu, Copy, Check } from "lucide-react";
 
 export interface DeviceTableItem {
-  id: number;
+  id: string | number;
+  uuidId?: string;
+  deviceCode?: string;
   deviceName: string;
   serialNumber: string;
   location: string;
@@ -56,7 +58,7 @@ interface DeviceTableProps {
   isLoading?: boolean;
   onEdit?: (device: DeviceTableItem) => void;
   onRegenerateKey?: (device: DeviceTableItem) => void;
-  onDelete?: (deviceId: number) => Promise<void>;
+  onDelete?: (deviceId: string | number) => Promise<void>;
 }
 
 export function DeviceTable({
@@ -66,11 +68,11 @@ export function DeviceTable({
   onRegenerateKey,
   onDelete,
 }: DeviceTableProps) {
-  const [deleteId, setDeleteId] = React.useState<number | null>(null);
+  const [deleteId, setDeleteId] = React.useState<string | number | null>(null);
   const [deleting, setDeleting] = React.useState(false);
-  const [copiedId, setCopiedId] = React.useState<number | null>(null);
+  const [copiedId, setCopiedId] = React.useState<string | number | null>(null);
 
-  const handleCopyId = async (id: number, e: React.MouseEvent) => {
+  const handleCopyId = async (id: string | number, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(String(id));
@@ -141,12 +143,12 @@ export function DeviceTable({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        onClick={(e) => handleCopyId(device.id, e)}
+                        onClick={(e) => handleCopyId(device.deviceCode || device.id, e)}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
                         aria-label="Click to copy Device ID"
                       >
-                        <span>#{device.id}</span>
-                        {copiedId === device.id ? (
+                        <span>{device.deviceCode || `#${String(device.id).slice(0, 8)}`}</span>
+                        {copiedId === device.id || copiedId === device.deviceCode ? (
                           <Check className="h-3 w-3 text-emerald-500" />
                         ) : (
                           <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
@@ -154,7 +156,7 @@ export function DeviceTable({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      {copiedId === device.id ? "Copied!" : "Click to copy Device ID"}
+                      {copiedId === device.id || copiedId === device.deviceCode ? "Copied!" : "Click to copy Device ID"}
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
@@ -168,11 +170,15 @@ export function DeviceTable({
                   >
                     {device.deviceName}
                   </Link>
-                  {device.ipAddress && (
-                    <div className="text-[11px] text-muted-foreground font-mono">
-                      {device.ipAddress}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
+                    {device.deviceCode && (
+                      <span className="font-semibold text-primary/80">{device.deviceCode}</span>
+                    )}
+                    {device.deviceCode && device.ipAddress && <span>•</span>}
+                    {device.ipAddress && (
+                      <span>{device.ipAddress}</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="py-3">
                   <DeviceTypeBadge type={device.deviceType} />

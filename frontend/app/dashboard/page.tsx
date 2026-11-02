@@ -77,8 +77,8 @@ export default async function AdminDashboardPage() {
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
-        person: { select: { id: true, personCode: true, firstName: true, lastName: true, category: true, status: true } },
-        device: { select: { id: true, deviceName: true, serialNumber: true } },
+        person: { select: { uuidId: true, personCode: true, firstName: true, lastName: true, category: true, status: true } },
+        device: { select: { uuidId: true, deviceCode: true, deviceName: true, serialNumber: true } },
       },
     }),
 
@@ -87,7 +87,7 @@ export default async function AdminDashboardPage() {
       take: 5,
       orderBy: { createdAt: "desc" },
       include: {
-        person: { select: { id: true, personCode: true, firstName: true, lastName: true } },
+        person: { select: { uuidId: true, personCode: true, firstName: true, lastName: true } },
       },
     }),
 
@@ -129,7 +129,9 @@ export default async function AdminDashboardPage() {
 
   // Format events for client component
   const recentEvents: AccessEventItem[] = rawRecentEvents.map((evt) => ({
-    id: evt.id,
+    id: evt.uuidId,
+    uuidId: evt.uuidId,
+    accessCode: evt.accessCode || undefined,
     matchStatus: evt.matchStatus,
     accessStatus: evt.accessStatus,
     reason: evt.reason,
@@ -137,19 +139,44 @@ export default async function AdminDashboardPage() {
     confidenceScore: evt.confidenceScore,
     processingTimeMs: evt.processingTimeMs,
     createdAt: evt.createdAt.toISOString(),
-    person: evt.person,
-    device: evt.device,
+    person: evt.person
+      ? {
+          id: evt.person.uuidId,
+          uuidId: evt.person.uuidId,
+          personCode: evt.person.personCode,
+          firstName: evt.person.firstName,
+          lastName: evt.person.lastName,
+          category: evt.person.category,
+          status: evt.person.status,
+        }
+      : null,
+    device: evt.device
+      ? {
+          id: evt.device.uuidId,
+          uuidId: evt.device.uuidId,
+          deviceName: evt.device.deviceName,
+          serialNumber: evt.device.serialNumber,
+        }
+      : null,
   }));
 
   const alerts: SecurityAlertItem[] = rawAlerts.map((alt) => ({
-    id: alt.id,
+    id: alt.uuidId,
+    alertCode: alt.alertCode || undefined,
     alertType: alt.alertType,
     title: alt.title,
     message: alt.message,
     severity: alt.severity,
     resolved: alt.resolved,
     createdAt: alt.createdAt.toISOString(),
-    person: alt.person,
+    person: alt.person
+      ? {
+          id: alt.person.uuidId,
+          personCode: alt.person.personCode,
+          firstName: alt.person.firstName,
+          lastName: alt.person.lastName,
+        }
+      : null,
   }));
 
   const countsBySeverity = {

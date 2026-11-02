@@ -32,7 +32,8 @@ import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import { useRouter } from "next/navigation";
 
 export interface PersonDrawerData {
-  id: number;
+  id: string | number;
+  uuidId?: string;
   personCode: string;
   firstName: string;
   lastName: string;

@@ -9,7 +9,8 @@ import { ReplaceFaceModal } from "@/components/ai/replace-face-modal";
 import { PencilIcon, CameraIcon, UserCheckIcon, UserXIcon, Loader2 } from "lucide-react";
 
 export interface PersonDetailsData extends PersonModalInitialData {
-  id: number;
+  id: string | number;
+  uuidId?: string;
   personCode: string;
   firstName: string;
   lastName: string;

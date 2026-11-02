@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
+import { generatePersonCode, generateEmbeddingCode } from "@/lib/identifiers";
 import { PersonCategory, PersonStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -137,59 +138,64 @@ export async function POST(req: NextRequest) {
     uploadedFileId = ikResult.fileId; // Save for cleanup in case database creation fails
 
     // 6. Step D: Create Person and FaceEmbedding records atomically in PostgreSQL
-    const personCode = `PER-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const personCode = generatePersonCode();
 
     // Wrap database creation in a transaction and try-catch for ImageKit cleanup
     try {
-      const newPerson = await prisma.$transaction(async (tx) => {
-        // Serialize concurrent facial registrations so two near-simultaneous requests for the same face cannot both insert
-        await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(20260419);");
+      const newPerson = await prisma.$transaction(
+        async (tx) => {
+          // Serialize concurrent facial registrations so two near-simultaneous requests for the same face cannot both insert
+          await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(20260419);");
 
-        const txDuplicateResult = await checkForDuplicateFace(
-          aiResult.embedding,
-          DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
-          undefined,
-          activeModel,
-          tx
-        );
-        if (txDuplicateResult.isDuplicate && txDuplicateResult.matchingPerson) {
-          throw new DuplicateFaceConflictError(txDuplicateResult.matchingPerson);
-        }
-
-        const createdPerson = await tx.person.create({
-          data: {
-            personCode,
-            firstName,
-            lastName,
-            email,
-            phone,
-            category: categoryInput as PersonCategory,
-            department,
-            status: "active",
-            faceImageUrl: ikResult.url,
-            faceImageFileId: ikResult.fileId,
-            notes,
-          },
-        });
-
-        const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO face_embeddings (
-            person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
-          ) VALUES (
-            $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+          const txDuplicateResult = await checkForDuplicateFace(
+            aiResult.embedding,
+            DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+            undefined,
+            activeModel,
+            tx
           );
-          `,
-          createdPerson.id,
-          vectorLiteral,
-          activeModel,
-          ikResult.url,
-          aiResult.qualityScore
-        );
+          if (txDuplicateResult.isDuplicate && txDuplicateResult.matchingPerson) {
+            throw new DuplicateFaceConflictError(txDuplicateResult.matchingPerson);
+          }
 
-        return createdPerson;
-      });
+          const createdPerson = await tx.person.create({
+            data: {
+              personCode,
+              firstName,
+              lastName,
+              email,
+              phone,
+              category: categoryInput as PersonCategory,
+              department,
+              status: "active",
+              faceImageUrl: ikResult.url,
+              faceImageFileId: ikResult.fileId,
+              notes,
+            },
+          });
+
+          const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
+          const embeddingCode = generateEmbeddingCode();
+          await tx.$executeRawUnsafe(
+            `
+            INSERT INTO face_embeddings (
+              person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+            ) VALUES (
+              $1::uuid, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
+            );
+            `,
+            createdPerson.uuidId,
+            embeddingCode,
+            vectorLiteral,
+            activeModel,
+            ikResult.url,
+            aiResult.qualityScore
+          );
+
+          return createdPerson;
+        },
+        { timeout: 30000, maxWait: 15000 }
+      );
 
       // Return success response WITHOUT exposing raw 512 float values
       return NextResponse.json(
@@ -197,7 +203,8 @@ export async function POST(req: NextRequest) {
           success: true,
           message: "Person registered successfully",
           person: {
-            id: newPerson.id,
+            id: newPerson.uuidId,
+            uuidId: newPerson.uuidId,
             personCode: newPerson.personCode,
             firstName: newPerson.firstName,
             lastName: newPerson.lastName,
@@ -345,7 +352,7 @@ export async function GET(req: NextRequest) {
       take: limit,
       orderBy: { createdAt: "desc" },
       select: {
-        id: true,
+        uuidId: true,
         personCode: true,
         firstName: true,
         lastName: true,
@@ -361,7 +368,7 @@ export async function GET(req: NextRequest) {
           where: { isActive: true },
           take: 1,
           select: {
-            id: true,
+            uuidId: true,
             embeddingModel: true,
             qualityScore: true,
             isActive: true,
@@ -380,7 +387,8 @@ export async function GET(req: NextRequest) {
       }
 
       return {
-        id: p.id,
+        id: p.uuidId,
+        uuidId: p.uuidId,
         personCode: p.personCode,
         firstName: p.firstName,
         lastName: p.lastName,
@@ -395,7 +403,8 @@ export async function GET(req: NextRequest) {
         embeddingStatus,
         embedding: activeEmbedding
           ? {
-              id: activeEmbedding.id,
+              id: activeEmbedding.uuidId,
+              uuidId: activeEmbedding.uuidId,
               model: activeEmbedding.embeddingModel,
               qualityScore: activeEmbedding.qualityScore,
               createdAt: activeEmbedding.createdAt,

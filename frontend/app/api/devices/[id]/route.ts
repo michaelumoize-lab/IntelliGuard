@@ -40,17 +40,17 @@ export async function GET(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  const deviceId = parseInt(idParam, 10);
-  if (isNaN(deviceId)) {
+  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
       { status: 400 }
     );
   }
+  const deviceId = idParam;
 
   try {
     const device = await prisma.device.findUnique({
-      where: { id: deviceId },
+      where: { uuidId: deviceId },
     });
 
     if (!device) {
@@ -60,7 +60,12 @@ export async function GET(
       );
     }
 
-    const { apiKeyHash: _, ...safeDevice } = device;
+    const { apiKeyHash: _, ...safeDeviceRaw } = device;
+    const safeDevice = {
+      ...safeDeviceRaw,
+      id: device.uuidId,
+      uuidId: device.uuidId,
+    };
 
     // Calculate start of today (UTC)
     const now = new Date();
@@ -76,24 +81,24 @@ export async function GET(
       todayDenied,
       unresolvedAlerts,
     ] = await Promise.all([
-      prisma.accessLog.count({ where: { deviceId } }),
-      prisma.accessLog.count({ where: { deviceId, accessStatus: "granted" } }),
-      prisma.accessLog.count({ where: { deviceId, accessStatus: "denied" } }),
-      prisma.accessLog.count({ where: { deviceId, createdAt: { gte: startOfToday } } }),
-      prisma.accessLog.count({ where: { deviceId, accessStatus: "granted", createdAt: { gte: startOfToday } } }),
-      prisma.accessLog.count({ where: { deviceId, accessStatus: "denied", createdAt: { gte: startOfToday } } }),
-      prisma.alert.count({ where: { deviceId, resolved: false } }),
+      prisma.accessLog.count({ where: { deviceUuidId: deviceId } }),
+      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "granted" } }),
+      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "denied" } }),
+      prisma.accessLog.count({ where: { deviceUuidId: deviceId, createdAt: { gte: startOfToday } } }),
+      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "granted", createdAt: { gte: startOfToday } } }),
+      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "denied", createdAt: { gte: startOfToday } } }),
+      prisma.alert.count({ where: { deviceUuidId: deviceId, resolved: false } }),
     ]);
 
     // Fetch recent logs
     const recentLogsRaw = await prisma.accessLog.findMany({
-      where: { deviceId },
+      where: { deviceUuidId: deviceId },
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
         person: {
           select: {
-            id: true,
+            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -107,9 +112,10 @@ export async function GET(
 
     // Clean logs to guarantee NO raw embeddings are exposed
     const recentLogs = recentLogsRaw.map((log) => ({
-      id: log.id,
+      id: log.uuidId,
+      uuidId: log.uuidId,
       timestamp: log.createdAt,
-      person: log.person,
+      person: log.person ? { ...log.person, id: log.person.uuidId } : null,
       matchStatus: log.matchStatus,
       accessStatus: log.accessStatus,
       reason: log.reason,
@@ -119,20 +125,27 @@ export async function GET(
     }));
 
     // Fetch recent alerts
-    const recentAlerts = await prisma.alert.findMany({
-      where: { deviceId },
+    const recentAlertsRaw = await prisma.alert.findMany({
+      where: { deviceUuidId: deviceId },
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
         person: {
           select: {
-            id: true,
+            uuidId: true,
             firstName: true,
             lastName: true,
           },
         },
       },
     });
+
+    const recentAlerts = recentAlertsRaw.map((alt) => ({
+      ...alt,
+      id: alt.uuidId,
+      uuidId: alt.uuidId,
+      person: alt.person ? { ...alt.person, id: alt.person.uuidId } : null,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -166,16 +179,16 @@ export async function PATCH(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  const deviceId = parseInt(idParam, 10);
-  if (isNaN(deviceId)) {
+  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
       { status: 400 }
     );
   }
+  const deviceId = idParam;
 
   try {
-    const existing = await prisma.device.findUnique({ where: { id: deviceId } });
+    const existing = await prisma.device.findUnique({ where: { uuidId: deviceId } });
     if (!existing) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -307,11 +320,16 @@ export async function PATCH(
     }
 
     const updatedDevice = await prisma.device.update({
-      where: { id: deviceId },
+      where: { uuidId: deviceId },
       data: updateData,
     });
 
-    const { apiKeyHash: _, ...safeDevice } = updatedDevice;
+    const { apiKeyHash: _, ...safeDeviceRaw } = updatedDevice;
+    const safeDevice = {
+      ...safeDeviceRaw,
+      id: updatedDevice.uuidId,
+      uuidId: updatedDevice.uuidId,
+    };
 
     return NextResponse.json({
       success: true,
@@ -334,16 +352,16 @@ export async function DELETE(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  const deviceId = parseInt(idParam, 10);
-  if (isNaN(deviceId)) {
+  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
       { status: 400 }
     );
   }
+  const deviceId = idParam;
 
   try {
-    const existing = await prisma.device.findUnique({ where: { id: deviceId } });
+    const existing = await prisma.device.findUnique({ where: { uuidId: deviceId } });
     if (!existing) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -353,7 +371,7 @@ export async function DELETE(
 
     // Delete device. Prisma `onDelete: SetNull` preserves historical AccessLogs and Alerts
     await prisma.device.delete({
-      where: { id: deviceId },
+      where: { uuidId: deviceId },
     });
 
     return NextResponse.json({

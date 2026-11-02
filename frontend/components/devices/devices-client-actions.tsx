@@ -34,7 +34,7 @@ export function AddDeviceButton() {
 
   // API Key dialog state
   const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
-  const [createdDeviceId, setCreatedDeviceId] = useState<number | null>(null);
+  const [createdDeviceId, setCreatedDeviceId] = useState<string | number | null>(null);
   const [createdDeviceName, setCreatedDeviceName] = useState<string>("");
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
 
@@ -267,7 +267,7 @@ export function DevicesTableInteractive({
 
   // API Key dialog state
   const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
-  const [createdDeviceId, setCreatedDeviceId] = useState<number | null>(null);
+  const [createdDeviceId, setCreatedDeviceId] = useState<string | number | null>(null);
   const [createdDeviceName, setCreatedDeviceName] = useState<string>("");
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
 
@@ -317,7 +317,7 @@ export function DevicesTableInteractive({
     }
   };
 
-  const handleDeleteDevice = async (deviceId: number) => {
+  const handleDeleteDevice = async (deviceId: string | number) => {
     const res = await fetch(`/api/devices/${deviceId}`, {
       method: "DELETE",
     });
@@ -365,7 +365,9 @@ export function DevicesTableInteractive({
 }
 
 export interface DeviceDetailItem {
-  id: number;
+  id: string | number;
+  uuidId?: string;
+  deviceCode?: string;
   deviceName: string;
   serialNumber: string;
   location: string;
@@ -388,7 +390,7 @@ export function DeviceDetailHeaderActions({
   const [editingDevice, setEditingDevice] = useState<DeviceFormData | null>(null);
 
   const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
-  const [createdDeviceId, setCreatedDeviceId] = useState<number | null>(null);
+  const [createdDeviceId, setCreatedDeviceId] = useState<string | number | null>(null);
   const [createdDeviceName, setCreatedDeviceName] = useState<string>("");
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
 

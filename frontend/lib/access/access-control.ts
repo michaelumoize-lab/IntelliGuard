@@ -12,7 +12,8 @@ export interface RecognitionInput {
     | "recognition_error";
   matchStatus?: "matched" | "unknown" | "ambiguous" | "rejected" | null;
   person?: {
-    id: number;
+    id: string | number;
+    uuidId?: string;
     personCode: string;
     firstName: string;
     lastName: string;

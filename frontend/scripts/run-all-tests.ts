@@ -73,6 +73,16 @@ const testSuites: TestSuite[] = [
     file: "tests/e2e-workflow.test.ts",
     description: "Complete user journeys A through F (registration, denial, failure, alerts)",
   },
+  {
+    name: "Business Identifiers & Format Contracts",
+    file: "tests/identifiers.test.ts",
+    description: "Prefix verification (PER, DEV, EMB, REC, ALT, ACL), 12-hex entropy, collision retries",
+  },
+  {
+    name: "Phase 2 UUIDv7 & Dual-Key Verification",
+    file: "tests/phase2-uuid.test.ts",
+    description: "UUIDv7 RFC 9562 compliance, native DB defaults, dual-key relations & constraints",
+  },
 ];
 
 async function runAll() {

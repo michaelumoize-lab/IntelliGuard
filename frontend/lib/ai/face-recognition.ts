@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { validateEmbeddingVector } from "@/lib/ai/duplicate-check";
 
 export interface FaceMatchCandidate {
-  embeddingId: number;
-  personId: number;
+  embeddingId: string;
+  personId: string;
   personCode: string;
   firstName: string;
   lastName: string;
@@ -20,7 +20,8 @@ export interface FaceMatchCandidate {
 export interface RecognitionClassificationResult {
   matchStatus: "matched" | "unknown" | "ambiguous";
   person: {
-    id: number;
+    id: string;
+    uuidId: string;
     personCode: string;
     firstName: string;
     lastName: string;
@@ -30,7 +31,7 @@ export interface RecognitionClassificationResult {
     faceImageUrl?: string | null;
   } | null;
   face: {
-    embeddingId?: number;
+    embeddingId?: string;
     similarity: number;
     distance: number;
     qualityScore?: number | null;
@@ -66,11 +67,11 @@ export async function findTopFaceMatches(
   const vectorString = `[${embedding.join(",")}]`;
 
   // Query only active embeddings matching the exact model architecture,
-  // selecting the single best (closest) embedding per distinct person_id
+  // selecting the single best (closest) embedding per distinct person_uuid_id
   // so multiple embeddings belonging to the same person never compete against each other.
   const rawResults: Array<{
-    embeddingId: number;
-    personId: number;
+    embeddingId: string;
+    personId: string;
     embeddingModel: string;
     qualityScore: number | null;
     isActive: boolean;
@@ -87,9 +88,9 @@ export async function findTopFaceMatches(
     `
     SELECT *
     FROM (
-      SELECT DISTINCT ON (fe.person_id)
-        fe.id AS "embeddingId",
-        fe.person_id AS "personId",
+      SELECT DISTINCT ON (fe.person_uuid_id)
+        fe.uuid_id::text AS "embeddingId",
+        fe.person_uuid_id::text AS "personId",
         fe.embedding_model AS "embeddingModel",
         fe.quality_score AS "qualityScore",
         fe.is_active AS "isActive",
@@ -103,10 +104,10 @@ export async function findTopFaceMatches(
         (fe.embedding <=> $1::vector) AS distance,
         (1 - (fe.embedding <=> $1::vector)) AS similarity
       FROM face_embeddings fe
-      JOIN persons p ON p.id = fe.person_id
+      JOIN persons p ON p.uuid_id = fe.person_uuid_id
       WHERE fe.is_active = true
         AND LOWER(fe.embedding_model) = LOWER($3)
-      ORDER BY fe.person_id, (fe.embedding <=> $1::vector) ASC
+      ORDER BY fe.person_uuid_id, (fe.embedding <=> $1::vector) ASC
     ) distinct_person_matches
     ORDER BY distance ASC
     LIMIT $2;
@@ -134,9 +135,9 @@ export async function findTopFaceMatches(
     (a, b) => Number(b.similarity) - Number(a.similarity)
   );
   const distinctResults: typeof rawResults = [];
-  const seenPersonIds = new Set<number>();
+  const seenPersonIds = new Set<string>();
   for (const row of sortedRaw) {
-    const pid = Number(row.personId);
+    const pid = String(row.personId);
     if (!seenPersonIds.has(pid)) {
       seenPersonIds.add(pid);
       distinctResults.push(row);
@@ -166,7 +167,8 @@ export async function findTopFaceMatches(
     return {
       matchStatus: "matched",
       person: {
-        id: Number(bestCandidate.personId),
+        id: String(bestCandidate.personId),
+        uuidId: String(bestCandidate.personId),
         personCode: bestCandidate.personCode,
         firstName: bestCandidate.firstName,
         lastName: bestCandidate.lastName,
@@ -176,7 +178,7 @@ export async function findTopFaceMatches(
         faceImageUrl: bestCandidate.faceImageUrl,
       },
       face: {
-        embeddingId: Number(bestCandidate.embeddingId),
+        embeddingId: String(bestCandidate.embeddingId),
         similarity: bestSimilarity,
         distance: bestDistance,
         qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
@@ -222,7 +224,8 @@ export async function findTopFaceMatches(
   return {
     matchStatus: "matched",
     person: {
-      id: Number(bestCandidate.personId),
+      id: String(bestCandidate.personId),
+      uuidId: String(bestCandidate.personId),
       personCode: bestCandidate.personCode,
       firstName: bestCandidate.firstName,
       lastName: bestCandidate.lastName,
@@ -232,7 +235,7 @@ export async function findTopFaceMatches(
       faceImageUrl: bestCandidate.faceImageUrl,
     },
     face: {
-      embeddingId: Number(bestCandidate.embeddingId),
+      embeddingId: String(bestCandidate.embeddingId),
       similarity: bestSimilarity,
       distance: bestDistance,
       qualityScore: bestCandidate.qualityScore != null ? roundFloat(Number(bestCandidate.qualityScore), 4) : null,
