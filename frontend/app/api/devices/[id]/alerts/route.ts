@@ -25,13 +25,13 @@ export async function GET(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  const deviceId = parseInt(idParam, 10);
-  if (isNaN(deviceId)) {
+  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
       { status: 400 }
     );
   }
+  const deviceId = idParam;
 
   const url = new URL(req.url);
   const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
@@ -43,7 +43,7 @@ export async function GET(
   const resolvedParam = url.searchParams.get("resolved");
 
   try {
-    const device = await prisma.device.findUnique({ where: { id: deviceId } });
+    const device = await prisma.device.findUnique({ where: { uuidId: deviceId } });
     if (!device) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -51,7 +51,7 @@ export async function GET(
       );
     }
 
-    const whereClause: Prisma.AlertWhereInput = { deviceId };
+    const whereClause: Prisma.AlertWhereInput = { deviceUuidId: deviceId };
 
     if (severity) {
       if (!Object.values(Severity).includes(severity as Severity)) {
@@ -88,7 +88,7 @@ export async function GET(
       include: {
         person: {
           select: {
-            id: true,
+            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -99,7 +99,9 @@ export async function GET(
     });
 
     const data = alertsRaw.map((alert) => ({
-      id: alert.id,
+      id: alert.uuidId,
+      uuidId: alert.uuidId,
+      alertCode: alert.alertCode,
       alertType: alert.alertType,
       title: alert.title,
       message: alert.message,
@@ -108,7 +110,7 @@ export async function GET(
       resolvedBy: alert.resolvedBy,
       resolvedAt: alert.resolvedAt,
       createdAt: alert.createdAt,
-      person: alert.person,
+      person: alert.person ? { ...alert.person, id: alert.person.uuidId } : null,
     }));
 
     return NextResponse.json({

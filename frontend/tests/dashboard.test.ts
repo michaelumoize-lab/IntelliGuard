@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { generateAlertCode } from "../lib/identifiers";
 
 async function runDashboardTests() {
   console.log("==================================================");
@@ -99,16 +100,17 @@ async function runDashboardTests() {
   const { GET: GET_STATS } = await import("../app/api/dashboard/stats/route");
   const { GET: GET_HEALTH } = await import("../app/api/dashboard/health/route");
 
-  let tempAlertId: number | null = null;
+  let tempAlertId: string | null = null;
   let tempUserId: string | null = null;
 
   try {
+    const dummyUuid = "00000000-0000-7000-8000-000000000001";
     // 6a. Unauthenticated requests -> 401
     __setGetServerSessionMock(async () => null);
 
     const rAlerts401 = await GET_ALERTS(new NextRequest("http://localhost:3000/api/alerts"));
-    const rPatch401 = await PATCH_ALERT(new NextRequest("http://localhost:3000/api/alerts/1", { method: "PATCH" }), {
-      params: Promise.resolve({ id: "1" }),
+    const rPatch401 = await PATCH_ALERT(new NextRequest(`http://localhost:3000/api/alerts/${dummyUuid}`, { method: "PATCH" }), {
+      params: Promise.resolve({ id: dummyUuid }),
     });
     const rAct401 = await GET_ACTIVITY(new NextRequest("http://localhost:3000/api/dashboard/activity"));
     const rStats401 = await GET_STATS(new NextRequest("http://localhost:3000/api/dashboard/stats"));
@@ -136,8 +138,8 @@ async function runDashboardTests() {
     );
 
     const rAlerts403 = await GET_ALERTS(new NextRequest("http://localhost:3000/api/alerts"));
-    const rPatch403 = await PATCH_ALERT(new NextRequest("http://localhost:3000/api/alerts/1", { method: "PATCH" }), {
-      params: Promise.resolve({ id: "1" }),
+    const rPatch403 = await PATCH_ALERT(new NextRequest(`http://localhost:3000/api/alerts/${dummyUuid}`, { method: "PATCH" }), {
+      params: Promise.resolve({ id: dummyUuid }),
     });
     const rAct403 = await GET_ACTIVITY(new NextRequest("http://localhost:3000/api/dashboard/activity"));
     const rStats403 = await GET_STATS(new NextRequest("http://localhost:3000/api/dashboard/stats"));
@@ -182,6 +184,7 @@ async function runDashboardTests() {
 
     const tempAlert = await prisma.alert.create({
       data: {
+        alertCode: generateAlertCode(),
         alertType: "system_error",
         title: "P0 Auth Test Alert",
         message: "Temporary alert for resolvedBy verification",
@@ -189,14 +192,14 @@ async function runDashboardTests() {
         resolved: false,
       },
     });
-    tempAlertId = tempAlert.id;
+    tempAlertId = tempAlert.uuidId;
 
     const rPatch200 = await PATCH_ALERT(
-      new NextRequest(`http://localhost:3000/api/alerts/${tempAlert.id}`, {
+      new NextRequest(`http://localhost:3000/api/alerts/${tempAlert.uuidId}`, {
         method: "PATCH",
         body: JSON.stringify({ resolved: true }),
       }),
-      { params: Promise.resolve({ id: String(tempAlert.id) }) }
+      { params: Promise.resolve({ id: tempAlert.uuidId }) }
     );
     const patchData = await rPatch200.json();
 
@@ -209,6 +212,7 @@ async function runDashboardTests() {
     // 6d. Test Batch PATCH /api/alerts (Resolve All)
     const batchAlert1 = await prisma.alert.create({
       data: {
+        alertCode: generateAlertCode(),
         alertType: "system_error",
         title: "Batch Resolve Alert 1",
         message: "First batch test alert",
@@ -218,6 +222,7 @@ async function runDashboardTests() {
     });
     const batchAlert2 = await prisma.alert.create({
       data: {
+        alertCode: generateAlertCode(),
         alertType: "system_error",
         title: "Batch Resolve Alert 2",
         message: "Second batch test alert",
@@ -231,7 +236,7 @@ async function runDashboardTests() {
         method: "PATCH",
         body: JSON.stringify({
           resolved: true,
-          alertIds: [batchAlert1.id, batchAlert2.id],
+          alertIds: [batchAlert1.uuidId, batchAlert2.uuidId],
         }),
       })
     );
@@ -244,14 +249,14 @@ async function runDashboardTests() {
     }
 
     const checkBatch = await prisma.alert.findMany({
-      where: { id: { in: [batchAlert1.id, batchAlert2.id] } },
+      where: { uuidId: { in: [batchAlert1.uuidId, batchAlert2.uuidId] } },
     });
     if (!checkBatch.every((a) => a.resolved && a.resolvedBy === tempUserId)) {
       throw new Error("Batch resolved alerts were not correctly marked resolved with resolvedBy.");
     }
 
     await prisma.alert.deleteMany({
-      where: { id: { in: [batchAlert1.id, batchAlert2.id] } },
+      where: { uuidId: { in: [batchAlert1.uuidId, batchAlert2.uuidId] } },
     });
 
     console.log("✅ Test 6 PASSED: All 5 dashboard/alerts routes enforce 401/403/200, batch resolve works, and records resolvedBy.");
@@ -261,7 +266,7 @@ async function runDashboardTests() {
   } finally {
     __setGetServerSessionMock(null);
     if (tempAlertId) {
-      await prisma.alert.delete({ where: { id: tempAlertId } }).catch(() => {});
+      await prisma.alert.delete({ where: { uuidId: tempAlertId } }).catch(() => {});
     }
     if (tempUserId && tempUserId.startsWith("test-admin-")) {
       await prisma.user.delete({ where: { id: tempUserId } }).catch(() => {});

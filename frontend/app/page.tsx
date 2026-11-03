@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getServerSession } from "@/lib/get-session";
 import { LandingHeaderAuth } from "@/components/landing-header-auth";
+import { Logo } from "@/components/logo";
 
 export default async function Home() {
   const session = await getServerSession();
@@ -41,9 +42,7 @@ export default async function Home() {
       <header className="border-b border-border/60 bg-background/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
+            <Logo className="size-9 rounded-xl" />
             <div>
               <span className="font-bold tracking-tight text-base block text-foreground">IntelliGuard</span>
               <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
@@ -324,7 +323,7 @@ export default async function Home() {
       <footer className="border-t border-border/80 py-8 bg-background/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-primary" />
+            <Logo size={20} className="size-5 rounded-md" />
             <span className="font-semibold text-foreground">IntelliGuard Security Platform</span>
             <span className="text-muted-foreground/60">•</span>
             <span>&copy; {new Date().getFullYear()} All rights reserved.</span>

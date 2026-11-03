@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { generateEmbedding } from "../lib/ai/fastapi";
 import { checkForDuplicateFace } from "../lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage, getImageFileDetails } from "../lib/ai/imagekit";
+import { generateEmbeddingCode } from "../lib/identifiers";
 
 async function runMilestone5Tests() {
   console.log("==================================================");
@@ -32,7 +33,7 @@ async function runMilestone5Tests() {
     }
   }
 
-  let createdPersonId: number | null = null;
+  let createdPersonId: string | null = null;
   let createdFileId: string | null = null;
 
   try {
@@ -89,15 +90,17 @@ async function runMilestone5Tests() {
       });
 
       const vectorLiteral = `[${testEmbedding.join(",")}]`;
+      const embeddingCode = generateEmbeddingCode();
       await tx.$executeRawUnsafe(
         `
         INSERT INTO face_embeddings (
-          person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+          person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
         ) VALUES (
-          $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+          $1::uuid, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
         );
         `,
-        p.id,
+        p.uuidId,
+        embeddingCode,
         vectorLiteral,
         aiResult.model || "buffalo_s",
         ikResult.url,
@@ -105,13 +108,13 @@ async function runMilestone5Tests() {
       );
 
       return p;
-    });
+    }, { timeout: 30000, maxWait: 15000 });
 
-    createdPersonId = newPerson.id;
+    createdPersonId = newPerson.uuidId;
 
     // Verify Person and FaceEmbedding in PostgreSQL
     const fetchedPerson = await prisma.person.findUnique({
-      where: { id: newPerson.id },
+      where: { uuidId: newPerson.uuidId },
       include: { faceEmbeddings: { where: { isActive: true } } },
     });
 
@@ -133,10 +136,20 @@ async function runMilestone5Tests() {
     // Test 3: Self-Exclusion Duplicate Check
     // ----------------------------------------------------
     console.log("\n[Test 3] Testing pgvector duplicate check with self-exclusion...");
-    const globalCheck = await checkForDuplicateFace(testEmbedding);
+    const globalCheck = await checkForDuplicateFace(
+      testEmbedding,
+      undefined,
+      undefined,
+      aiResult.model || "buffalo_s"
+    );
     assert(globalCheck.isDuplicate === true, "Test 3: Global check detects duplicate face");
 
-    const selfExcludedCheck = await checkForDuplicateFace(testEmbedding, undefined, newPerson.id);
+    const selfExcludedCheck = await checkForDuplicateFace(
+      testEmbedding,
+      undefined,
+      newPerson.uuidId,
+      aiResult.model || "buffalo_s"
+    );
     assert(
       selfExcludedCheck.isDuplicate === false,
       "Test 3: Self-excluded check (excluding person.id) allows face replacement for same individual"
@@ -156,21 +169,23 @@ async function runMilestone5Tests() {
     await prisma.$transaction(async (tx) => {
       // Deactivate old embeddings
       await tx.faceEmbedding.updateMany({
-        where: { personId: newPerson.id, isActive: true },
+        where: { personUuidId: newPerson.uuidId, isActive: true },
         data: { isActive: false },
       });
 
       // Insert new active embedding
       const vectorLiteral = `[${replacementAiResult.embedding.join(",")}]`;
+      const replacementEmbeddingCode = generateEmbeddingCode();
       await tx.$executeRawUnsafe(
         `
         INSERT INTO face_embeddings (
-          person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+          person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
         ) VALUES (
-          $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+          $1::uuid, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
         );
         `,
-        newPerson.id,
+        newPerson.uuidId,
+        replacementEmbeddingCode,
         vectorLiteral,
         replacementAiResult.model || "buffalo_s",
         replacementIkResult.url,
@@ -179,19 +194,19 @@ async function runMilestone5Tests() {
 
       // Update Person
       await tx.person.update({
-        where: { id: newPerson.id },
+        where: { uuidId: newPerson.uuidId },
         data: {
           faceImageUrl: replacementIkResult.url,
           faceImageFileId: replacementIkResult.fileId,
         },
       });
-    });
+    }, { timeout: 30000, maxWait: 15000 });
 
     // Delete old ImageKit asset after transaction succeeds
     await deleteFaceImage(oldFileId);
 
     const updatedPerson = await prisma.person.findUnique({
-      where: { id: newPerson.id },
+      where: { uuidId: newPerson.uuidId },
       include: { faceEmbeddings: { orderBy: { createdAt: "desc" } } },
     });
 
@@ -230,7 +245,7 @@ async function runMilestone5Tests() {
       },
     });
     assert(
-      firstNameResults.some((p) => p.id === newPerson.id),
+      firstNameResults.some((p) => p.uuidId === newPerson.uuidId),
       "Test 5: Search by first name ('Alice') succeeds"
     );
 
@@ -241,7 +256,7 @@ async function runMilestone5Tests() {
       },
     });
     assert(
-      lastNameResults.some((p) => p.id === newPerson.id),
+      lastNameResults.some((p) => p.uuidId === newPerson.uuidId),
       "Test 5: Search by last name ('Wonderland') succeeds"
     );
 
@@ -263,7 +278,7 @@ async function runMilestone5Tests() {
     });
 
     assert(
-      fullNameResults.some((p) => p.id === newPerson.id),
+      fullNameResults.some((p) => p.uuidId === newPerson.uuidId),
       "Test 5: Full-name multi-word search ('Alice Wonderland') succeeds"
     );
 
@@ -274,18 +289,18 @@ async function runMilestone5Tests() {
     const deleteTargetFileId = updatedPerson?.faceImageFileId;
 
     await prisma.$transaction([
-      prisma.accessLog.updateMany({ where: { personId: newPerson.id }, data: { personId: null } }),
-      prisma.alert.updateMany({ where: { personId: newPerson.id }, data: { personId: null } }),
-      prisma.faceEmbedding.deleteMany({ where: { personId: newPerson.id } }),
-      prisma.person.delete({ where: { id: newPerson.id } }),
+      prisma.accessLog.updateMany({ where: { personUuidId: newPerson.uuidId }, data: { personUuidId: null } }),
+      prisma.alert.updateMany({ where: { personUuidId: newPerson.uuidId }, data: { personUuidId: null } }),
+      prisma.faceEmbedding.deleteMany({ where: { personUuidId: newPerson.uuidId } }),
+      prisma.person.delete({ where: { uuidId: newPerson.uuidId } }),
     ]);
 
     if (deleteTargetFileId) {
       await deleteFaceImage(deleteTargetFileId);
     }
 
-    const deletedCheck = await prisma.person.findUnique({ where: { id: newPerson.id } });
-    const deletedEmbs = await prisma.faceEmbedding.findMany({ where: { personId: newPerson.id } });
+    const deletedCheck = await prisma.person.findUnique({ where: { uuidId: newPerson.uuidId } });
+    const deletedEmbs = await prisma.faceEmbedding.findMany({ where: { personUuidId: newPerson.uuidId } });
 
     assert(deletedCheck === null, "Test 6: Person record deleted from PostgreSQL");
     assert(deletedEmbs.length === 0, "Test 6: FaceEmbedding records cascaded and deleted from PostgreSQL");
@@ -298,8 +313,8 @@ async function runMilestone5Tests() {
   } finally {
     // Cleanup if test aborted mid-way
     if (createdPersonId) {
-      await prisma.faceEmbedding.deleteMany({ where: { personId: createdPersonId } }).catch(() => {});
-      await prisma.person.delete({ where: { id: createdPersonId } }).catch(() => {});
+      await prisma.faceEmbedding.deleteMany({ where: { personUuidId: createdPersonId } }).catch(() => {});
+      await prisma.person.delete({ where: { uuidId: createdPersonId } }).catch(() => {});
     }
     if (createdFileId) {
       await deleteFaceImage(createdFileId).catch(() => {});

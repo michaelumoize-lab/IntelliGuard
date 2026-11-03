@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const dynamic = "force-dynamic";
 
 async function checkAdminAuth() {
@@ -24,16 +26,15 @@ export async function POST(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  const deviceId = parseInt(idParam, 10);
-  if (isNaN(deviceId)) {
+  if (!idParam || !UUID_REGEX.test(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID format. Expected UUIDv7." },
       { status: 400 }
     );
   }
 
   try {
-    const existing = await prisma.device.findUnique({ where: { id: deviceId } });
+    const existing = await prisma.device.findUnique({ where: { uuidId: idParam } });
     if (!existing) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -45,7 +46,7 @@ export async function POST(
     const apiKeyHash = crypto.createHash("sha256").update(rawApiKey).digest("hex");
 
     await prisma.device.update({
-      where: { id: deviceId },
+      where: { uuidId: idParam },
       data: { apiKeyHash },
     });
 

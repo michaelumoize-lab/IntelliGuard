@@ -7,10 +7,10 @@ import { ShieldCheck, ShieldAlert, Clock, ArrowRight, UserCheck } from "lucide-r
 import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 
 export interface AccessSummaryLog {
-  id: number;
+  id: string | number;
   timestamp: string | Date;
   person?: {
-    id: number;
+    id: string | number;
     personCode: string;
     firstName: string;
     lastName: string;
@@ -33,7 +33,7 @@ interface DeviceAccessSummaryProps {
     todayDenied: number;
   };
   recentLogs: AccessSummaryLog[];
-  deviceId: number;
+  deviceId: string | number;
 }
 
 export function DeviceAccessSummary({ stats, recentLogs, deviceId }: DeviceAccessSummaryProps) {

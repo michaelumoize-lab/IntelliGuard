@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
 import { Prisma, AlertType, Severity } from "@prisma/client";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const dynamic = "force-dynamic";
 
 async function checkAdminAuth() {
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
     const totalPages = Math.ceil(total / limit) || 1;
     const skip = (page - 1) * limit;
 
-    const alerts = await prisma.alert.findMany({
+    const alertsRaw = await prisma.alert.findMany({
       where,
       skip,
       take: limit,
@@ -74,7 +76,8 @@ export async function GET(req: NextRequest) {
       include: {
         device: {
           select: {
-            id: true,
+            uuidId: true,
+            deviceCode: true,
             deviceName: true,
             serialNumber: true,
             location: true,
@@ -82,7 +85,7 @@ export async function GET(req: NextRequest) {
         },
         person: {
           select: {
-            id: true,
+            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -91,6 +94,26 @@ export async function GET(req: NextRequest) {
         },
       },
     });
+
+    const alerts = alertsRaw.map((alert) => ({
+      ...alert,
+      id: alert.uuidId,
+      uuidId: alert.uuidId,
+      device: alert.device
+        ? {
+            ...alert.device,
+            id: alert.device.uuidId,
+            uuidId: alert.device.uuidId,
+          }
+        : null,
+      person: alert.person
+        ? {
+            ...alert.person,
+            id: alert.person.uuidId,
+            uuidId: alert.person.uuidId,
+          }
+        : null,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -131,16 +154,21 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (Array.isArray(body.alertIds) && body.alertIds.length > 0) {
-      const validIds = body.alertIds
-        .map((id: unknown) => (typeof id === "number" ? id : parseInt(String(id), 10)))
-        .filter((id: number) => !isNaN(id));
-      if (validIds.length > 0) {
-        where.id = { in: validIds };
+      const validUuids = body.alertIds
+        .map((id: unknown) => String(id))
+        .filter((id: string) => UUID_REGEX.test(id));
+      if (validUuids.length > 0) {
+        where.uuidId = { in: validUuids };
       }
     }
 
-    if (body.deviceId && !isNaN(parseInt(String(body.deviceId), 10))) {
-      where.deviceId = parseInt(String(body.deviceId), 10);
+    if (body.deviceId) {
+      const devIdStr = String(body.deviceId);
+      if (UUID_REGEX.test(devIdStr)) {
+        where.deviceUuidId = devIdStr;
+      } else {
+        where.device = { deviceCode: devIdStr };
+      }
     }
 
     let updateResult;

@@ -18,26 +18,29 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function PersonDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
-  const personId = parseInt(resolvedParams.id, 10);
+  const personUuid = resolvedParams.id;
 
-  if (isNaN(personId)) {
+  if (!personUuid || !UUID_REGEX.test(personUuid)) {
     notFound();
   }
 
   // Directly query PostgreSQL via Prisma on the server
-  const person = await prisma.person.findUnique({
-    where: { id: personId },
+  const rawPerson = await prisma.person.findUnique({
+    where: { uuidId: personUuid },
     include: {
       faceEmbeddings: {
         orderBy: { createdAt: "desc" },
         select: {
-          id: true,
+          uuidId: true,
+          embeddingCode: true,
           embeddingModel: true,
           imagePath: true,
           qualityScore: true,
@@ -49,9 +52,15 @@ export default async function PersonDetailsPage({
     },
   });
 
-  if (!person) {
+  if (!rawPerson) {
     notFound();
   }
+
+  const person = {
+    ...rawPerson,
+    id: rawPerson.uuidId,
+    uuidId: rawPerson.uuidId,
+  };
 
   const activeEmbedding = person.faceEmbeddings.find((e) => e.isActive) || null;
   const embeddingStatus = activeEmbedding ? "active" : person.faceEmbeddings.length > 0 ? "inactive" : "none";
@@ -268,8 +277,8 @@ export default async function PersonDetailsPage({
                 <TableBody>
                   {person.faceEmbeddings && person.faceEmbeddings.length > 0 ? (
                     person.faceEmbeddings.map((emb) => (
-                      <TableRow key={emb.id} className="text-xs">
-                        <TableCell className="font-mono">#{emb.id}</TableCell>
+                      <TableRow key={emb.uuidId} className="text-xs">
+                        <TableCell className="font-mono">{emb.embeddingCode || `#${emb.uuidId.slice(0, 8)}`}</TableCell>
                         <TableCell className="font-medium">{emb.embeddingModel}</TableCell>
                         <TableCell>
                           {emb.qualityScore ? `${(emb.qualityScore * 100).toFixed(2)}%` : "N/A"}

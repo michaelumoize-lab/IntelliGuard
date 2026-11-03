@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { generateEmbedding } from "../lib/ai/fastapi";
 import { findTopFaceMatches } from "../lib/ai/face-recognition";
 import { evaluateAccess } from "../lib/access/access-control";
+import { generateAccessCode, generateAlertCode } from "../lib/identifiers";
 
 async function runMilestone7IntegrationTests() {
   console.log("==================================================");
@@ -48,11 +49,12 @@ async function runMilestone7IntegrationTests() {
 
   // 2. Test AccessLog Creation Verification
   console.log("\n[Test 2] Verifying AccessLog Persistence in PostgreSQL...");
-  let createdLogId: number | null = null;
+  let createdLogId: string | null = null;
   try {
     const initialLogCount = await prisma.accessLog.count();
     const newLog = await prisma.accessLog.create({
       data: {
+        accessCode: generateAccessCode(),
         matchStatus: "matched",
         accessStatus: "granted",
         reason: "face_match",
@@ -62,11 +64,11 @@ async function runMilestone7IntegrationTests() {
         processingTimeMs: 1200,
       },
     });
-    createdLogId = newLog.id;
+    createdLogId = newLog.uuidId;
 
     const updatedLogCount = await prisma.accessLog.count();
-    if (updatedLogCount === initialLogCount + 1 && newLog.id) {
-      console.log(`✅ Test 2 PASSED: AccessLog record #${newLog.id} persisted to PostgreSQL successfully!`);
+    if (updatedLogCount === initialLogCount + 1 && newLog.uuidId) {
+      console.log(`✅ Test 2 PASSED: AccessLog record #${newLog.uuidId} persisted to PostgreSQL successfully!`);
     } else {
       console.error("❌ Test 2 failed: AccessLog count mismatch.");
       process.exitCode = 1;
@@ -76,28 +78,29 @@ async function runMilestone7IntegrationTests() {
     process.exitCode = 1;
   } finally {
     if (createdLogId) {
-      await prisma.accessLog.delete({ where: { id: createdLogId } }).catch(() => {});
+      await prisma.accessLog.delete({ where: { uuidId: createdLogId } }).catch(() => {});
     }
   }
 
   // 3. Test Security Alert Creation Verification
   console.log("\n[Test 3] Verifying Security Alert Creation in PostgreSQL...");
-  let createdAlertId: number | null = null;
+  let createdAlertId: string | null = null;
   try {
     const initialAlertCount = await prisma.alert.count();
     const newAlert = await prisma.alert.create({
       data: {
+        alertCode: generateAlertCode(),
         alertType: "unknown_face",
         title: "Unknown Face Detected",
         message: "An unrecognized face attempted access.",
         severity: "medium",
       },
     });
-    createdAlertId = newAlert.id;
+    createdAlertId = newAlert.uuidId;
 
     const updatedAlertCount = await prisma.alert.count();
-    if (updatedAlertCount === initialAlertCount + 1 && newAlert.id) {
-      console.log(`✅ Test 3 PASSED: Security Alert #${newAlert.id} persisted to PostgreSQL successfully!`);
+    if (updatedAlertCount === initialAlertCount + 1 && newAlert.uuidId) {
+      console.log(`✅ Test 3 PASSED: Security Alert #${newAlert.uuidId} persisted to PostgreSQL successfully!`);
     } else {
       console.error("❌ Test 3 failed: Alert count mismatch.");
       process.exitCode = 1;
@@ -107,7 +110,7 @@ async function runMilestone7IntegrationTests() {
     process.exitCode = 1;
   } finally {
     if (createdAlertId) {
-      await prisma.alert.delete({ where: { id: createdAlertId } }).catch(() => {});
+      await prisma.alert.delete({ where: { uuidId: createdAlertId } }).catch(() => {});
     }
   }
 

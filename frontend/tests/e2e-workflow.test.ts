@@ -21,6 +21,7 @@ import { GET as GET_ALERTS } from "../app/api/alerts/route";
 import { PATCH as PATCH_ALERT } from "../app/api/alerts/[id]/route";
 import { NextRequest } from "next/server";
 import { evaluateAccess } from "../lib/access/access-control";
+import { generateEmbeddingCode, generateAccessCode, generateAlertCode } from "../lib/identifiers";
 
 console.log("================================================================");
 console.log("  IntelliGuard Phase 4: End-to-End Workflows & Security Verification");
@@ -47,9 +48,9 @@ function makeTestJpegBuffer(): Buffer {
 }
 
 async function runE2EWorkflowTests() {
-  let createdPersonId: number | null = null;
-  let createdAlertId: number | null = null;
-  const createdAccessLogIds: number[] = [];
+  let createdPersonId: string | null = null;
+  let createdAlertId: string | null = null;
+  const createdAccessLogIds: string[] = [];
 
   const uniqueSuffix = Date.now().toString(36);
   const testPersonCode = `PER-E2E-${uniqueSuffix.toUpperCase()}`;
@@ -80,27 +81,29 @@ async function runE2EWorkflowTests() {
         notes: "Automated Phase 4 E2E Test Subject",
       },
     });
-    createdPersonId = person.id;
-    assert.ok(person.id, "Person record must be created in PostgreSQL");
+    createdPersonId = person.uuidId;
+    assert.ok(person.uuidId, "Person record must be created in PostgreSQL");
 
     // 2. Persist 512D active face embedding
     const vectorLiteral = `[${testVector.join(",")}]`;
+    const embeddingCode = generateEmbeddingCode();
     await prisma.$executeRawUnsafe(
       `
       INSERT INTO face_embeddings (
-        person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+        person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
       ) VALUES (
-        $1, $2::vector, 'buffalo_s', $3, 0.92, true, NOW(), NOW()
+        $1::uuid, $2, $3::vector, 'buffalo_s', $4, 0.92, true, NOW(), NOW()
       );
       `,
-      person.id,
+      person.uuidId,
+      embeddingCode,
       vectorLiteral,
       person.faceImageUrl
     );
 
     // Verify embedding persistence
     const savedEmbedding = await prisma.faceEmbedding.findFirst({
-      where: { personId: person.id, isActive: true },
+      where: { personUuidId: person.uuidId, isActive: true },
     });
     assert.ok(savedEmbedding, "Active FaceEmbedding must be persisted for new person");
     assert.strictEqual(savedEmbedding.embeddingModel, "buffalo_s");
@@ -115,12 +118,12 @@ async function runE2EWorkflowTests() {
     console.log("[Journey B.1] Checking duplicate face detection against newly enrolled subject...");
     const dupCheck = await checkForDuplicateFace(testVector);
     assert.strictEqual(dupCheck.isDuplicate, true, "Duplicate face check must detect identical face");
-    assert.strictEqual(dupCheck.matchingPerson?.personId, person.id);
+    assert.strictEqual(dupCheck.matchingPerson?.personId, person.uuidId);
     console.log(` - Detected match with ${dupCheck.matchingPerson?.firstName} ${dupCheck.matchingPerson?.lastName} (similarity: ${dupCheck.matchingPerson?.similarity})`);
 
     // Verify self-exclusion allows replacement for the same person
     console.log("[Journey B.2] Verifying self-exclusion allows face replacement for same individual...");
-    const selfExcludeCheck = await checkForDuplicateFace(testVector, 0.50, person.id);
+    const selfExcludeCheck = await checkForDuplicateFace(testVector, 0.50, person.uuidId);
     assert.strictEqual(selfExcludeCheck.isDuplicate, false, "Self-excluded duplicate check must return false");
     console.log("✅ [PASS] Journey B: Duplicate registration correctly prevented; self-exclusion preserved.\n");
 
@@ -133,7 +136,7 @@ async function runE2EWorkflowTests() {
     console.log("[Journey C.1] Performing pgvector similarity search on enrolled active subject...");
     const matchResult = await findTopFaceMatches(testVector, 2, "buffalo_s");
     assert.strictEqual(matchResult.matchStatus, "matched", "Enrolled active face must be matched");
-    assert.strictEqual(matchResult.person?.id, person.id);
+    assert.strictEqual(matchResult.person?.id, person.uuidId);
     assert.ok(matchResult.face.similarity >= 0.95, "Identity vector should have near-1.0 similarity");
 
     console.log("[Journey C.2] Evaluating access control decision for matched active person...");
@@ -151,7 +154,8 @@ async function runE2EWorkflowTests() {
     // Persist simulated access log
     const authLog = await prisma.accessLog.create({
       data: {
-        personId: person.id,
+        accessCode: generateAccessCode(),
+        personUuidId: person.uuidId,
         matchStatus: "matched",
         accessStatus: "granted",
         reason: "face_match",
@@ -161,8 +165,8 @@ async function runE2EWorkflowTests() {
         processingTimeMs: 120,
       },
     });
-    createdAccessLogIds.push(authLog.id);
-    assert.ok(authLog.id, "Access log record must be stored");
+    createdAccessLogIds.push(authLog.uuidId);
+    assert.ok(authLog.uuidId, "Access log record must be stored");
     console.log("✅ [PASS] Journey C: Authorized recognition granted access with door unlock and audit log.\n");
 
     // =======================================================================
@@ -172,7 +176,7 @@ async function runE2EWorkflowTests() {
 
     console.log("[Journey D.1] Updating person status to 'suspended'...");
     await prisma.person.update({
-      where: { id: person.id },
+      where: { uuidId: person.uuidId },
       data: { status: "suspended" },
     });
 
@@ -195,7 +199,8 @@ async function runE2EWorkflowTests() {
     // Persist unauthorized access log & security alert
     const deniedLog = await prisma.accessLog.create({
       data: {
-        personId: person.id,
+        accessCode: generateAccessCode(),
+        personUuidId: person.uuidId,
         matchStatus: "matched",
         accessStatus: "denied",
         reason: "unauthorized",
@@ -205,11 +210,12 @@ async function runE2EWorkflowTests() {
         processingTimeMs: 85,
       },
     });
-    createdAccessLogIds.push(deniedLog.id);
+    createdAccessLogIds.push(deniedLog.uuidId);
 
     const alert = await prisma.alert.create({
       data: {
-        personId: person.id,
+        alertCode: generateAlertCode(),
+        personUuidId: person.uuidId,
         alertType: "unauthorized_access",
         title: "Access Denied - Suspended User",
         message: `${person.firstName} ${person.lastName} (${person.personCode}) attempted access while suspended.`,
@@ -217,8 +223,8 @@ async function runE2EWorkflowTests() {
         resolved: false,
       },
     });
-    createdAlertId = alert.id;
-    assert.ok(alert.id, "Security alert must be generated for unauthorized attempt");
+    createdAlertId = alert.uuidId;
+    assert.ok(alert.uuidId, "Security alert must be generated for unauthorized attempt");
     console.log("✅ [PASS] Journey D: Suspended user denied access, door locked, unauthorized_access alert created.\n");
 
     // =======================================================================
@@ -251,7 +257,7 @@ async function runE2EWorkflowTests() {
 
     console.log("[Journey F.1] Querying generated alert from PostgreSQL...");
     const fetchedAlert = await prisma.alert.findUnique({
-      where: { id: createdAlertId },
+      where: { uuidId: createdAlertId },
     });
     assert.ok(fetchedAlert, "Alert must be retrievable");
     assert.strictEqual(fetchedAlert.resolved, false, "Alert should initially be unresolved");
@@ -259,7 +265,7 @@ async function runE2EWorkflowTests() {
     console.log("[Journey F.2] Resolving security alert...");
     const resolvedTimestamp = new Date();
     const updatedAlert = await prisma.alert.update({
-      where: { id: createdAlertId },
+      where: { uuidId: createdAlertId },
       data: {
         resolved: true,
         resolvedAt: resolvedTimestamp,
@@ -277,14 +283,14 @@ async function runE2EWorkflowTests() {
     console.log("--- Test Teardown & Fixture Cleanup ---");
     try {
       if (createdAlertId) {
-        await prisma.alert.delete({ where: { id: createdAlertId } }).catch(() => {});
+        await prisma.alert.delete({ where: { uuidId: createdAlertId } }).catch(() => {});
       }
       for (const logId of createdAccessLogIds) {
-        await prisma.accessLog.delete({ where: { id: logId } }).catch(() => {});
+        await prisma.accessLog.delete({ where: { uuidId: logId } }).catch(() => {});
       }
       if (createdPersonId) {
-        await prisma.faceEmbedding.deleteMany({ where: { personId: createdPersonId } }).catch(() => {});
-        await prisma.person.delete({ where: { id: createdPersonId } }).catch(() => {});
+        await prisma.faceEmbedding.deleteMany({ where: { personUuidId: createdPersonId } }).catch(() => {});
+        await prisma.person.delete({ where: { uuidId: createdPersonId } }).catch(() => {});
       }
       console.log("✅ Test fixtures safely cleaned up from PostgreSQL database.");
     } catch (cleanupErr) {

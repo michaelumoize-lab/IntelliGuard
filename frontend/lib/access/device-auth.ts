@@ -20,7 +20,8 @@ export interface DeviceAuthResult {
     | "replay_detected"
     | "invalid_signature";
   device?: {
-    id: number;
+    id?: number | string;
+    uuidId: string;
     deviceName: string;
     serialNumber: string;
     status: string;
@@ -29,7 +30,7 @@ export interface DeviceAuthResult {
 }
 
 interface NonceEntry {
-  deviceId: number;
+  deviceId: string;
   expiresAt: number;
 }
 
@@ -69,19 +70,36 @@ export async function authenticateDevice(
   apiKeyInput?: string | null,
   options?: DeviceAuthOptions
 ): Promise<DeviceAuthResult> {
-  const deviceId = typeof deviceIdInput === "string" ? parseInt(deviceIdInput, 10) : deviceIdInput;
-  if (!deviceId || isNaN(deviceId) || !apiKeyInput) {
+  if (!deviceIdInput || !apiKeyInput) {
     return { isValid: false, reason: "invalid_credentials" };
   }
 
+  const rawIdStr = String(deviceIdInput).trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawIdStr);
+
   try {
-    const device = await prisma.device.findUnique({
-      where: { id: deviceId },
-    });
+    const device = isUuid
+      ? await prisma.device.findUnique({
+          where: { uuidId: rawIdStr },
+        })
+      : await prisma.device.findFirst({
+          where: {
+            OR: [
+              { deviceCode: rawIdStr },
+              { serialNumber: rawIdStr },
+            ],
+          },
+        });
 
     if (!device) {
       return { isValid: false, reason: "device_not_found" };
     }
+
+    const safeDeviceObj = {
+      ...device,
+      id: device.uuidId,
+      uuidId: device.uuidId,
+    };
 
     // Securely compare SHA-256 hashed API key using constant-time comparison
     const hashedApiKey = crypto.createHash("sha256").update(apiKeyInput).digest("hex");
@@ -97,11 +115,11 @@ export async function authenticateDevice(
 
     // Device status rules: maintenance or error devices cannot unlock doors
     if (device.status === "maintenance") {
-      return { isValid: false, reason: "device_in_maintenance", device };
+      return { isValid: false, reason: "device_in_maintenance", device: safeDeviceObj };
     }
 
     if (device.status === "error") {
-      return { isValid: false, reason: "device_error", device };
+      return { isValid: false, reason: "device_error", device: safeDeviceObj };
     }
 
     // Require both timestamp and nonce in the authenticated device validation before replay-protection checks
@@ -109,7 +127,7 @@ export async function authenticateDevice(
       return {
         isValid: false,
         reason: !options?.timestamp ? "invalid_timestamp" : "invalid_credentials",
-        device,
+        device: safeDeviceObj,
       };
     }
 
@@ -127,12 +145,12 @@ export async function authenticateDevice(
     }
 
     if (isNaN(tsNumber)) {
-      return { isValid: false, reason: "invalid_timestamp", device };
+      return { isValid: false, reason: "invalid_timestamp", device: safeDeviceObj };
     }
 
     const timeDiff = Math.abs(Date.now() - tsNumber);
     if (timeDiff > MAX_TIMESTAMP_SKEW_MS) {
-      return { isValid: false, reason: "timestamp_expired", device };
+      return { isValid: false, reason: "timestamp_expired", device: safeDeviceObj };
     }
 
     // 2. HMAC-SHA256 Signature Verification over deviceId, timestamp, nonce, and bodyHash
@@ -148,10 +166,9 @@ export async function authenticateDevice(
       }
 
       const trimmedNonce = options.nonce.trim();
-      const canonicalPayloadWithHash = `${deviceId}:${options.timestamp}:${trimmedNonce}${
-        options.bodyHash ? `:${options.bodyHash}` : ""
-      }`;
-      const canonicalPayloadWithoutHash = `${deviceId}:${options.timestamp}:${trimmedNonce}`;
+      const candidateIdentifiers = Array.from(
+        new Set([rawIdStr, device.uuidId, device.deviceCode].filter(Boolean) as string[])
+      );
 
       // Derive candidate signing keys:
       // 1. Server-side per-device HMAC secret (HMAC(DEVICE_HMAC_SECRET, device.apiKeyHash)) or stored apiKeyHash (never sent in plaintext headers)
@@ -171,56 +188,64 @@ export async function authenticateDevice(
       const sigBuf = Buffer.from(sigClean, "utf8");
 
       let signatureMatched = false;
-      for (const signingKey of candidateKeys) {
-        const expectedWithHash = crypto
-          .createHmac("sha256", signingKey)
-          .update(canonicalPayloadWithHash)
-          .digest("hex")
-          .toLowerCase();
-        const expBufWith = Buffer.from(expectedWithHash, "utf8");
-        const matchWith =
-          sigBuf.length === expBufWith.length &&
-          crypto.timingSafeEqual(sigBuf, expBufWith);
+      for (const devIdent of candidateIdentifiers) {
+        const canonicalPayloadWithHash = `${devIdent}:${options.timestamp}:${trimmedNonce}${
+          options.bodyHash ? `:${options.bodyHash}` : ""
+        }`;
+        const canonicalPayloadWithoutHash = `${devIdent}:${options.timestamp}:${trimmedNonce}`;
 
-        let matchWithout = false;
-        if (!isEnforceHmac) {
-          const expectedWithoutHash = crypto
+        for (const signingKey of candidateKeys) {
+          const expectedWithHash = crypto
             .createHmac("sha256", signingKey)
-            .update(canonicalPayloadWithoutHash)
+            .update(canonicalPayloadWithHash)
             .digest("hex")
             .toLowerCase();
-          const expBufWithout = Buffer.from(expectedWithoutHash, "utf8");
-          matchWithout =
-            sigBuf.length === expBufWithout.length &&
-            crypto.timingSafeEqual(sigBuf, expBufWithout);
-        }
+          const expBufWith = Buffer.from(expectedWithHash, "utf8");
+          const matchWith =
+            sigBuf.length === expBufWith.length &&
+            crypto.timingSafeEqual(sigBuf, expBufWith);
 
-        if (matchWith || matchWithout) {
-          signatureMatched = true;
-          break;
+          let matchWithout = false;
+          if (!isEnforceHmac) {
+            const expectedWithoutHash = crypto
+              .createHmac("sha256", signingKey)
+              .update(canonicalPayloadWithoutHash)
+              .digest("hex")
+              .toLowerCase();
+            const expBufWithout = Buffer.from(expectedWithoutHash, "utf8");
+            matchWithout =
+              sigBuf.length === expBufWithout.length &&
+              crypto.timingSafeEqual(sigBuf, expBufWithout);
+          }
+
+          if (matchWith || matchWithout) {
+            signatureMatched = true;
+            break;
+          }
         }
+        if (signatureMatched) break;
       }
 
       if (!signatureMatched) {
-        return { isValid: false, reason: "invalid_signature", device };
+        return { isValid: false, reason: "invalid_signature", device: safeDeviceObj };
       }
     }
 
     // 3. Replay Protection: Nonce uniqueness check (atomic check-and-set AFTER API key + HMAC verification)
-    const nonceKey = `${deviceId}:${options.nonce.trim()}`;
+    const nonceKey = `${safeDeviceObj.uuidId}:${options.nonce.trim()}`;
     const now = Date.now();
     const existingNonce = recentNonces.get(nonceKey);
     if (existingNonce && existingNonce.expiresAt > now) {
-      return { isValid: false, reason: "replay_detected", device };
+      return { isValid: false, reason: "replay_detected", device: safeDeviceObj };
     }
     recentNonces.set(nonceKey, {
-      deviceId,
+      deviceId: safeDeviceObj.uuidId,
       expiresAt: now + MAX_TIMESTAMP_SKEW_MS,
     });
 
     // Update lastSeen timestamp and ensure status is online
     const updatedDevice = await prisma.device.update({
-      where: { id: device.id },
+      where: { uuidId: safeDeviceObj.uuidId },
       data: {
         status: "online",
         lastSeen: new Date(),
@@ -230,11 +255,9 @@ export async function authenticateDevice(
     return {
       isValid: true,
       device: {
-        id: updatedDevice.id,
-        deviceName: updatedDevice.deviceName,
-        serialNumber: updatedDevice.serialNumber,
-        status: updatedDevice.status,
-        location: updatedDevice.location,
+        ...updatedDevice,
+        id: updatedDevice.uuidId,
+        uuidId: updatedDevice.uuidId,
       },
     };
   } catch (error) {

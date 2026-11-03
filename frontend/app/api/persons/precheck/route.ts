@@ -28,16 +28,9 @@ export async function POST(req: NextRequest) {
     const rawImage = formData.get("image");
     const rawExcludePersonId = formData.get("excludePersonId");
 
-    let excludePersonId: number | undefined = undefined;
+    let excludePersonId: string | undefined = undefined;
     if (rawExcludePersonId !== null && rawExcludePersonId !== undefined && String(rawExcludePersonId).trim() !== "") {
-      const parsedId = parseInt(String(rawExcludePersonId), 10);
-      if (isNaN(parsedId)) {
-        return NextResponse.json(
-          { success: false, canProceed: false, error: "VALIDATION_ERROR", message: "Invalid excludePersonId parameter." },
-          { status: 400 }
-        );
-      }
-      excludePersonId = parsedId;
+      excludePersonId = String(rawExcludePersonId).trim();
     }
 
     if (!rawImage || !(rawImage instanceof File) || rawImage.size === 0) {

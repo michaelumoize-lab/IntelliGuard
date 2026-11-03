@@ -15,7 +15,6 @@ import {
   Settings,
   CircleHelp,
   LogOut,
-  Shield,
   LucideIcon,
   Loader2,
   ChevronDown,
@@ -31,6 +30,7 @@ import { useTheme } from "next-themes";
 import { signOut } from "@/lib/auth-client";
 
 import { UserAvatar } from "@/components/user-avatar";
+import { Logo } from "@/components/logo";
 import {
   Sidebar,
   SidebarContent,
@@ -134,7 +134,7 @@ const mainNavItems: NavItem[] = [
   {
     title: "Anti-Spoofing (PAD)",
     href: "/dashboard/liveness",
-    icon: Shield,
+    icon: ShieldCheck,
   },
 ];
 
@@ -191,9 +191,7 @@ export function AdminSidebar({ user, className, ...props }: AdminSidebarProps) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard" onClick={handleNavClick}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Shield className="size-4" />
-                </div>
+                <Logo className="size-8" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">IntelliGuard</span>
                   <span className="truncate text-[10px] text-muted-foreground font-medium uppercase tracking-wider">

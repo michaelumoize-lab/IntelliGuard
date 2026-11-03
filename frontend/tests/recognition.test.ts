@@ -4,6 +4,7 @@ import path from "path";
 import { prisma } from "../lib/prisma";
 import { generateEmbedding, FastAPIError } from "../lib/ai/fastapi";
 import { findTopFaceMatches } from "../lib/ai/face-recognition";
+import { generateEmbeddingCode } from "../lib/identifiers";
 
 async function runMilestone6Tests() {
   console.log("==================================================");
@@ -20,7 +21,7 @@ async function runMilestone6Tests() {
   });
   console.log(`[DB Check] Active Face Embeddings in Database: ${dbEmbeddings.length}`);
   dbEmbeddings.forEach(e => {
-    console.log(` - ID: ${e.id} | Person: ${e.person.firstName} ${e.person.lastName} (${e.person.personCode}) | Status: ${e.person.status}`);
+    console.log(` - ID: ${e.uuidId} | Person: ${e.person.firstName} ${e.person.lastName} (${e.person.personCode}) | Status: ${e.person.status}`);
   });
 
   if (!fs.existsSync(singleFacePath)) {
@@ -28,7 +29,7 @@ async function runMilestone6Tests() {
     process.exit(1);
   }
 
-  let createdTestPersonId: number | null = null;
+  let createdTestPersonId: string | null = null;
 
   // 1. Test Known Face Recognition (Register single_face.jpg person first, then recognize)
   console.log("[Test 1] Testing Known Face Recognition...");
@@ -52,18 +53,20 @@ async function runMilestone6Tests() {
           faceImageUrl: "https://ik.imagekit.io/intelliguard_demo/single_face.jpg"
         }
       });
-      createdTestPersonId = testPerson.id;
+      createdTestPersonId = testPerson.uuidId;
 
       const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
+      const embeddingCode = generateEmbeddingCode();
       await prisma.$executeRawUnsafe(
         `
         INSERT INTO face_embeddings (
-          person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+          person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
         ) VALUES (
-          $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+          $1::uuid, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
         );
         `,
-        testPerson.id,
+        testPerson.uuidId,
+        embeddingCode,
         vectorLiteral,
         aiResult.model || "buffalo_s",
         "https://ik.imagekit.io/intelliguard_demo/single_face.jpg",
@@ -87,8 +90,8 @@ async function runMilestone6Tests() {
     process.exitCode = 1;
   } finally {
     if (createdTestPersonId) {
-      await prisma.faceEmbedding.deleteMany({ where: { personId: createdTestPersonId } }).catch(() => {});
-      await prisma.person.delete({ where: { id: createdTestPersonId } }).catch(() => {});
+      await prisma.faceEmbedding.deleteMany({ where: { personUuidId: createdTestPersonId } }).catch(() => {});
+      await prisma.person.delete({ where: { uuidId: createdTestPersonId } }).catch(() => {});
     }
   }
 

@@ -23,7 +23,7 @@ import { Loader2 } from "lucide-react";
 import { DeviceType, DeviceStatus } from "@prisma/client";
 
 export interface DeviceFormData {
-  id?: number;
+  id?: string | number;
   deviceName: string;
   serialNumber: string;
   location: string;

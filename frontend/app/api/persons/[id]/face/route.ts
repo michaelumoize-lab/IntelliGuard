@@ -9,6 +9,7 @@ import {
 } from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
+import { generateEmbeddingCode } from "@/lib/identifiers";
 
 export const dynamic = "force-dynamic";
 
@@ -66,17 +67,17 @@ export async function POST(
     }
 
     const resolvedParams = await params;
-    const personId = parseInt(resolvedParams.id, 10);
-    if (isNaN(personId)) {
+    const personId = resolvedParams.id;
+    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
       return NextResponse.json(
-        { success: false, error: "INVALID_ID", message: "Invalid person ID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
         { status: 400 }
       );
     }
 
     // 1. Verify person exists
     const person = await prisma.person.findUnique({
-      where: { id: personId },
+      where: { uuidId: personId },
     });
 
     if (!person) {
@@ -130,53 +131,58 @@ export async function POST(
 
     // 6. Step D: Run Database Transaction
     try {
-      const updatedPerson = await prisma.$transaction(async (tx) => {
-        // Serialize concurrent facial registrations/replacements
-        await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(20260419);");
+      const updatedPerson = await prisma.$transaction(
+        async (tx) => {
+          // Serialize concurrent facial registrations/replacements
+          await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(20260419);");
 
-        const txDuplicateResult = await checkForDuplicateFace(
-          aiResult.embedding,
-          DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
-          personId,
-          activeModel,
-          tx
-        );
-        if (txDuplicateResult.isDuplicate && txDuplicateResult.matchingPerson) {
-          throw new DuplicateFaceConflictError(txDuplicateResult.matchingPerson);
-        }
-
-        // Deactivate all previous embeddings for this person
-        await tx.faceEmbedding.updateMany({
-          where: { personId, isActive: true },
-          data: { isActive: false },
-        });
-
-        // Insert new active 512D FaceEmbedding
-        const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO face_embeddings (
-            person_id, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
-          ) VALUES (
-            $1, $2::vector, $3, $4, $5, true, NOW(), NOW()
+          const txDuplicateResult = await checkForDuplicateFace(
+            aiResult.embedding,
+            DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+            personId,
+            activeModel,
+            tx
           );
-          `,
-          personId,
-          vectorLiteral,
-          activeModel,
-          ikResult.url,
-          aiResult.qualityScore
-        );
+          if (txDuplicateResult.isDuplicate && txDuplicateResult.matchingPerson) {
+            throw new DuplicateFaceConflictError(txDuplicateResult.matchingPerson);
+          }
 
-        // Update Person record with new face image URL and file ID
-        return await tx.person.update({
-          where: { id: personId },
-          data: {
-            faceImageUrl: ikResult.url,
-            faceImageFileId: ikResult.fileId,
-          },
-        });
-      });
+          // Deactivate all previous embeddings for this person
+          await tx.faceEmbedding.updateMany({
+            where: { personUuidId: personId, isActive: true },
+            data: { isActive: false },
+          });
+
+          // Insert new active 512D FaceEmbedding
+          const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
+          const embeddingCode = generateEmbeddingCode();
+          await tx.$executeRawUnsafe(
+            `
+            INSERT INTO face_embeddings (
+              person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+            ) VALUES (
+              $1::uuid, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
+            );
+            `,
+            personId,
+            embeddingCode,
+            vectorLiteral,
+            activeModel,
+            ikResult.url,
+            aiResult.qualityScore
+          );
+
+          // Update Person record with new face image URL and file ID
+          return await tx.person.update({
+            where: { uuidId: personId },
+            data: {
+              faceImageUrl: ikResult.url,
+              faceImageFileId: ikResult.fileId,
+            },
+          });
+        },
+        { timeout: 30000, maxWait: 15000 }
+      );
 
       // Step E: DB Transaction Succeeded -> Attempt deletion of OLD ImageKit asset
       if (oldFileId) {
@@ -189,11 +195,18 @@ export async function POST(
         success: true,
         message: "Face photo replaced successfully",
         person: {
-          id: updatedPerson.id,
+          id: updatedPerson.uuidId,
+          uuidId: updatedPerson.uuidId,
           personCode: updatedPerson.personCode,
           firstName: updatedPerson.firstName,
           lastName: updatedPerson.lastName,
+          email: updatedPerson.email,
+          phone: updatedPerson.phone,
+          category: updatedPerson.category,
+          department: updatedPerson.department,
+          status: updatedPerson.status,
           faceImageUrl: updatedPerson.faceImageUrl,
+          updatedAt: updatedPerson.updatedAt,
         },
         embedding: {
           qualityScore: aiResult.qualityScore,

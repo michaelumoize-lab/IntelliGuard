@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
 import type { Prisma, AccessStatus, MatchStatus, AccessReason } from "@prisma/client";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const dynamic = "force-dynamic";
 
 const VALID_REASONS = [
@@ -63,13 +65,19 @@ export async function GET(req: NextRequest) {
     }
 
     if (deviceIdParam) {
-      const devId = parseInt(deviceIdParam, 10);
-      if (!isNaN(devId)) where.deviceId = devId;
+      if (UUID_REGEX.test(deviceIdParam)) {
+        where.deviceUuidId = deviceIdParam;
+      } else {
+        where.device = { deviceCode: deviceIdParam };
+      }
     }
 
     if (personIdParam) {
-      const pId = parseInt(personIdParam, 10);
-      if (!isNaN(pId)) where.personId = pId;
+      if (UUID_REGEX.test(personIdParam)) {
+        where.personUuidId = personIdParam;
+      } else {
+        where.person = { personCode: personIdParam };
+      }
     }
 
     if (search) {
@@ -86,7 +94,7 @@ export async function GET(req: NextRequest) {
     const totalPages = Math.ceil(total / limit) || 1;
     const skip = (page - 1) * limit;
 
-    const logs = await prisma.accessLog.findMany({
+    const logsRaw = await prisma.accessLog.findMany({
       where,
       skip,
       take: limit,
@@ -94,7 +102,8 @@ export async function GET(req: NextRequest) {
       include: {
         device: {
           select: {
-            id: true,
+            uuidId: true,
+            deviceCode: true,
             deviceName: true,
             serialNumber: true,
             location: true,
@@ -102,7 +111,7 @@ export async function GET(req: NextRequest) {
         },
         person: {
           select: {
-            id: true,
+            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -114,6 +123,26 @@ export async function GET(req: NextRequest) {
         },
       },
     });
+
+    const logs = logsRaw.map((log) => ({
+      ...log,
+      id: log.uuidId,
+      uuidId: log.uuidId,
+      device: log.device
+        ? {
+            ...log.device,
+            id: log.device.uuidId,
+            uuidId: log.device.uuidId,
+          }
+        : null,
+      person: log.person
+        ? {
+            ...log.person,
+            id: log.person.uuidId,
+            uuidId: log.person.uuidId,
+          }
+        : null,
+    }));
 
     return NextResponse.json({
       success: true,

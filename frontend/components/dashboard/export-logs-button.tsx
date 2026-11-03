@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 interface ExportLogsButtonProps {
   logs: {
-    id: number;
+    id: string | number;
     createdAt: string | Date;
     personName?: string | null;
     personCode?: string | null;
