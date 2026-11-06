@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { isValidAlertCode } from "@/lib/identifiers";
 
 export const dynamic = "force-dynamic";
 
@@ -35,16 +36,16 @@ export async function PATCH(
 
   try {
     const resolvedParams = await params;
-    const alertId = resolvedParams.id;
-    if (!alertId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(alertId)) {
+    const alertCode = resolvedParams.id;
+    if (!alertCode || !isValidAlertCode(alertCode)) {
       return NextResponse.json(
-        { success: false, error: "VALIDATION_ERROR", message: "Invalid alert ID. Expected a valid UUID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid alert code. Expected format ALT-XXXXXX." },
         { status: 400 }
       );
     }
 
     const alert = await prisma.alert.findUnique({
-      where: { uuidId: alertId },
+      where: { alertCode },
     });
 
     if (!alert) {
@@ -64,7 +65,7 @@ export async function PATCH(
     let updatedAlert;
     try {
       updatedAlert = await prisma.alert.update({
-        where: { uuidId: alertId },
+        where: { alertCode },
         data: {
           resolved: resolvedValue,
           resolvedAt: resolvedValue ? new Date() : null,
@@ -78,7 +79,7 @@ export async function PATCH(
         updateErr.code === "P2003"
       ) {
         updatedAlert = await prisma.alert.update({
-          where: { uuidId: alertId },
+          where: { alertCode },
           data: {
             resolved: resolvedValue,
             resolvedAt: resolvedValue ? new Date() : null,
@@ -95,8 +96,8 @@ export async function PATCH(
       message: resolvedValue ? "Alert resolved successfully." : "Alert status updated.",
       alert: {
         ...updatedAlert,
-        id: updatedAlert.uuidId,
-        uuidId: updatedAlert.uuidId,
+        id: updatedAlert.alertCode,
+        alertCode: updatedAlert.alertCode,
       },
     });
   } catch (error: unknown) {

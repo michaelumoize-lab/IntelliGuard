@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { isValidAlertCode, isValidDeviceCode } from "@/lib/identifiers";
 import { Prisma, AlertType, Severity } from "@prisma/client";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +75,6 @@ export async function GET(req: NextRequest) {
       include: {
         device: {
           select: {
-            uuidId: true,
             deviceCode: true,
             deviceName: true,
             serialNumber: true,
@@ -85,7 +83,6 @@ export async function GET(req: NextRequest) {
         },
         person: {
           select: {
-            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -97,20 +94,20 @@ export async function GET(req: NextRequest) {
 
     const alerts = alertsRaw.map((alert) => ({
       ...alert,
-      id: alert.uuidId,
-      uuidId: alert.uuidId,
+      id: alert.alertCode,
+      alertCode: alert.alertCode,
       device: alert.device
         ? {
             ...alert.device,
-            id: alert.device.uuidId,
-            uuidId: alert.device.uuidId,
+            id: alert.device.deviceCode,
+            deviceCode: alert.device.deviceCode,
           }
         : null,
       person: alert.person
         ? {
             ...alert.person,
-            id: alert.person.uuidId,
-            uuidId: alert.person.uuidId,
+            id: alert.person.personCode,
+            personCode: alert.person.personCode,
           }
         : null,
     }));
@@ -153,22 +150,35 @@ export async function PATCH(req: NextRequest) {
       where.resolved = true;
     }
 
-    if (Array.isArray(body.alertIds) && body.alertIds.length > 0) {
-      const validUuids = body.alertIds
+    const rawAlertCodes = Array.isArray(body.alertCodes)
+      ? body.alertCodes
+      : Array.isArray(body.alertIds)
+        ? body.alertIds
+        : null;
+
+    if (rawAlertCodes && rawAlertCodes.length > 0) {
+      const validAlertCodes = rawAlertCodes
         .map((id: unknown) => String(id))
-        .filter((id: string) => UUID_REGEX.test(id));
-      if (validUuids.length > 0) {
-        where.uuidId = { in: validUuids };
+        .filter((id: string) => isValidAlertCode(id));
+      if (validAlertCodes.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Invalid alert code(s). Expected format ALT-XXXXXX." },
+          { status: 400 }
+        );
       }
+      where.alertCode = { in: validAlertCodes };
     }
 
-    if (body.deviceId) {
-      const devIdStr = String(body.deviceId);
-      if (UUID_REGEX.test(devIdStr)) {
-        where.deviceUuidId = devIdStr;
-      } else {
-        where.device = { deviceCode: devIdStr };
+    const rawDeviceCode = body.deviceCode ?? body.deviceId;
+    if (rawDeviceCode) {
+      const devCodeStr = String(rawDeviceCode);
+      if (!isValidDeviceCode(devCodeStr)) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Invalid deviceCode. Expected format DEV-XXXXXX." },
+          { status: 400 }
+        );
       }
+      where.deviceCode = devCodeStr;
     }
 
     let updateResult;

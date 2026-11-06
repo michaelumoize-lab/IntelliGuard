@@ -10,7 +10,7 @@ import {
   DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
 } from "../lib/ai/duplicate-check";
 import { findTopFaceMatches } from "../lib/ai/face-recognition";
-import { generateEmbeddingCode } from "../lib/identifiers";
+import { generatePersonCode, generateEmbeddingCode } from "../lib/identifiers";
 import { POST as POST_PRECHECK } from "../app/api/persons/precheck/route";
 import { POST as POST_PERSONS } from "../app/api/persons/route";
 import { POST as POST_REPLACE_FACE } from "../app/api/persons/[id]/face/route";
@@ -55,7 +55,7 @@ async function runPhase2RemediationTests() {
     }
   }
 
-  const createdPersonIds: string[] = [];
+  const createdPersonCodes: string[] = [];
 
   const originalGetSession = auth.api.getSession;
   const originalFetch = global.fetch;
@@ -86,10 +86,7 @@ async function runPhase2RemediationTests() {
     // Clean up any stale test records from previously interrupted runs
     await prisma.person.deleteMany({
       where: {
-        OR: [
-          { personCode: { startsWith: "P2-" } },
-          { firstName: { in: ["PhaseTwo", "Concurrent"] } },
-        ],
+        firstName: { in: ["PhaseTwo", "Concurrent"] },
       },
     }).catch(() => {});
 
@@ -217,7 +214,7 @@ async function runPhase2RemediationTests() {
     const regForm1 = new FormData();
     regForm1.append("firstName", "PhaseTwo");
     regForm1.append("lastName", "Alpha");
-    regForm1.append("personCode", `P2-ALPHA-${Date.now()}`);
+    regForm1.append("personCode", generatePersonCode());
     regForm1.append("category", "employee");
     regForm1.append("department", "Security");
     regForm1.append("status", "active");
@@ -231,12 +228,12 @@ async function runPhase2RemediationTests() {
     const regData1 = await regRes1.json();
 
     assert(
-      regRes1.status === 201 && regData1.success === true && Boolean(regData1.person?.id),
+      regRes1.status === 201 && regData1.success === true && Boolean(regData1.person?.personCode),
       "1b. Final registration succeeds for unique face",
       JSON.stringify(regData1)
     );
-    const personAId: string = regData1.person.id;
-    createdPersonIds.push(personAId);
+    const personACode: string = regData1.person.personCode;
+    createdPersonCodes.push(personACode);
 
     // 2. Registering the same face image twice is blocked
     const precheckForm2 = new FormData();
@@ -261,7 +258,7 @@ async function runPhase2RemediationTests() {
     const regForm2 = new FormData();
     regForm2.append("firstName", "PhaseTwo");
     regForm2.append("lastName", "AlphaClone");
-    regForm2.append("personCode", `P2-CLONE-${Date.now()}`);
+    regForm2.append("personCode", generatePersonCode());
     regForm2.append("category", "employee");
     regForm2.append("image", makeDummyImageFile("personA_dup.jpg"));
     const regReq2 = new NextRequest("http://localhost:3000/api/persons", {
@@ -305,13 +302,13 @@ async function runPhase2RemediationTests() {
 
     // 4. Duplicate detection works when the matched person is inactive
     await prisma.person.update({
-      where: { uuidId: personAId },
+      where: { personCode: personACode },
       data: { status: "inactive" },
     });
     const inactiveDupCheck = await checkForDuplicateFace(personADifferentCaptureVec);
     assert(
       inactiveDupCheck.isDuplicate === true &&
-        inactiveDupCheck.matchingPerson?.personId === personAId &&
+        inactiveDupCheck.matchingPerson?.personCode === personACode &&
         inactiveDupCheck.matchingPerson?.status === "inactive",
       "4. Duplicate detection catches matches against inactive people",
       JSON.stringify(inactiveDupCheck)
@@ -319,7 +316,7 @@ async function runPhase2RemediationTests() {
 
     // 5. Duplicate detection works when the matched person is suspended
     await prisma.person.update({
-      where: { uuidId: personAId },
+      where: { personCode: personACode },
       data: { status: "suspended" },
     });
     const suspendedDupCheck = await checkForDuplicateFace(personADifferentCaptureVec);
@@ -343,7 +340,7 @@ async function runPhase2RemediationTests() {
 
     // Restore Person A to active
     await prisma.person.update({
-      where: { uuidId: personAId },
+      where: { personCode: personACode },
       data: { status: "active" },
     });
 
@@ -351,7 +348,7 @@ async function runPhase2RemediationTests() {
     currentMockEmbedding = personADifferentCaptureVec;
     const precheckSelfForm = new FormData();
     precheckSelfForm.append("image", makeDummyImageFile("personA_replace.jpg"));
-    precheckSelfForm.append("excludePersonId", String(personAId));
+    precheckSelfForm.append("excludePersonId", String(personACode));
     const precheckSelfRes = await POST_PRECHECK(
       new NextRequest("http://localhost:3000/api/persons/precheck", {
         method: "POST",
@@ -369,15 +366,15 @@ async function runPhase2RemediationTests() {
     const replaceSelfForm = new FormData();
     replaceSelfForm.append("image", makeDummyImageFile("personA_replace.jpg"));
     const replaceSelfRes = await POST_REPLACE_FACE(
-      new NextRequest(`http://localhost:3000/api/persons/${personAId}/face`, {
+      new NextRequest(`http://localhost:3000/api/persons/${personACode}/face`, {
         method: "POST",
         body: replaceSelfForm,
       }),
-      { params: Promise.resolve({ id: String(personAId) }) }
+      { params: Promise.resolve({ id: String(personACode) }) }
     );
     const replaceSelfData = await replaceSelfRes.json();
     const activeEmbeddingsAfterReplace = await prisma.faceEmbedding.count({
-      where: { personUuidId: personAId, isActive: true },
+      where: { personCode: personACode, isActive: true },
     });
 
     assert(
@@ -391,7 +388,7 @@ async function runPhase2RemediationTests() {
     const regFormB = new FormData();
     regFormB.append("firstName", "PhaseTwo");
     regFormB.append("lastName", "Bravo");
-    regFormB.append("personCode", `P2-BRAVO-${Date.now()}`);
+    regFormB.append("personCode", generatePersonCode());
     regFormB.append("category", "employee");
     regFormB.append("image", makeDummyImageFile("personB.jpg"));
     const regResB = await POST_PERSONS(
@@ -401,19 +398,19 @@ async function runPhase2RemediationTests() {
       })
     );
     const regDataB = await regResB.json();
-    const personBId: string = regDataB.person.id;
-    createdPersonIds.push(personBId);
+    const personBCode: string = regDataB.person.personCode;
+    createdPersonCodes.push(personBCode);
 
     // Try replacing Person B's face with Person A's face
     currentMockEmbedding = personADifferentCaptureVec;
     const replaceCrossForm = new FormData();
     replaceCrossForm.append("image", makeDummyImageFile("personA_on_B.jpg"));
     const replaceCrossRes = await POST_REPLACE_FACE(
-      new NextRequest(`http://localhost:3000/api/persons/${personBId}/face`, {
+      new NextRequest(`http://localhost:3000/api/persons/${personBCode}/face`, {
         method: "POST",
         body: replaceCrossForm,
       }),
-      { params: Promise.resolve({ id: String(personBId) }) }
+      { params: Promise.resolve({ id: String(personBCode) }) }
     );
     const replaceCrossData = await replaceCrossRes.json();
 
@@ -490,7 +487,7 @@ async function runPhase2RemediationTests() {
       const fd = new FormData();
       fd.append("firstName", "Concurrent");
       fd.append("lastName", suffix);
-      fd.append("personCode", `P2-CONC-${suffix}-${Date.now()}`);
+      fd.append("personCode", generatePersonCode());
       fd.append("category", "visitor");
       fd.append("image", makeDummyImageFile(`conc_${suffix}.jpg`));
       return POST_PERSONS(
@@ -504,8 +501,8 @@ async function runPhase2RemediationTests() {
     const [concRes1, concRes2] = await Promise.all([makeConcurrentReq("One"), makeConcurrentReq("Two")]);
     const concData1 = await concRes1.json();
     const concData2 = await concRes2.json();
-    if (concData1.person?.id) createdPersonIds.push(concData1.person.id);
-    if (concData2.person?.id) createdPersonIds.push(concData2.person.id);
+    if (concData1.person?.personCode) createdPersonCodes.push(concData1.person.personCode);
+    if (concData2.person?.personCode) createdPersonCodes.push(concData2.person.personCode);
 
     const statuses = [concRes1.status, concRes2.status].sort();
     assert(
@@ -522,7 +519,7 @@ async function runPhase2RemediationTests() {
     // 11. Single best person match above threshold is recognized
     const matchResA = await findTopFaceMatches(personADifferentCaptureVec);
     assert(
-      matchResA.matchStatus === "matched" && matchResA.person?.id === personAId,
+      matchResA.matchStatus === "matched" && matchResA.person?.personCode === personACode,
       "11. Single best person match above threshold is recognized accurately",
       JSON.stringify(matchResA)
     );
@@ -533,55 +530,55 @@ async function runPhase2RemediationTests() {
     await prisma.$executeRawUnsafe(
       `
       INSERT INTO face_embeddings (
-        person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+        embedding_code, person_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
       ) VALUES (
-        $1::uuid, $2, $3::vector, 'buffalo_s', 'https://ik.imagekit.io/test/extra.jpg', 0.95, true, NOW(), NOW()
+        $1, $2, $3::vector, 'buffalo_s', 'https://ik.imagekit.io/test/extra.jpg', 0.95, true, NOW(), NOW()
       );
       `,
-      personAId,
       extraEmbeddingCode,
+      personACode,
       vectorLiteralExtra
     );
 
     const multiEmbMatch = await findTopFaceMatches(personADifferentCaptureVec);
 
     assert(
-      multiEmbMatch.matchStatus === "matched" && multiEmbMatch.person?.id === personAId,
-      "12. Multiple active embeddings for the same person are deduplicated by person_id and never cause false ambiguity",
+      multiEmbMatch.matchStatus === "matched" && multiEmbMatch.person?.personCode === personACode,
+      "12. Multiple active embeddings for the same person are deduplicated by person_code and never cause false ambiguity",
       JSON.stringify(multiEmbMatch)
     );
 
     // Clean up the extra active embedding on Person A
     const activeEmbsA = await prisma.faceEmbedding.findMany({
-      where: { personUuidId: personAId, isActive: true },
+      where: { personCode: personACode, isActive: true },
       orderBy: { createdAt: "desc" },
     });
     if (activeEmbsA.length > 1) {
-      await prisma.faceEmbedding.delete({ where: { uuidId: activeEmbsA[0].uuidId } });
+      await prisma.faceEmbedding.delete({ where: { embeddingCode: activeEmbsA[0].embeddingCode } });
     }
 
     // 13. Two different people within FACE_AMBIGUITY_MARGIN return status="ambiguous_match"
     const personC = await prisma.person.create({
       data: {
-        personCode: `P2-CHARLIE-${Date.now()}`,
+        personCode: generatePersonCode(),
         firstName: "PhaseTwo",
         lastName: "Charlie",
         category: "employee",
         status: "active",
       },
     });
-    createdPersonIds.push(personC.uuidId);
+    createdPersonCodes.push(personC.personCode);
     const charlieEmbeddingCode = generateEmbeddingCode();
     await prisma.$executeRawUnsafe(
       `
       INSERT INTO face_embeddings (
-        person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+        embedding_code, person_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
       ) VALUES (
-        $1::uuid, $2, $3::vector, 'buffalo_s', 'https://ik.imagekit.io/test/charlie.jpg', 0.95, true, NOW(), NOW()
+        $1, $2, $3::vector, 'buffalo_s', 'https://ik.imagekit.io/test/charlie.jpg', 0.95, true, NOW(), NOW()
       );
       `,
-      personC.uuidId,
       charlieEmbeddingCode,
+      personC.personCode,
       `[${personCVec.join(",")}]`
     );
 
@@ -615,7 +612,7 @@ async function runPhase2RemediationTests() {
     );
 
     // Remove Person C's embedding so Person B is unambiguous again
-    await prisma.faceEmbedding.deleteMany({ where: { personUuidId: personC.uuidId } });
+    await prisma.faceEmbedding.deleteMany({ where: { personCode: personC.personCode } });
 
     // 14. Unknown face below threshold returns unknown_individual
     currentMockEmbedding = unknownVec;
@@ -663,14 +660,14 @@ async function runPhase2RemediationTests() {
         activeAccessData.access_status === "granted" &&
         activeAccessData.reason === "face_match" &&
         activeAccessData.door_action === "unlock" &&
-        (activeAccessData.person?.id === personAId || activeAccessData.person?.uuidId === personAId),
+        (activeAccessData.person?.personCode === personACode || activeAccessData.person?.id === personACode),
       "15. Recognized active person is granted access with reason='face_match' and door_action='unlock'",
       JSON.stringify(activeAccessData)
     );
 
     // 16. Recognized inactive person -> denied, unauthorized, lock + unauthorized_access alert
     await prisma.person.update({
-      where: { uuidId: personAId },
+      where: { personCode: personACode },
       data: { status: "inactive" },
     });
 
@@ -685,11 +682,11 @@ async function runPhase2RemediationTests() {
     const inactiveAccessData = await inactiveAccessRes.json();
 
     const inactiveLog = await prisma.accessLog.findFirst({
-      where: { personUuidId: personAId },
+      where: { personCode: personACode },
       orderBy: { createdAt: "desc" },
     });
     const inactiveAlert = await prisma.alert.findFirst({
-      where: { personUuidId: personAId },
+      where: { personCode: personACode },
       orderBy: { createdAt: "desc" },
     });
 
@@ -707,7 +704,7 @@ async function runPhase2RemediationTests() {
 
     // 17. Recognized suspended person -> denied, unauthorized, lock + unauthorized_access alert
     await prisma.person.update({
-      where: { uuidId: personAId },
+      where: { personCode: personACode },
       data: { status: "suspended" },
     });
 
@@ -722,11 +719,11 @@ async function runPhase2RemediationTests() {
     const suspendedAccessData = await suspendedAccessRes.json();
 
     const suspendedLog = await prisma.accessLog.findFirst({
-      where: { personUuidId: personAId },
+      where: { personCode: personACode },
       orderBy: { createdAt: "desc" },
     });
     const suspendedAlert = await prisma.alert.findFirst({
-      where: { personUuidId: personAId },
+      where: { personCode: personACode },
       orderBy: { createdAt: "desc" },
     });
 
@@ -774,12 +771,12 @@ async function runPhase2RemediationTests() {
 
     // 19. Changing a person's status later does not rewrite the meaning of earlier historical access logs
     await prisma.person.update({
-      where: { uuidId: personAId },
+      where: { personCode: personACode },
       data: { status: "active" },
     });
 
     const historicalLogsForA = await prisma.accessLog.findMany({
-      where: { personUuidId: personAId },
+      where: { personCode: personACode },
       include: { person: true },
       orderBy: { createdAt: "asc" },
     });
@@ -811,24 +808,23 @@ async function runPhase2RemediationTests() {
     await prisma.alert.deleteMany({
       where: {
         OR: [
-          { personUuidId: { in: createdPersonIds } },
-          { person: { personCode: { startsWith: "P2-" } } },
+          { personCode: { in: createdPersonCodes } },
+          { person: { firstName: { in: ["PhaseTwo", "Concurrent"] } } },
         ],
       },
     }).catch(() => {});
     await prisma.accessLog.deleteMany({
       where: {
         OR: [
-          { personUuidId: { in: createdPersonIds } },
-          { person: { personCode: { startsWith: "P2-" } } },
+          { personCode: { in: createdPersonCodes } },
+          { person: { firstName: { in: ["PhaseTwo", "Concurrent"] } } },
         ],
       },
     }).catch(() => {});
     await prisma.faceEmbedding.deleteMany({
       where: {
         OR: [
-          { personUuidId: { in: createdPersonIds } },
-          { person: { personCode: { startsWith: "P2-" } } },
+          { personCode: { in: createdPersonCodes } },
           { person: { firstName: { in: ["PhaseTwo", "Concurrent"] } } },
         ],
       },
@@ -836,8 +832,7 @@ async function runPhase2RemediationTests() {
     await prisma.person.deleteMany({
       where: {
         OR: [
-          { uuidId: { in: createdPersonIds } },
-          { personCode: { startsWith: "P2-" } },
+          { personCode: { in: createdPersonCodes } },
           { firstName: { in: ["PhaseTwo", "Concurrent"] } },
         ],
       },
@@ -849,15 +844,15 @@ async function runPhase2RemediationTests() {
         where: {
           title: "Unknown Individual Detected",
           createdAt: { gte: new Date(Date.now() - 60000) },
-          deviceUuidId: null,
+          deviceCode: null,
         },
       })
       .catch(() => {});
     await prisma.accessLog
       .deleteMany({
         where: {
-          personUuidId: null,
-          deviceUuidId: null,
+          personCode: null,
+          deviceCode: null,
           createdAt: { gte: new Date(Date.now() - 60000) },
           reason: { in: ["insufficient_confidence", "face_no_match"] },
         },

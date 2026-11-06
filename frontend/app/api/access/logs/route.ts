@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { isValidDeviceCode, isValidPersonCode } from "@/lib/identifiers";
 import type { Prisma, AccessStatus, MatchStatus, AccessReason } from "@prisma/client";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const dynamic = "force-dynamic";
 
@@ -65,26 +64,32 @@ export async function GET(req: NextRequest) {
     }
 
     if (deviceIdParam) {
-      if (UUID_REGEX.test(deviceIdParam)) {
-        where.deviceUuidId = deviceIdParam;
-      } else {
-        where.device = { deviceCode: deviceIdParam };
+      if (!isValidDeviceCode(deviceIdParam)) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Invalid deviceCode filter. Expected format DEV-XXXXXX." },
+          { status: 400 }
+        );
       }
+      where.deviceCode = deviceIdParam;
     }
 
     if (personIdParam) {
-      if (UUID_REGEX.test(personIdParam)) {
-        where.personUuidId = personIdParam;
-      } else {
-        where.person = { personCode: personIdParam };
+      if (!isValidPersonCode(personIdParam)) {
+        return NextResponse.json(
+          { success: false, error: "VALIDATION_ERROR", message: "Invalid personCode filter. Expected format PER-XXXXXX." },
+          { status: 400 }
+        );
       }
+      where.personCode = personIdParam;
     }
 
     if (search) {
       where.OR = [
+        { accessCode: { contains: search, mode: "insensitive" } },
         { person: { firstName: { contains: search, mode: "insensitive" } } },
         { person: { lastName: { contains: search, mode: "insensitive" } } },
         { person: { personCode: { contains: search, mode: "insensitive" } } },
+        { device: { deviceCode: { contains: search, mode: "insensitive" } } },
         { device: { deviceName: { contains: search, mode: "insensitive" } } },
         { device: { serialNumber: { contains: search, mode: "insensitive" } } },
       ];
@@ -102,7 +107,6 @@ export async function GET(req: NextRequest) {
       include: {
         device: {
           select: {
-            uuidId: true,
             deviceCode: true,
             deviceName: true,
             serialNumber: true,
@@ -111,7 +115,6 @@ export async function GET(req: NextRequest) {
         },
         person: {
           select: {
-            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -126,20 +129,20 @@ export async function GET(req: NextRequest) {
 
     const logs = logsRaw.map((log) => ({
       ...log,
-      id: log.uuidId,
-      uuidId: log.uuidId,
+      id: log.accessCode,
+      accessCode: log.accessCode,
       device: log.device
         ? {
             ...log.device,
-            id: log.device.uuidId,
-            uuidId: log.device.uuidId,
+            id: log.device.deviceCode,
+            deviceCode: log.device.deviceCode,
           }
         : null,
       person: log.person
         ? {
             ...log.person,
-            id: log.person.uuidId,
-            uuidId: log.person.uuidId,
+            id: log.person.personCode,
+            personCode: log.person.personCode,
           }
         : null,
     }));

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
 import { Prisma, PersonCategory, PersonStatus } from "@prisma/client";
+import { isValidPersonCode } from "@/lib/identifiers";
 
 export const dynamic = "force-dynamic";
 
@@ -40,21 +41,20 @@ export async function GET(
     }
 
     const resolvedParams = await params;
-    const personId = resolvedParams.id;
-    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
+    const personCode = resolvedParams.id;
+    if (!isValidPersonCode(personCode)) {
       return NextResponse.json(
-        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person code. Expected format PER-XXXXXX." },
         { status: 400 }
       );
     }
 
     const person = await prisma.person.findUnique({
-      where: { uuidId: personId },
+      where: { personCode },
       include: {
         faceEmbeddings: {
           orderBy: { createdAt: "desc" },
           select: {
-            uuidId: true,
             embeddingCode: true,
             embeddingModel: true,
             imagePath: true,
@@ -85,8 +85,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       person: {
-        id: person.uuidId,
-        uuidId: person.uuidId,
+        id: person.personCode,
         personCode: person.personCode,
         firstName: person.firstName,
         lastName: person.lastName,
@@ -133,16 +132,16 @@ export async function PATCH(
     }
 
     const resolvedParams = await params;
-    const personId = resolvedParams.id;
-    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
+    const personCode = resolvedParams.id;
+    if (!isValidPersonCode(personCode)) {
       return NextResponse.json(
-        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person code. Expected format PER-XXXXXX." },
         { status: 400 }
       );
     }
 
     const existingPerson = await prisma.person.findUnique({
-      where: { uuidId: personId },
+      where: { personCode },
     });
 
     if (!existingPerson) {
@@ -237,7 +236,7 @@ export async function PATCH(
     }
 
     const updatedPerson = await prisma.person.update({
-      where: { uuidId: personId },
+      where: { personCode },
       data: updateData,
     });
 
@@ -245,8 +244,7 @@ export async function PATCH(
       success: true,
       message: "Person updated successfully",
       person: {
-        id: updatedPerson.uuidId,
-        uuidId: updatedPerson.uuidId,
+        id: updatedPerson.personCode,
         personCode: updatedPerson.personCode,
         firstName: updatedPerson.firstName,
         lastName: updatedPerson.lastName,
@@ -312,17 +310,17 @@ export async function DELETE(
     }
 
     const resolvedParams = await params;
-    const personId = resolvedParams.id;
-    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
+    const personCode = resolvedParams.id;
+    if (!isValidPersonCode(personCode)) {
       return NextResponse.json(
-        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person code. Expected format PER-XXXXXX." },
         { status: 400 }
       );
     }
 
     const person = await prisma.person.findUnique({
-      where: { uuidId: personId },
-      select: { uuidId: true, faceImageFileId: true },
+      where: { personCode },
+      select: { personCode: true, faceImageFileId: true },
     });
 
     if (!person) {
@@ -335,18 +333,18 @@ export async function DELETE(
     // 1. Perform transactional deletion in PostgreSQL (nullify access logs/alerts, delete embeddings, delete person)
     await prisma.$transaction([
       prisma.accessLog.updateMany({
-        where: { personUuidId: personId },
-        data: { personUuidId: null },
+        where: { personCode },
+        data: { personCode: null },
       }),
       prisma.alert.updateMany({
-        where: { personUuidId: personId },
-        data: { personUuidId: null },
+        where: { personCode },
+        data: { personCode: null },
       }),
       prisma.faceEmbedding.deleteMany({
-        where: { personUuidId: personId },
+        where: { personCode },
       }),
       prisma.person.delete({
-        where: { uuidId: personId },
+        where: { personCode },
       }),
     ]);
 

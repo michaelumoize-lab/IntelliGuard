@@ -19,7 +19,6 @@ async function reenrollBuffaloS() {
     include: {
       person: {
         select: {
-          uuidId: true,
           personCode: true,
           firstName: true,
           lastName: true,
@@ -43,7 +42,7 @@ async function reenrollBuffaloS() {
     const sourceUrl = record.imagePath || record.person?.faceImageUrl;
     if (!sourceUrl) {
       console.warn(
-        `[SKIP] FaceEmbedding #${record.uuidId} (personUuidId=${record.personUuidId}) has no stored imagePath.`
+        `[SKIP] FaceEmbedding ${record.embeddingCode} (personCode=${record.personCode}) has no stored imagePath.`
       );
       skipped++;
       continue;
@@ -59,7 +58,7 @@ async function reenrollBuffaloS() {
 
       const embeddingResult = await generateEmbedding(
         imageBuffer,
-        `reenroll_${record.personUuidId}_${record.uuidId}.jpg`
+        `reenroll_${record.personCode}_${record.embeddingCode}.jpg`
       );
       const vectorString = `[${embeddingResult.embedding.join(",")}]`;
 
@@ -69,16 +68,16 @@ async function reenrollBuffaloS() {
           "embedding" = ${vectorString}::vector,
           "embedding_model" = 'buffalo_s',
           "quality_score" = ${embeddingResult.qualityScore ?? record.qualityScore}
-        WHERE "uuid_id" = ${record.uuidId}::uuid
+        WHERE "embedding_code" = ${record.embeddingCode}
       `;
 
       console.log(
-        `[OK] Re-embedded FaceEmbedding #${record.uuidId} (${record.embeddingCode}) for person ${record.person?.personCode ?? record.personUuidId} -> buffalo_s`
+        `[OK] Re-embedded FaceEmbedding ${record.embeddingCode} for person ${record.person?.personCode ?? record.personCode} -> buffalo_s`
       );
       updated++;
     } catch (err) {
       console.error(
-        `[ERR] Failed to re-embed FaceEmbedding #${record.uuidId} (personUuidId=${record.personUuidId}):`,
+        `[ERR] Failed to re-embed FaceEmbedding ${record.embeddingCode} (personCode=${record.personCode}):`,
         err
       );
       skipped++;

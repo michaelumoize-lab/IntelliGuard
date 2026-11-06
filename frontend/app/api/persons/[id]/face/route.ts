@@ -9,7 +9,11 @@ import {
 } from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
-import { generateEmbeddingCode } from "@/lib/identifiers";
+import {
+  generateEmbeddingCode,
+  generateUniqueBusinessIdentifier,
+  isValidPersonCode,
+} from "@/lib/identifiers";
 
 export const dynamic = "force-dynamic";
 
@@ -67,17 +71,17 @@ export async function POST(
     }
 
     const resolvedParams = await params;
-    const personId = resolvedParams.id;
-    if (!personId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(personId)) {
+    const personCode = resolvedParams.id;
+    if (!isValidPersonCode(personCode)) {
       return NextResponse.json(
-        { success: false, error: "VALIDATION_ERROR", message: "Invalid person ID. Expected a valid UUID." },
+        { success: false, error: "VALIDATION_ERROR", message: "Invalid person code. Expected format PER-XXXXXX." },
         { status: 400 }
       );
     }
 
     // 1. Verify person exists
     const person = await prisma.person.findUnique({
-      where: { uuidId: personId },
+      where: { personCode },
     });
 
     if (!person) {
@@ -114,11 +118,11 @@ export async function POST(
     const aiResult = await generateEmbedding(imageBuffer, imageFile.name || "face.jpg");
     const activeModel = aiResult.model || "buffalo_s";
 
-    // 4. Step B: Check for duplicate face using pgvector (excluding this personId)
+    // 4. Step B: Check for duplicate face using pgvector (excluding this personCode)
     const duplicateResult = await checkForDuplicateFace(
       aiResult.embedding,
       DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
-      personId,
+      personCode,
       activeModel
     );
     if (duplicateResult.isDuplicate && duplicateResult.matchingPerson) {
@@ -139,7 +143,7 @@ export async function POST(
           const txDuplicateResult = await checkForDuplicateFace(
             aiResult.embedding,
             DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
-            personId,
+            personCode,
             activeModel,
             tx
           );
@@ -149,22 +153,32 @@ export async function POST(
 
           // Deactivate all previous embeddings for this person
           await tx.faceEmbedding.updateMany({
-            where: { personUuidId: personId, isActive: true },
+            where: { personCode, isActive: true },
             data: { isActive: false },
           });
 
           // Insert new active 512D FaceEmbedding
           const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
-          const embeddingCode = generateEmbeddingCode();
+          const embeddingCode = await generateUniqueBusinessIdentifier(
+            generateEmbeddingCode,
+            async (code) => {
+              const existing = await tx.faceEmbedding.findUnique({
+                where: { embeddingCode: code },
+                select: { embeddingCode: true },
+              });
+              return existing !== null;
+            },
+            { entityName: "FaceEmbedding" }
+          );
           await tx.$executeRawUnsafe(
             `
             INSERT INTO face_embeddings (
-              person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+              person_code, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
             ) VALUES (
-              $1::uuid, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
+              $1, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
             );
             `,
-            personId,
+            personCode,
             embeddingCode,
             vectorLiteral,
             activeModel,
@@ -174,7 +188,7 @@ export async function POST(
 
           // Update Person record with new face image URL and file ID
           return await tx.person.update({
-            where: { uuidId: personId },
+            where: { personCode },
             data: {
               faceImageUrl: ikResult.url,
               faceImageFileId: ikResult.fileId,
@@ -195,8 +209,7 @@ export async function POST(
         success: true,
         message: "Face photo replaced successfully",
         person: {
-          id: updatedPerson.uuidId,
-          uuidId: updatedPerson.uuidId,
+          id: updatedPerson.personCode,
           personCode: updatedPerson.personCode,
           firstName: updatedPerson.firstName,
           lastName: updatedPerson.lastName,

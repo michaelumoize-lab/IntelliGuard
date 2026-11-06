@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { isValidPersonCode } from "@/lib/identifiers";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,28 +19,25 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export default async function PersonDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
-  const personUuid = resolvedParams.id;
+  const personCode = resolvedParams.id;
 
-  if (!personUuid || !UUID_REGEX.test(personUuid)) {
+  if (!personCode || !isValidPersonCode(personCode)) {
     notFound();
   }
 
   // Directly query PostgreSQL via Prisma on the server
   const rawPerson = await prisma.person.findUnique({
-    where: { uuidId: personUuid },
+    where: { personCode },
     include: {
       faceEmbeddings: {
         orderBy: { createdAt: "desc" },
         select: {
-          uuidId: true,
           embeddingCode: true,
           embeddingModel: true,
           imagePath: true,
@@ -58,8 +56,7 @@ export default async function PersonDetailsPage({
 
   const person = {
     ...rawPerson,
-    id: rawPerson.uuidId,
-    uuidId: rawPerson.uuidId,
+    id: rawPerson.personCode,
   };
 
   const activeEmbedding = person.faceEmbeddings.find((e) => e.isActive) || null;
@@ -235,7 +232,9 @@ export default async function PersonDetailsPage({
 
                 <div>
                   <span className="text-muted-foreground block mb-0.5">Created At</span>
-                  <span className="font-mono">{new Date(person.createdAt).toLocaleDateString()}</span>
+                  <span className="font-mono">
+                    <FormattedTimestamp date={person.createdAt} mode="date" />
+                  </span>
                 </div>
               </div>
 
@@ -277,8 +276,8 @@ export default async function PersonDetailsPage({
                 <TableBody>
                   {person.faceEmbeddings && person.faceEmbeddings.length > 0 ? (
                     person.faceEmbeddings.map((emb) => (
-                      <TableRow key={emb.uuidId} className="text-xs">
-                        <TableCell className="font-mono">{emb.embeddingCode || `#${emb.uuidId.slice(0, 8)}`}</TableCell>
+                      <TableRow key={emb.embeddingCode} className="text-xs">
+                        <TableCell className="font-mono">{emb.embeddingCode}</TableCell>
                         <TableCell className="font-medium">{emb.embeddingModel}</TableCell>
                         <TableCell>
                           {emb.qualityScore ? `${(emb.qualityScore * 100).toFixed(2)}%` : "N/A"}

@@ -74,14 +74,14 @@ const testSuites: TestSuite[] = [
     description: "Complete user journeys A through F (registration, denial, failure, alerts)",
   },
   {
-    name: "Business Identifiers & Format Contracts",
+    name: "Business Identifiers & Compact Timestamp Contracts",
     file: "tests/identifiers.test.ts",
-    description: "Prefix verification (PER, DEV, EMB, REC, ALT, ACL), 12-hex entropy, collision retries",
+    description: "Prefix verification (PER, DEV, EMB, ASL, ALT), 6-digit numeric format, collision retries, compact timestamps",
   },
   {
-    name: "Phase 2 UUIDv7 & Dual-Key Verification",
+    name: "Option A Business-Code Primary & Foreign Key Verification",
     file: "tests/phase2-uuid.test.ts",
-    description: "UUIDv7 RFC 9562 compliance, native DB defaults, dual-key relations & constraints",
+    description: "Business-code primary keys, relational foreign key integrity, cascade/set-null behavior",
   },
 ];
 

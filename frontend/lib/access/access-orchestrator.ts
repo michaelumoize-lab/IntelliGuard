@@ -538,13 +538,13 @@ export async function handleAccessRequest(req: NextRequest): Promise<NextRespons
     };
 
     // 6. Persist AccessLog and Security Alert in PostgreSQL ONLY for evaluated biometric events
-    const matchedPersonId = recognition.person?.id || null;
-    const matchedEmbeddingId = recognition.face?.embeddingId || null;
+    const matchedPersonCode = recognition.person?.personCode || recognition.person?.id || null;
+    const matchedEmbeddingCode = recognition.face?.embeddingCode || recognition.face?.embeddingId || null;
 
     await AuditLogger.logBiometricDecision({
-      deviceId: deviceAuth.device?.id || null,
-      personId: matchedPersonId,
-      embeddingId: matchedEmbeddingId,
+      deviceCode: deviceAuth.device?.deviceCode || null,
+      personCode: matchedPersonCode,
+      embeddingCode: matchedEmbeddingCode,
       matchStatus: recognition.matchStatus as MatchStatus,
       accessStatus: decision.accessStatus as AccessStatus,
       reason: decision.reason,
@@ -556,7 +556,7 @@ export async function handleAccessRequest(req: NextRequest): Promise<NextRespons
 
     if (decision.accessStatus === "denied") {
       await AuditLogger.logBiometricDeniedAlert({
-        deviceId: deviceAuth.device?.id || null,
+        deviceCode: deviceAuth.device?.deviceCode || null,
         person: recognition.person,
         matchStatus: recognition.matchStatus,
         isTailgating,
@@ -608,7 +608,8 @@ export async function handleAccessRequest(req: NextRequest): Promise<NextRespons
             }
           : null,
         face: {
-          embedding_id: recognition.face.embeddingId,
+          embedding_id: recognition.face.embeddingCode,
+          embedding_code: recognition.face.embeddingCode,
           similarity: recognition.face.similarity,
           distance: recognition.face.distance,
           quality_score: recognition.face.qualityScore ?? aiResult.qualityScore,
@@ -623,7 +624,8 @@ export async function handleAccessRequest(req: NextRequest): Promise<NextRespons
         faces: aiResult.faces,
         device: deviceAuth.device
           ? {
-              id: deviceAuth.device.id,
+              id: deviceAuth.device.deviceCode,
+              device_code: deviceAuth.device.deviceCode,
               serial_number: deviceAuth.device.serialNumber,
               device_name: deviceAuth.device.deviceName,
             }

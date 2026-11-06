@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { isValidDeviceCode } from "@/lib/identifiers";
 import type { Prisma } from "@prisma/client";
 import { Severity, AlertType } from "@prisma/client";
 
@@ -25,13 +26,13 @@ export async function GET(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code. Expected DEV-XXXXXX." },
       { status: 400 }
     );
   }
-  const deviceId = idParam;
+  const deviceCode = idParam;
 
   const url = new URL(req.url);
   const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
@@ -43,7 +44,7 @@ export async function GET(
   const resolvedParam = url.searchParams.get("resolved");
 
   try {
-    const device = await prisma.device.findUnique({ where: { uuidId: deviceId } });
+    const device = await prisma.device.findUnique({ where: { deviceCode } });
     if (!device) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -51,7 +52,7 @@ export async function GET(
       );
     }
 
-    const whereClause: Prisma.AlertWhereInput = { deviceUuidId: deviceId };
+    const whereClause: Prisma.AlertWhereInput = { deviceCode };
 
     if (severity) {
       if (!Object.values(Severity).includes(severity as Severity)) {
@@ -88,7 +89,6 @@ export async function GET(
       include: {
         person: {
           select: {
-            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -99,8 +99,7 @@ export async function GET(
     });
 
     const data = alertsRaw.map((alert) => ({
-      id: alert.uuidId,
-      uuidId: alert.uuidId,
+      id: alert.alertCode,
       alertCode: alert.alertCode,
       alertType: alert.alertType,
       title: alert.title,
@@ -110,7 +109,7 @@ export async function GET(
       resolvedBy: alert.resolvedBy,
       resolvedAt: alert.resolvedAt,
       createdAt: alert.createdAt,
-      person: alert.person ? { ...alert.person, id: alert.person.uuidId } : null,
+      person: alert.person ? { ...alert.person, id: alert.person.personCode, personCode: alert.person.personCode } : null,
     }));
 
     return NextResponse.json({

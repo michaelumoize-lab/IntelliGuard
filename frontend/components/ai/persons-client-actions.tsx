@@ -145,8 +145,7 @@ export function RegisterPersonButton() {
 }
 
 export interface PersonRowData {
-  id: string | number;
-  uuidId?: string;
+  id: string;
   personCode: string;
   firstName: string;
   lastName: string;
@@ -169,12 +168,14 @@ export function PersonRowActions({ person }: { person: PersonRowData }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+  const personCode = person.personCode || person.id;
+
   const handleStatusToggle = async (newStatus: string) => {
     if (isUpdatingStatus) return;
     setIsUpdatingStatus(true);
 
     try {
-      const res = await fetch(`/api/persons/${person.id}`, {
+      const res = await fetch(`/api/persons/${personCode}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -199,7 +200,7 @@ export function PersonRowActions({ person }: { person: PersonRowData }) {
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/persons/${person.id}`, {
+      const res = await fetch(`/api/persons/${personCode}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -236,7 +237,7 @@ export function PersonRowActions({ person }: { person: PersonRowData }) {
           </DropdownMenuItem>
 
           <DropdownMenuItem asChild>
-            <Link href={`/dashboard/persons/${person.id}`} className="cursor-pointer">
+            <Link href={`/dashboard/persons/${personCode}`} className="cursor-pointer">
               <EyeIcon className="mr-2 h-4 w-4" /> View Full Profile
             </Link>
           </DropdownMenuItem>

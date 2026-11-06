@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
 
   if (search) {
     whereClause.OR = [
+      { deviceCode: { contains: search, mode: "insensitive" } },
       { deviceName: { contains: search, mode: "insensitive" } },
       { serialNumber: { contains: search, mode: "insensitive" } },
       { location: { contains: search, mode: "insensitive" } },
@@ -91,8 +92,8 @@ export async function GET(req: NextRequest) {
       const { apiKeyHash, accessLogs, _count, ...safeDevice } = device;
       return {
         ...safeDevice,
-        id: device.uuidId,
-        uuidId: device.uuidId,
+        id: device.deviceCode,
+        deviceCode: device.deviceCode,
         accessLogCount: _count.accessLogs,
         alertCount: _count.alerts,
         lastAccessAt: accessLogs[0]?.createdAt || null,
@@ -259,8 +260,8 @@ export async function POST(req: NextRequest) {
         success: true,
         device: {
           ...safeDevice,
-          id: newDevice.uuidId,
-          uuidId: newDevice.uuidId,
+          id: newDevice.deviceCode,
+          deviceCode: newDevice.deviceCode,
         },
         apiKey: rawApiKey,
       },

@@ -32,8 +32,7 @@ import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import { useRouter } from "next/navigation";
 
 export interface PersonDrawerData {
-  id: string | number;
-  uuidId?: string;
+  id: string;
   personCode: string;
   firstName: string;
   lastName: string;
@@ -70,7 +69,7 @@ export function PersonDetailsDrawer({
     setIsUpdatingStatus(true);
 
     try {
-      const res = await fetch(`/api/persons/${person.id}`, {
+      const res = await fetch(`/api/persons/${person.personCode || person.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -235,7 +234,7 @@ export function PersonDetailsDrawer({
         {/* Profile Full Edit Button */}
         <div className="pt-2">
           <Button asChild variant="outline" className="w-full text-xs gap-2">
-            <Link href={`/dashboard/persons/${person.id}`}>
+            <Link href={`/dashboard/persons/${person.personCode || person.id}`}>
               <Camera className="w-3.5 h-3.5 text-primary" /> Replace Face Photo / Full Profile
             </Link>
           </Button>

@@ -20,8 +20,8 @@ export interface DeviceAuthResult {
     | "replay_detected"
     | "invalid_signature";
   device?: {
-    id?: number | string;
-    uuidId: string;
+    id: string;
+    deviceCode: string;
     deviceName: string;
     serialNumber: string;
     status: string;
@@ -75,21 +75,16 @@ export async function authenticateDevice(
   }
 
   const rawIdStr = String(deviceIdInput).trim();
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawIdStr);
 
   try {
-    const device = isUuid
-      ? await prisma.device.findUnique({
-          where: { uuidId: rawIdStr },
-        })
-      : await prisma.device.findFirst({
-          where: {
-            OR: [
-              { deviceCode: rawIdStr },
-              { serialNumber: rawIdStr },
-            ],
-          },
-        });
+    const device = await prisma.device.findFirst({
+      where: {
+        OR: [
+          { deviceCode: rawIdStr },
+          { serialNumber: rawIdStr },
+        ],
+      },
+    });
 
     if (!device) {
       return { isValid: false, reason: "device_not_found" };
@@ -97,8 +92,8 @@ export async function authenticateDevice(
 
     const safeDeviceObj = {
       ...device,
-      id: device.uuidId,
-      uuidId: device.uuidId,
+      id: device.deviceCode,
+      deviceCode: device.deviceCode,
     };
 
     // Securely compare SHA-256 hashed API key using constant-time comparison
@@ -158,16 +153,16 @@ export async function authenticateDevice(
     const isEnforceHmac = process.env.ENFORCE_DEVICE_HMAC === "true";
     if (options?.signature || isEnforceHmac) {
       if (!options?.signature) {
-        return { isValid: false, reason: "invalid_signature", device };
+        return { isValid: false, reason: "invalid_signature", device: safeDeviceObj };
       }
 
       if (isEnforceHmac && (!options.bodyHash || !options.bodyHash.trim())) {
-        return { isValid: false, reason: "invalid_signature", device };
+        return { isValid: false, reason: "invalid_signature", device: safeDeviceObj };
       }
 
       const trimmedNonce = options.nonce.trim();
       const candidateIdentifiers = Array.from(
-        new Set([rawIdStr, device.uuidId, device.deviceCode].filter(Boolean) as string[])
+        new Set([rawIdStr, device.deviceCode, device.serialNumber].filter(Boolean) as string[])
       );
 
       // Derive candidate signing keys:
@@ -232,20 +227,20 @@ export async function authenticateDevice(
     }
 
     // 3. Replay Protection: Nonce uniqueness check (atomic check-and-set AFTER API key + HMAC verification)
-    const nonceKey = `${safeDeviceObj.uuidId}:${options.nonce.trim()}`;
+    const nonceKey = `${safeDeviceObj.deviceCode}:${options.nonce.trim()}`;
     const now = Date.now();
     const existingNonce = recentNonces.get(nonceKey);
     if (existingNonce && existingNonce.expiresAt > now) {
       return { isValid: false, reason: "replay_detected", device: safeDeviceObj };
     }
     recentNonces.set(nonceKey, {
-      deviceId: safeDeviceObj.uuidId,
+      deviceId: safeDeviceObj.deviceCode,
       expiresAt: now + MAX_TIMESTAMP_SKEW_MS,
     });
 
     // Update lastSeen timestamp and ensure status is online
     const updatedDevice = await prisma.device.update({
-      where: { uuidId: safeDeviceObj.uuidId },
+      where: { deviceCode: safeDeviceObj.deviceCode },
       data: {
         status: "online",
         lastSeen: new Date(),
@@ -256,8 +251,8 @@ export async function authenticateDevice(
       isValid: true,
       device: {
         ...updatedDevice,
-        id: updatedDevice.uuidId,
-        uuidId: updatedDevice.uuidId,
+        id: updatedDevice.deviceCode,
+        deviceCode: updatedDevice.deviceCode,
       },
     };
   } catch (error) {

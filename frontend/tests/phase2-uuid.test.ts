@@ -1,27 +1,31 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import {
-  generateUuidV7,
-  isValidUuidV7,
-  extractTimestampFromUuidV7,
   generatePersonCode,
   generateDeviceCode,
+  generateEmbeddingCode,
   generateAccessCode,
   generateAlertCode,
+  isValidPersonCode,
+  isValidDeviceCode,
+  isValidEmbeddingCode,
+  isValidAccessCode,
+  isValidAlertCode,
 } from "../lib/identifiers";
 
 /**
- * Phase 2 UUIDv7 & Dual-Key Relationships Test Suite
- * 
+ * Business-Code Primary & Foreign Key Architecture Test Suite (Option A)
+ *
  * Verifies:
- * 1. UUIDv7 generation & RFC 9562 compliance
- * 2. Uniqueness & timestamp monotonically increasing properties
- * 3. Database default generation via PostgreSQL native uuidv7()
- * 4. Dual-key relationships (integer FK + UUID FK)
- * 5. Automatic synchronization triggers
- * 6. Nullable relationship preservation
- * 7. Foreign key constraint enforcement
- * 8. Zero impact on integer primary & foreign keys
+ * 1. 6-digit numeric business code format & cryptographic generation
+ * 2. Person creation with personCode as primary key
+ * 3. Device creation with deviceCode as primary key
+ * 4. FaceEmbedding creation & FK relation (personCode -> Person.personCode)
+ * 5. AccessLog creation & FK resolution (accessCode, deviceCode, personCode, embeddingCode)
+ * 6. Nullable relationship preservation (personCode: null on unknown face AccessLog)
+ * 7. Alert creation & FK resolution (alertCode, deviceCode, personCode)
+ * 8. Primary key uniqueness constraint enforcement on business codes
+ * 9. Foreign key constraint enforcement on invalid business codes
  */
 
 function assert(condition: boolean, testName: string, detail?: string) {
@@ -32,133 +36,153 @@ function assert(condition: boolean, testName: string, detail?: string) {
   console.log(`✅ [PASS] ${testName}`);
 }
 
-async function runPhase2Tests() {
-  console.log("==================================================");
-  console.log("  Phase 2: UUIDv7 & Dual-Key Verification Tests   ");
-  console.log("==================================================\n");
+async function runBusinessCodeArchitectureTests() {
+  console.log("==========================================================");
+  console.log("  Business-Code Primary & Foreign Key Architecture Tests  ");
+  console.log("==========================================================\n");
 
-  let createdPersonId: string | null = null;
-  let createdDeviceId: string | null = null;
-  let createdLogId: string | null = null;
-  let createdAlertId: string | null = null;
+  let createdPersonCode: string | null = null;
+  let createdDeviceCode: string | null = null;
+  let createdEmbeddingCode: string | null = null;
+  let createdAccessCode: string | null = null;
+  let createdAlertCode: string | null = null;
 
   try {
     // ----------------------------------------------------
-    // Test 1: UUIDv7 Format & RFC 9562 Validation
+    // Test 1: 6-Digit Business Code Format Validation
     // ----------------------------------------------------
-    console.log("[Test 1] Testing UUIDv7 Generator Format & Variant...");
-    const sampleUuid = generateUuidV7();
-    console.log(`  Sample UUIDv7: ${sampleUuid}`);
+    console.log("[Test 1] Testing 6-Digit Business Code Format & Validators...");
+    const samplePer = generatePersonCode();
+    const sampleDev = generateDeviceCode();
+    const sampleEmb = generateEmbeddingCode();
+    const sampleAsl = generateAccessCode();
+    const sampleAlt = generateAlertCode();
 
-    assert(isValidUuidV7(sampleUuid), "Generated value satisfies UUIDv7 RFC 9562 format");
-    assert(sampleUuid.charAt(14) === "7", "15th character (nibble 13) is '7' for version 7");
-    const variantChar = sampleUuid.charAt(19).toLowerCase();
-    assert(
-      ["8", "9", "a", "b"].includes(variantChar),
-      `Variant nibble is RFC 4122/9562 variant 1 (${variantChar})`
-    );
-
-    const timestamp = extractTimestampFromUuidV7(sampleUuid);
-    assert(timestamp !== null, "Extracts timestamp from UUIDv7 successfully");
-    const timeDiffMs = Math.abs(Date.now() - timestamp!.getTime());
-    assert(timeDiffMs < 5000, `Timestamp is within 5 seconds of wall-clock time (${timeDiffMs}ms)`);
+    assert(isValidPersonCode(samplePer), `Person code matches ^PER-[0-9]{6}$ (${samplePer})`);
+    assert(isValidDeviceCode(sampleDev), `Device code matches ^DEV-[0-9]{6}$ (${sampleDev})`);
+    assert(isValidEmbeddingCode(sampleEmb), `Embedding code matches ^EMB-[0-9]{6}$ (${sampleEmb})`);
+    assert(isValidAccessCode(sampleAsl), `AccessLog code matches ^ASL-[0-9]{6}$ (${sampleAsl})`);
+    assert(isValidAlertCode(sampleAlt), `Alert code matches ^ALT-[0-9]{6}$ (${sampleAlt})`);
 
     // ----------------------------------------------------
-    // Test 2: Monotonicity & Uniqueness Batch Test
+    // Test 2: Person Creation with personCode Primary Key
     // ----------------------------------------------------
-    console.log("\n[Test 2] Testing Monotonic Ordering & Uniqueness in Batch of 1,000...");
-    const batchSize = 1000;
-    const batch: string[] = [];
-    for (let i = 0; i < batchSize; i++) {
-      batch.push(generateUuidV7());
-    }
-    const uniqueSet = new Set(batch);
-    assert(uniqueSet.size === batchSize, `All ${batchSize} generated UUIDv7s are strictly unique`);
-
-    let isMonotonic = true;
-    for (let i = 1; i < batch.length; i++) {
-      if (batch[i] < batch[i - 1]) {
-        isMonotonic = false;
-        break;
-      }
-    }
-    assert(isMonotonic, "UUIDv7 batch values are monotonically non-decreasing over time");
-
-    // ----------------------------------------------------
-    // Test 3: Database Native UUIDv7 Default Generation
-    // ----------------------------------------------------
-    console.log("\n[Test 3] Testing PostgreSQL native uuidv7() generation on Person creation...");
+    console.log("\n[Test 2] Testing Person creation with personCode as Primary Key...");
     const personCode = generatePersonCode();
     const createdPerson = await prisma.person.create({
       data: {
         personCode,
-        firstName: "Phase2",
+        firstName: "Arch",
         lastName: "Verification",
-        email: `phase2_${Date.now()}@example.com`,
+        email: `arch_${Date.now()}@example.com`,
         phone: `+1-555-${Math.floor(100000 + Math.random() * 900000)}`,
         category: "employee",
         status: "active",
       },
     });
-    createdPersonId = createdPerson.uuidId;
+    createdPersonCode = createdPerson.personCode;
 
-    assert(Boolean(createdPerson.uuidId), `Person created with uuidId: ${createdPerson.uuidId}`);
-    assert(isValidUuidV7(createdPerson.uuidId), "Person uuidId is a valid RFC 9562 UUIDv7");
+    assert(createdPerson.personCode === personCode, `Person created with PK personCode: ${createdPerson.personCode}`);
+    assert(isValidPersonCode(createdPerson.personCode), "Person PK is a valid 6-digit PER-XXXXXX code");
+    assert(!("uuidId" in createdPerson) && !("id" in createdPerson), "Redundant id and uuidId fields removed from Person");
 
     // ----------------------------------------------------
-    // Test 4: Device Creation & Default UUIDv7
+    // Test 3: Device Creation with deviceCode Primary Key
     // ----------------------------------------------------
-    console.log("\n[Test 4] Testing Device creation with native UUIDv7...");
+    console.log("\n[Test 3] Testing Device creation with deviceCode as Primary Key...");
     const deviceCode = generateDeviceCode();
     const createdDevice = await prisma.device.create({
       data: {
         deviceCode,
-        deviceName: "Phase 2 Security Cam",
-        serialNumber: `SN-P2-${Date.now()}`,
-        apiKeyHash: `hash_p2_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+        deviceName: "Option A Security Cam",
+        serialNumber: `SN-OA-${Date.now()}`,
+        apiKeyHash: `hash_oa_${Date.now()}_${Math.random().toString(36).substring(2)}`,
         location: "Lab Corridor North",
         deviceType: "camera",
         status: "online",
       },
     });
-    createdDeviceId = createdDevice.uuidId;
+    createdDeviceCode = createdDevice.deviceCode;
 
-    assert(Boolean(createdDevice.uuidId), `Device created with uuidId: ${createdDevice.uuidId}`);
-    assert(isValidUuidV7(createdDevice.uuidId), "Device uuidId is a valid RFC 9562 UUIDv7");
+    assert(createdDevice.deviceCode === deviceCode, `Device created with PK deviceCode: ${createdDevice.deviceCode}`);
+    assert(isValidDeviceCode(createdDevice.deviceCode), "Device PK is a valid 6-digit DEV-XXXXXX code");
 
     // ----------------------------------------------------
-    // Test 5: Foreign-Key Population & Resolution
+    // Test 4: FaceEmbedding Creation & FK Relation
     // ----------------------------------------------------
-    console.log("\n[Test 5] Testing AccessLog UUID Foreign-Key Population...");
+    console.log("\n[Test 4] Testing FaceEmbedding creation with embeddingCode PK & personCode FK...");
+    const embeddingCode = generateEmbeddingCode();
+    const vectorLiteral = `[${new Array(512).fill(0.044).join(",")}]`;
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO face_embeddings (
+        embedding_code, person_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3::vector, 'buffalo_s', 'https://ik.imagekit.io/test/arch_face.jpg', 0.94, true, NOW(), NOW()
+      );
+      `,
+      embeddingCode,
+      createdPerson.personCode,
+      vectorLiteral
+    );
+    const createdEmbedding = await prisma.faceEmbedding.findUnique({
+      where: { embeddingCode },
+    });
+    createdEmbeddingCode = createdEmbedding?.embeddingCode ?? null;
+
+    assert(
+      Boolean(createdEmbedding) &&
+        createdEmbedding!.embeddingCode === embeddingCode &&
+        isValidEmbeddingCode(createdEmbedding!.embeddingCode),
+      `FaceEmbedding created with PK embeddingCode: ${createdEmbedding?.embeddingCode}`
+    );
+    assert(
+      createdEmbedding!.personCode === createdPerson.personCode,
+      "FaceEmbedding.personCode FK references Person.personCode"
+    );
+
+    // ----------------------------------------------------
+    // Test 5: AccessLog Business-Code Foreign Keys & Resolution
+    // ----------------------------------------------------
+    console.log("\n[Test 5] Testing AccessLog Business-Code Foreign-Key Population & Resolution...");
     const accessCode = generateAccessCode();
     const createdLog = await prisma.accessLog.create({
       data: {
         accessCode,
-        deviceUuidId: createdDevice.uuidId,
-        personUuidId: createdPerson.uuidId,
+        deviceCode: createdDevice.deviceCode,
+        personCode: createdPerson.personCode,
+        embeddingCode: createdEmbedding!.embeddingCode,
         matchStatus: "matched",
         accessStatus: "granted",
         reason: "face_match",
         doorAction: "unlock",
       },
     });
-    createdLogId = createdLog.uuidId;
+    createdAccessCode = createdLog.accessCode;
 
-    // Fetch back the log including relation fields
     const fetchedLog = await prisma.accessLog.findUnique({
-      where: { uuidId: createdLog.uuidId },
+      where: { accessCode: createdLog.accessCode },
       include: {
         person: true,
         device: true,
+        faceEmbedding: true,
       },
     });
 
-    assert(Boolean(fetchedLog), "AccessLog retrieved successfully");
-    assert(isValidUuidV7(fetchedLog!.uuidId), "AccessLog has valid native UUIDv7");
-    assert(fetchedLog!.deviceUuidId === createdDevice.uuidId, "AccessLog deviceUuidId matches Device uuidId");
-    assert(fetchedLog!.personUuidId === createdPerson.uuidId, "AccessLog personUuidId matches Person uuidId");
-    assert(fetchedLog!.device?.uuidId === createdDevice.uuidId, "UUID relation `device` resolves accurately");
-    assert(fetchedLog!.person?.uuidId === createdPerson.uuidId, "UUID relation `person` resolves accurately");
+    assert(Boolean(fetchedLog), "AccessLog retrieved by accessCode PK successfully");
+    assert(isValidAccessCode(fetchedLog!.accessCode), `AccessLog has valid ASL-XXXXXX code (${fetchedLog!.accessCode})`);
+    assert(fetchedLog!.deviceCode === createdDevice.deviceCode, "AccessLog.deviceCode matches Device.deviceCode");
+    assert(fetchedLog!.personCode === createdPerson.personCode, "AccessLog.personCode matches Person.personCode");
+    assert(
+      fetchedLog!.embeddingCode === createdEmbedding!.embeddingCode,
+      "AccessLog.embeddingCode matches FaceEmbedding.embeddingCode"
+    );
+    assert(fetchedLog!.device?.deviceCode === createdDevice.deviceCode, "Relation `device` resolves accurately");
+    assert(fetchedLog!.person?.personCode === createdPerson.personCode, "Relation `person` resolves accurately");
+    assert(
+      fetchedLog!.faceEmbedding?.embeddingCode === createdEmbedding!.embeddingCode,
+      "Relation `faceEmbedding` resolves accurately"
+    );
 
     // ----------------------------------------------------
     // Test 6: Nullable Foreign Key Preservation
@@ -168,8 +192,9 @@ async function runPhase2Tests() {
     const anonymousLog = await prisma.accessLog.create({
       data: {
         accessCode: anonymousLogCode,
-        deviceUuidId: createdDevice.uuidId,
-        personUuidId: null, // Nullable person
+        deviceCode: createdDevice.deviceCode,
+        personCode: null,
+        embeddingCode: null,
         matchStatus: "unknown",
         accessStatus: "denied",
         reason: "face_no_match",
@@ -177,54 +202,53 @@ async function runPhase2Tests() {
       },
     });
 
-    assert(anonymousLog.personUuidId === null, "UUID personUuidId is preserved as null");
-    assert(anonymousLog.deviceUuidId === createdDevice.uuidId, "Device UUID remains correctly populated");
+    assert(anonymousLog.personCode === null, "Nullable personCode is preserved as null");
+    assert(anonymousLog.deviceCode === createdDevice.deviceCode, "deviceCode remains populated");
 
-    await prisma.accessLog.delete({ where: { uuidId: anonymousLog.uuidId } });
+    await prisma.accessLog.delete({ where: { accessCode: anonymousLog.accessCode } });
 
     // ----------------------------------------------------
     // Test 7: Alert Relations & Constraints
     // ----------------------------------------------------
-    console.log("\n[Test 7] Testing Alert UUID Foreign Keys...");
+    console.log("\n[Test 7] Testing Alert Business-Code Primary & Foreign Keys...");
     const alertCode = generateAlertCode();
     const createdAlert = await prisma.alert.create({
       data: {
         alertCode,
-        deviceUuidId: createdDevice.uuidId,
-        personUuidId: createdPerson.uuidId,
+        deviceCode: createdDevice.deviceCode,
+        personCode: createdPerson.personCode,
         alertType: "unauthorized_access",
-        title: "Phase 2 Security Alert",
-        message: "Dual-key verification alert",
+        title: "Option A Security Alert",
+        message: "Business-code key verification alert",
         severity: "medium",
       },
     });
-    createdAlertId = createdAlert.uuidId;
+    createdAlertCode = createdAlert.alertCode;
 
     const fetchedAlert = await prisma.alert.findUnique({
-      where: { uuidId: createdAlert.uuidId },
+      where: { alertCode: createdAlert.alertCode },
       include: {
         device: true,
         person: true,
       },
     });
 
-    assert(Boolean(fetchedAlert), "Alert retrieved successfully");
-    assert(isValidUuidV7(fetchedAlert!.uuidId), "Alert has valid native UUIDv7");
-    assert(fetchedAlert!.deviceUuidId === createdDevice.uuidId, "Alert deviceUuidId matches Device uuidId");
-    assert(fetchedAlert!.personUuidId === createdPerson.uuidId, "Alert personUuidId matches Person uuidId");
-    assert(fetchedAlert!.device?.uuidId === createdDevice.uuidId, "Alert UUID relation `device` resolves accurately");
-    assert(fetchedAlert!.person?.uuidId === createdPerson.uuidId, "Alert UUID relation `person` resolves accurately");
+    assert(Boolean(fetchedAlert), "Alert retrieved by alertCode PK successfully");
+    assert(isValidAlertCode(fetchedAlert!.alertCode), `Alert has valid ALT-XXXXXX code (${fetchedAlert!.alertCode})`);
+    assert(fetchedAlert!.deviceCode === createdDevice.deviceCode, "Alert.deviceCode matches Device.deviceCode");
+    assert(fetchedAlert!.personCode === createdPerson.personCode, "Alert.personCode matches Person.personCode");
+    assert(fetchedAlert!.device?.deviceCode === createdDevice.deviceCode, "Alert relation `device` resolves accurately");
+    assert(fetchedAlert!.person?.personCode === createdPerson.personCode, "Alert relation `person` resolves accurately");
 
     // ----------------------------------------------------
-    // Test 8: Uniqueness Constraint Rejection on uuidId
+    // Test 8: Primary Key Uniqueness Constraint Rejection
     // ----------------------------------------------------
-    console.log("\n[Test 8] Testing Database Unique Constraint on uuidId...");
+    console.log("\n[Test 8] Testing Database Primary Key Uniqueness Constraint on deviceCode...");
     let duplicateRejected = false;
     try {
       await prisma.device.create({
         data: {
-          uuidId: createdDevice.uuidId, // Duplicate UUID!
-          deviceCode: generateDeviceCode(),
+          deviceCode: createdDevice.deviceCode, // Duplicate PK!
           deviceName: "Duplicate Device",
           serialNumber: `SN-DUP-${Date.now()}`,
           apiKeyHash: `hash_dup_${Date.now()}`,
@@ -234,18 +258,18 @@ async function runPhase2Tests() {
     } catch {
       duplicateRejected = true;
     }
-    assert(duplicateRejected, "Database correctly rejects duplicate uuidId with unique constraint violation");
+    assert(duplicateRejected, "Database rejects duplicate deviceCode with primary key constraint violation");
 
     // ----------------------------------------------------
-    // Test 9: Foreign Key Constraint Rejection on Invalid UUID
+    // Test 9: Foreign Key Constraint Rejection on Invalid Business Code
     // ----------------------------------------------------
-    console.log("\n[Test 9] Testing Database Foreign Key Constraint on invalid UUID FK...");
+    console.log("\n[Test 9] Testing Database Foreign Key Constraint on nonexistent deviceCode...");
     let invalidFkRejected = false;
     try {
       await prisma.alert.create({
         data: {
           alertCode: generateAlertCode(),
-          deviceUuidId: "01000000-0000-7000-8000-000000000000", // Non-existent device UUID!
+          deviceCode: "DEV-000000", // Non-existent device code!
           alertType: "system_error",
           title: "Invalid FK Alert",
           message: "Should be rejected by foreign key constraint",
@@ -255,30 +279,32 @@ async function runPhase2Tests() {
     } catch {
       invalidFkRejected = true;
     }
-    assert(invalidFkRejected, "Database correctly rejects invalid deviceUuidId with foreign key violation");
+    assert(invalidFkRejected, "Database rejects nonexistent deviceCode with foreign key violation");
 
-    console.log("\n==================================================");
-    console.log("  All Phase 2 UUIDv7 & Dual-Key Tests Passed!    ");
-    console.log("==================================================");
+    console.log("\n==========================================================");
+    console.log("  All Business-Code Architecture Tests Passed!            ");
+    console.log("==========================================================");
   } finally {
-    // Clean up created test entities
-    if (createdAlertId) {
-      await prisma.alert.delete({ where: { uuidId: createdAlertId } }).catch(() => {});
+    if (createdAlertCode) {
+      await prisma.alert.delete({ where: { alertCode: createdAlertCode } }).catch(() => {});
     }
-    if (createdLogId) {
-      await prisma.accessLog.delete({ where: { uuidId: createdLogId } }).catch(() => {});
+    if (createdAccessCode) {
+      await prisma.accessLog.delete({ where: { accessCode: createdAccessCode } }).catch(() => {});
     }
-    if (createdDeviceId) {
-      await prisma.device.delete({ where: { uuidId: createdDeviceId } }).catch(() => {});
+    if (createdEmbeddingCode) {
+      await prisma.faceEmbedding.delete({ where: { embeddingCode: createdEmbeddingCode } }).catch(() => {});
     }
-    if (createdPersonId) {
-      await prisma.person.delete({ where: { uuidId: createdPersonId } }).catch(() => {});
+    if (createdDeviceCode) {
+      await prisma.device.delete({ where: { deviceCode: createdDeviceCode } }).catch(() => {});
+    }
+    if (createdPersonCode) {
+      await prisma.person.delete({ where: { personCode: createdPersonCode } }).catch(() => {});
     }
     await prisma.$disconnect();
   }
 }
 
-runPhase2Tests().catch((err) => {
-  console.error("❌ Phase 2 test suite failed:", err);
+runBusinessCodeArchitectureTests().catch((err) => {
+  console.error("❌ Business-code architecture test suite failed:", err);
   process.exit(1);
 });

@@ -49,7 +49,7 @@ async function runMilestone7IntegrationTests() {
 
   // 2. Test AccessLog Creation Verification
   console.log("\n[Test 2] Verifying AccessLog Persistence in PostgreSQL...");
-  let createdLogId: string | null = null;
+  let createdAccessCode: string | null = null;
   try {
     const initialLogCount = await prisma.accessLog.count();
     const newLog = await prisma.accessLog.create({
@@ -64,11 +64,11 @@ async function runMilestone7IntegrationTests() {
         processingTimeMs: 1200,
       },
     });
-    createdLogId = newLog.uuidId;
+    createdAccessCode = newLog.accessCode;
 
     const updatedLogCount = await prisma.accessLog.count();
-    if (updatedLogCount === initialLogCount + 1 && newLog.uuidId) {
-      console.log(`✅ Test 2 PASSED: AccessLog record #${newLog.uuidId} persisted to PostgreSQL successfully!`);
+    if (updatedLogCount === initialLogCount + 1 && newLog.accessCode) {
+      console.log(`✅ Test 2 PASSED: AccessLog record #${newLog.accessCode} persisted to PostgreSQL successfully!`);
     } else {
       console.error("❌ Test 2 failed: AccessLog count mismatch.");
       process.exitCode = 1;
@@ -77,14 +77,14 @@ async function runMilestone7IntegrationTests() {
     console.error("❌ Test 2 failed:", err);
     process.exitCode = 1;
   } finally {
-    if (createdLogId) {
-      await prisma.accessLog.delete({ where: { uuidId: createdLogId } }).catch(() => {});
+    if (createdAccessCode) {
+      await prisma.accessLog.delete({ where: { accessCode: createdAccessCode } }).catch(() => {});
     }
   }
 
   // 3. Test Security Alert Creation Verification
   console.log("\n[Test 3] Verifying Security Alert Creation in PostgreSQL...");
-  let createdAlertId: string | null = null;
+  let createdAlertCode: string | null = null;
   try {
     const initialAlertCount = await prisma.alert.count();
     const newAlert = await prisma.alert.create({
@@ -96,11 +96,11 @@ async function runMilestone7IntegrationTests() {
         severity: "medium",
       },
     });
-    createdAlertId = newAlert.uuidId;
+    createdAlertCode = newAlert.alertCode;
 
     const updatedAlertCount = await prisma.alert.count();
-    if (updatedAlertCount === initialAlertCount + 1 && newAlert.uuidId) {
-      console.log(`✅ Test 3 PASSED: Security Alert #${newAlert.uuidId} persisted to PostgreSQL successfully!`);
+    if (updatedAlertCount === initialAlertCount + 1 && newAlert.alertCode) {
+      console.log(`✅ Test 3 PASSED: Security Alert #${newAlert.alertCode} persisted to PostgreSQL successfully!`);
     } else {
       console.error("❌ Test 3 failed: Alert count mismatch.");
       process.exitCode = 1;
@@ -109,8 +109,8 @@ async function runMilestone7IntegrationTests() {
     console.error("❌ Test 3 failed:", err);
     process.exitCode = 1;
   } finally {
-    if (createdAlertId) {
-      await prisma.alert.delete({ where: { uuidId: createdAlertId } }).catch(() => {});
+    if (createdAlertCode) {
+      await prisma.alert.delete({ where: { alertCode: createdAlertCode } }).catch(() => {});
     }
   }
 

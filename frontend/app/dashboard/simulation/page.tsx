@@ -11,6 +11,7 @@ import {
 import { AccessResultCard } from "@/components/ai/access-result-card";
 import { LiveScanControls } from "@/components/ai/live-scan-controls";
 import { HardwareTerminalHUD } from "@/components/ai/hardware-terminal-hud";
+import { formatCompactTimestamp } from "@/components/ui/formatted-timestamp";
 import { scanFace, AccessScanResponse } from "@/lib/access/access-client";
 import { playBiometricSound } from "@/lib/audio";
 import {
@@ -228,7 +229,7 @@ export default function WebcamSimulationPage() {
       }
 
       setLatestResult(response);
-      const timeStr = new Date().toLocaleTimeString();
+      const timeStr = formatCompactTimestamp(new Date(), { mode: "time" }) ?? "";
       setLastScanTime(timeStr);
       setScanCount((prev) => prev + 1);
 
@@ -419,7 +420,7 @@ export default function WebcamSimulationPage() {
     } catch (err) {
       console.error("Error executing webcam face scan:", err);
       if (isCameraOnRef.current && requestSeq === requestSequenceRef.current) {
-        const timeStr = new Date().toLocaleTimeString();
+        const timeStr = formatCompactTimestamp(new Date(), { mode: "time" }) ?? "";
         setLastScanTime(timeStr);
         setScanCount((prev) => prev + 1);
         setDetectedPersons([]);

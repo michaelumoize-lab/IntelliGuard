@@ -19,8 +19,8 @@ import { UploadIcon, InfoIcon, Loader2Icon, Camera, ShieldAlert, Sparkles } from
 import { WebcamCaptureModal } from "@/components/ai/webcam-capture-modal";
 
 export interface PersonModalInitialData {
-  id?: string | number;
-  uuidId?: string;
+  id?: string;
+  personCode?: string;
   firstName?: string;
   lastName?: string;
   category?: string;
@@ -174,11 +174,12 @@ export function PersonModal({ isOpen, onClose, onSuccess, initialData }: PersonM
       const trimmedNotes = notes.trim();
 
       if (isEditing) {
-        if (!initialData?.id) {
-          throw new Error("Unable to update: Person ID is missing.");
+        const targetCode = initialData?.personCode || initialData?.id;
+        if (!targetCode) {
+          throw new Error("Unable to update: Person code is missing.");
         }
         // Edit Person Metadata
-        const res = await fetch(`/api/persons/${initialData.id}`, {
+        const res = await fetch(`/api/persons/${targetCode}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

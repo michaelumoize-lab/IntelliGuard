@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { isValidDeviceCode } from "@/lib/identifiers";
 import { DeviceType, DeviceStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 interface UpdateDeviceBody {
   id?: unknown;
+  deviceCode?: unknown;
   serialNumber?: unknown;
   apiKeyHash?: unknown;
   createdAt?: unknown;
@@ -40,17 +42,17 @@ export async function GET(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code. Expected format DEV-XXXXXX." },
       { status: 400 }
     );
   }
-  const deviceId = idParam;
+  const deviceCode = idParam;
 
   try {
     const device = await prisma.device.findUnique({
-      where: { uuidId: deviceId },
+      where: { deviceCode },
     });
 
     if (!device) {
@@ -63,8 +65,8 @@ export async function GET(
     const { apiKeyHash: _, ...safeDeviceRaw } = device;
     const safeDevice = {
       ...safeDeviceRaw,
-      id: device.uuidId,
-      uuidId: device.uuidId,
+      id: device.deviceCode,
+      deviceCode: device.deviceCode,
     };
 
     // Calculate start of today (UTC)
@@ -81,24 +83,23 @@ export async function GET(
       todayDenied,
       unresolvedAlerts,
     ] = await Promise.all([
-      prisma.accessLog.count({ where: { deviceUuidId: deviceId } }),
-      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "granted" } }),
-      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "denied" } }),
-      prisma.accessLog.count({ where: { deviceUuidId: deviceId, createdAt: { gte: startOfToday } } }),
-      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "granted", createdAt: { gte: startOfToday } } }),
-      prisma.accessLog.count({ where: { deviceUuidId: deviceId, accessStatus: "denied", createdAt: { gte: startOfToday } } }),
-      prisma.alert.count({ where: { deviceUuidId: deviceId, resolved: false } }),
+      prisma.accessLog.count({ where: { deviceCode } }),
+      prisma.accessLog.count({ where: { deviceCode, accessStatus: "granted" } }),
+      prisma.accessLog.count({ where: { deviceCode, accessStatus: "denied" } }),
+      prisma.accessLog.count({ where: { deviceCode, createdAt: { gte: startOfToday } } }),
+      prisma.accessLog.count({ where: { deviceCode, accessStatus: "granted", createdAt: { gte: startOfToday } } }),
+      prisma.accessLog.count({ where: { deviceCode, accessStatus: "denied", createdAt: { gte: startOfToday } } }),
+      prisma.alert.count({ where: { deviceCode, resolved: false } }),
     ]);
 
     // Fetch recent logs
     const recentLogsRaw = await prisma.accessLog.findMany({
-      where: { deviceUuidId: deviceId },
+      where: { deviceCode },
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
         person: {
           select: {
-            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -112,10 +113,10 @@ export async function GET(
 
     // Clean logs to guarantee NO raw embeddings are exposed
     const recentLogs = recentLogsRaw.map((log) => ({
-      id: log.uuidId,
-      uuidId: log.uuidId,
+      id: log.accessCode,
+      accessCode: log.accessCode,
       timestamp: log.createdAt,
-      person: log.person ? { ...log.person, id: log.person.uuidId } : null,
+      person: log.person ? { ...log.person, id: log.person.personCode, personCode: log.person.personCode } : null,
       matchStatus: log.matchStatus,
       accessStatus: log.accessStatus,
       reason: log.reason,
@@ -126,13 +127,13 @@ export async function GET(
 
     // Fetch recent alerts
     const recentAlertsRaw = await prisma.alert.findMany({
-      where: { deviceUuidId: deviceId },
+      where: { deviceCode },
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
         person: {
           select: {
-            uuidId: true,
+            personCode: true,
             firstName: true,
             lastName: true,
           },
@@ -142,9 +143,9 @@ export async function GET(
 
     const recentAlerts = recentAlertsRaw.map((alt) => ({
       ...alt,
-      id: alt.uuidId,
-      uuidId: alt.uuidId,
-      person: alt.person ? { ...alt.person, id: alt.person.uuidId } : null,
+      id: alt.alertCode,
+      alertCode: alt.alertCode,
+      person: alt.person ? { ...alt.person, id: alt.person.personCode, personCode: alt.person.personCode } : null,
     }));
 
     return NextResponse.json({
@@ -179,16 +180,16 @@ export async function PATCH(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code. Expected format DEV-XXXXXX." },
       { status: 400 }
     );
   }
-  const deviceId = idParam;
+  const deviceCode = idParam;
 
   try {
-    const existing = await prisma.device.findUnique({ where: { uuidId: deviceId } });
+    const existing = await prisma.device.findUnique({ where: { deviceCode } });
     if (!existing) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -220,10 +221,10 @@ export async function PATCH(
 
     const body = rawBody as Record<string, unknown>;
 
-    // Explicitly disallow modifying id, serialNumber, apiKeyHash, createdAt
-    if ("id" in body || "serialNumber" in body || "apiKeyHash" in body || "createdAt" in body) {
+    // Explicitly disallow modifying id, deviceCode, serialNumber, apiKeyHash, createdAt
+    if ("id" in body || "deviceCode" in body || "serialNumber" in body || "apiKeyHash" in body || "createdAt" in body) {
       return NextResponse.json(
-        { success: false, error: "VALIDATION_ERROR", message: "Cannot modify protected fields (id, serialNumber, apiKeyHash, createdAt)." },
+        { success: false, error: "VALIDATION_ERROR", message: "Cannot modify protected fields (id, deviceCode, serialNumber, apiKeyHash, createdAt)." },
         { status: 400 }
       );
     }
@@ -320,15 +321,15 @@ export async function PATCH(
     }
 
     const updatedDevice = await prisma.device.update({
-      where: { uuidId: deviceId },
+      where: { deviceCode },
       data: updateData,
     });
 
     const { apiKeyHash: _, ...safeDeviceRaw } = updatedDevice;
     const safeDevice = {
       ...safeDeviceRaw,
-      id: updatedDevice.uuidId,
-      uuidId: updatedDevice.uuidId,
+      id: updatedDevice.deviceCode,
+      deviceCode: updatedDevice.deviceCode,
     };
 
     return NextResponse.json({
@@ -352,16 +353,16 @@ export async function DELETE(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  if (!idParam || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID. Expected a valid UUID." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code. Expected format DEV-XXXXXX." },
       { status: 400 }
     );
   }
-  const deviceId = idParam;
+  const deviceCode = idParam;
 
   try {
-    const existing = await prisma.device.findUnique({ where: { uuidId: deviceId } });
+    const existing = await prisma.device.findUnique({ where: { deviceCode } });
     if (!existing) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -371,7 +372,7 @@ export async function DELETE(
 
     // Delete device. Prisma `onDelete: SetNull` preserves historical AccessLogs and Alerts
     await prisma.device.delete({
-      where: { uuidId: deviceId },
+      where: { deviceCode },
     });
 
     return NextResponse.json({

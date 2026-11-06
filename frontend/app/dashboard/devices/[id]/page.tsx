@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { isValidDeviceCode } from "@/lib/identifiers";
 import { Button } from "@/components/ui/button";
 import { DeviceHealthCard } from "@/components/devices/device-health-card";
 import { DeviceAccessSummary } from "@/components/devices/device-access-summary";
@@ -28,16 +29,15 @@ export default async function DeviceDetailPage({
     redirect("/dashboard");
   }
 
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const deviceUuid = resolvedParams.id;
+  const deviceCode = resolvedParams.id;
 
-  if (!deviceUuid || !UUID_REGEX.test(deviceUuid)) {
+  if (!deviceCode || !isValidDeviceCode(deviceCode)) {
     notFound();
   }
 
   // Fetch device profile directly from PostgreSQL via Prisma
   const device = await prisma.device.findUnique({
-    where: { uuidId: deviceUuid },
+    where: { deviceCode },
   });
 
   if (!device) {
@@ -62,22 +62,21 @@ export default async function DeviceDetailPage({
     recentLogsRaw,
     recentAlertsRaw,
   ] = await Promise.all([
-    prisma.accessLog.count({ where: { deviceUuidId: deviceUuid } }),
-    prisma.accessLog.count({ where: { deviceUuidId: deviceUuid, accessStatus: "granted" } }),
-    prisma.accessLog.count({ where: { deviceUuidId: deviceUuid, accessStatus: "denied" } }),
-    prisma.accessLog.count({ where: { deviceUuidId: deviceUuid, createdAt: { gte: startOfToday } } }),
-    prisma.accessLog.count({ where: { deviceUuidId: deviceUuid, accessStatus: "granted", createdAt: { gte: startOfToday } } }),
-    prisma.accessLog.count({ where: { deviceUuidId: deviceUuid, accessStatus: "denied", createdAt: { gte: startOfToday } } }),
-    prisma.alert.count({ where: { deviceUuidId: deviceUuid, resolved: false } }),
+    prisma.accessLog.count({ where: { deviceCode } }),
+    prisma.accessLog.count({ where: { deviceCode, accessStatus: "granted" } }),
+    prisma.accessLog.count({ where: { deviceCode, accessStatus: "denied" } }),
+    prisma.accessLog.count({ where: { deviceCode, createdAt: { gte: startOfToday } } }),
+    prisma.accessLog.count({ where: { deviceCode, accessStatus: "granted", createdAt: { gte: startOfToday } } }),
+    prisma.accessLog.count({ where: { deviceCode, accessStatus: "denied", createdAt: { gte: startOfToday } } }),
+    prisma.alert.count({ where: { deviceCode, resolved: false } }),
 
     prisma.accessLog.findMany({
-      where: { deviceUuidId: deviceUuid },
+      where: { deviceCode },
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
         person: {
           select: {
-            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -88,13 +87,13 @@ export default async function DeviceDetailPage({
     }),
 
     prisma.alert.findMany({
-      where: { deviceUuidId: deviceUuid },
+      where: { deviceCode },
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
         person: {
           select: {
-            uuidId: true,
+            personCode: true,
             firstName: true,
             lastName: true,
           },
@@ -114,11 +113,12 @@ export default async function DeviceDetailPage({
   };
 
   const recentLogs = recentLogsRaw.map((log) => ({
-    id: log.uuidId,
+    id: log.accessCode,
+    accessCode: log.accessCode,
     timestamp: log.createdAt.toISOString(),
     person: log.person
       ? {
-          id: log.person.uuidId,
+          id: log.person.personCode,
           personCode: log.person.personCode,
           firstName: log.person.firstName,
           lastName: log.person.lastName,
@@ -133,7 +133,8 @@ export default async function DeviceDetailPage({
   }));
 
   const recentAlerts = recentAlertsRaw.map((alt) => ({
-    id: alt.uuidId,
+    id: alt.alertCode,
+    alertCode: alt.alertCode,
     alertType: alt.alertType,
     title: alt.title,
     message: alt.message,
@@ -143,7 +144,8 @@ export default async function DeviceDetailPage({
     resolvedAt: alt.resolvedAt ? alt.resolvedAt.toISOString() : null,
     person: alt.person
       ? {
-          id: alt.person.uuidId,
+          id: alt.person.personCode,
+          personCode: alt.person.personCode,
           firstName: alt.person.firstName,
           lastName: alt.person.lastName,
         }
@@ -152,8 +154,8 @@ export default async function DeviceDetailPage({
 
   const serializableDevice = {
     ...safeDevice,
-    id: safeDevice.uuidId,
-    uuidId: safeDevice.uuidId,
+    id: safeDevice.deviceCode,
+    deviceCode: safeDevice.deviceCode,
     lastSeen: safeDevice.lastSeen ? safeDevice.lastSeen.toISOString() : null,
     createdAt: safeDevice.createdAt.toISOString(),
     updatedAt: safeDevice.updatedAt.toISOString(),
@@ -174,6 +176,9 @@ export default async function DeviceDetailPage({
               <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
                 <span>{device.deviceName}</span>
               </h1>
+              <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                {device.deviceCode}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               Serial: <span className="font-mono text-foreground font-medium">{device.serialNumber}</span> • Registered <FormattedTimestamp date={device.createdAt} mode="date" />
@@ -193,10 +198,10 @@ export default async function DeviceDetailPage({
       </div>
 
       {/* Access Event Metrics & Logs */}
-      <DeviceAccessSummary stats={stats} recentLogs={recentLogs} deviceId={device.uuidId} />
+      <DeviceAccessSummary stats={stats} recentLogs={recentLogs} deviceId={device.deviceCode} />
 
       {/* Security Alerts */}
-      <DeviceAlerts alerts={recentAlerts} deviceId={device.uuidId} />
+      <DeviceAlerts alerts={recentAlerts} deviceId={device.deviceCode} />
     </div>
   );
 }

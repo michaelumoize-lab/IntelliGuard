@@ -22,12 +22,12 @@ async function repairImageKitUrls() {
   let matchesCount = 0;
 
   for (const person of persons) {
-    console.log(`Person ID ${person.uuidId} (${person.personCode} - ${person.firstName} ${person.lastName}):`);
+    console.log(`Person ${person.personCode} (${person.firstName} ${person.lastName}):`);
     console.log(` - Current faceImageUrl:    ${person.faceImageUrl}`);
     console.log(` - Current faceImageFileId: ${person.faceImageFileId}`);
 
     if (!person.faceImageFileId) {
-      console.log(` ⚠️ Warning: No faceImageFileId stored for Person ID ${person.uuidId}. Skipping cloud verification.\n`);
+      console.log(` ⚠️ Warning: No faceImageFileId stored for Person ${person.personCode}. Skipping cloud verification.\n`);
       unverifiedCount++;
       continue;
     }
@@ -53,19 +53,19 @@ async function repairImageKitUrls() {
 
       await prisma.$transaction(async (tx) => {
         await tx.person.update({
-          where: { uuidId: person.uuidId },
+          where: { personCode: person.personCode },
           data: { faceImageUrl: canonicalUrl },
         });
 
         if (activeEmbedding) {
           await tx.faceEmbedding.update({
-            where: { uuidId: activeEmbedding.uuidId },
+            where: { embeddingCode: activeEmbedding.embeddingCode },
             data: { imagePath: canonicalUrl },
           });
         }
       });
 
-      console.log(` ✅ Person ID ${person.uuidId} updated successfully to: ${canonicalUrl}\n`);
+      console.log(` ✅ Person ${person.personCode} updated successfully to: ${canonicalUrl}\n`);
       repairedCount++;
     } else {
       console.log(` ✅ Record is consistent with ImageKit cloud asset.\n`);
