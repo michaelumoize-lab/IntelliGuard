@@ -160,7 +160,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     return (
       <div
         className={cn(
-          "relative w-full aspect-[3/4] max-h-[62dvh] sm:max-h-[70dvh] lg:max-h-[74dvh] bg-black/95 rounded-2xl overflow-hidden border border-border shadow-md flex flex-col items-center justify-center transition-all duration-300 select-none",
+          "relative isolate w-full aspect-[3/4] max-h-[62dvh] sm:max-h-[70dvh] lg:max-h-[74dvh] bg-black/95 rounded-2xl overflow-hidden border border-border shadow-md flex flex-col items-center justify-center transition-all duration-300 select-none",
           className
         )}
       >

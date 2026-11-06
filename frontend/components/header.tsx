@@ -13,7 +13,7 @@ export async function Header() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="py-3 px-4 md:px-6 mx-auto justify-between flex items-center">
           <Link href="/" className="flex items-center gap-2.5 no-underline">
             <Logo />
