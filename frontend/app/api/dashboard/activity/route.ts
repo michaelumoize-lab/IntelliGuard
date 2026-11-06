@@ -46,7 +46,6 @@ export async function GET(req: NextRequest) {
       take: limit,
       orderBy: { createdAt: "desc" },
       select: {
-        uuidId: true,
         accessCode: true,
         matchStatus: true,
         accessStatus: true,
@@ -58,7 +57,6 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         person: {
           select: {
-            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -68,7 +66,6 @@ export async function GET(req: NextRequest) {
         },
         device: {
           select: {
-            uuidId: true,
             deviceCode: true,
             deviceName: true,
             serialNumber: true,
@@ -80,20 +77,20 @@ export async function GET(req: NextRequest) {
 
     const mappedEvents = events.map((event) => ({
       ...event,
-      id: event.uuidId,
-      uuidId: event.uuidId,
+      id: event.accessCode,
+      accessCode: event.accessCode,
       person: event.person
         ? {
             ...event.person,
-            id: event.person.uuidId,
-            uuidId: event.person.uuidId,
+            id: event.person.personCode,
+            personCode: event.person.personCode,
           }
         : null,
       device: event.device
         ? {
             ...event.device,
-            id: event.device.uuidId,
-            uuidId: event.device.uuidId,
+            id: event.device.deviceCode,
+            deviceCode: event.device.deviceCode,
           }
         : null,
     }));

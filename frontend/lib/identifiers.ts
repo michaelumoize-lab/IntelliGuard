@@ -1,192 +1,224 @@
 import crypto from "crypto";
-import { uuidv7 } from "uuidv7";
 
 /**
- * IntelliGuard Business Identifier & UUIDv7 System
- * 
- * Centralized generation and validation of:
- * 1. Human-readable public business identifiers (PER-, DEV-, EMB-, REC-, ALT-, ACL-).
- * 2. RFC 9562-compliant UUIDv7 identifiers for internal database keys and relationships.
+ * Canonical Business Identifier Prefixes for IntelliGuard Core Entities
+ *
+ * Format: <PREFIX>-<6 NUMERIC DIGITS>
+ * Examples:
+ *  - Person:        PER-482910
+ *  - Device:        DEV-918273
+ *  - FaceEmbedding: EMB-123456
+ *  - AccessLog:     ASL-456789
+ *  - Alert:         ALT-987654
  */
-
-// ---------------------------------------------------------------------------
-// UUIDv7 Generation & Validation (RFC 9562)
-// ---------------------------------------------------------------------------
-
-/**
- * Regex pattern for strictly validating an RFC 9562 UUID version 7.
- * Format: 8-4-4-4-12 hex chars.
- * 13th char MUST be '7' (version).
- * 17th char MUST be '8', '9', 'a', or 'b' (variant 1).
- */
-export const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/**
- * Generate a standards-compliant, time-ordered UUIDv7.
- * Uses cryptographically secure random entropy and millisecond timestamp.
- */
-export function generateUuidV7(): string {
-  return uuidv7();
-}
-
-/**
- * Validate whether a given value is a valid RFC 9562 UUIDv7 string.
- */
-export function isValidUuidV7(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  return UUID_V7_PATTERN.test(value);
-}
-
-/**
- * Extract the embedded Unix timestamp from a UUIDv7.
- * The first 48 bits represent Unix epoch timestamp in milliseconds.
- */
-export function extractTimestampFromUuidV7(uuid: string): Date | null {
-  if (!isValidUuidV7(uuid)) return null;
-  const hexTime = uuid.replace(/-/g, "").slice(0, 12);
-  const ms = parseInt(hexTime, 16);
-  return new Date(ms);
-}
-
-
 export const IDENTIFIER_PREFIXES = {
   PERSON: "PER-",
   DEVICE: "DEV-",
   FACE_EMBEDDING: "EMB-",
-  RECOGNITION_EVENT: "REC-",
+  ACCESS_LOG: "ASL-",
   ALERT: "ALT-",
-  ACCESS_LOG: "ACL-",
 } as const;
 
-export type EntityType = keyof typeof IDENTIFIER_PREFIXES;
-export type IdentifierPrefix = (typeof IDENTIFIER_PREFIXES)[EntityType];
-
-/** Standard random suffix length: 12 hexadecimal characters (48 bits of entropy) */
-export const SUFFIX_HEX_LENGTH = 12;
+export type IdentifierEntityType = keyof typeof IDENTIFIER_PREFIXES;
+export type IdentifierPrefix = (typeof IDENTIFIER_PREFIXES)[IdentifierEntityType];
 
 /**
- * Generate a cryptographically secure random hexadecimal suffix.
- * Uses 6 bytes = 12 uppercase hexadecimal characters.
+ * Exact number of numeric digits after the 3-letter prefix and hyphen.
  */
-function generateRandomHexSuffix(length: number = SUFFIX_HEX_LENGTH): string {
-  const byteCount = Math.ceil(length / 2);
-  const buffer = crypto.randomBytes(byteCount);
-  return buffer.toString("hex").slice(0, length).toUpperCase();
+export const SUFFIX_DIGIT_LENGTH = 6;
+
+/**
+ * Maximum exclusive bound for 6 numeric digits (000000 to 999999).
+ */
+const MAX_NUMERIC_SUFFIX_EXCLUSIVE = 1_000_000;
+
+/**
+ * Complete regular-expression patterns for each business entity code.
+ */
+export const PERSON_CODE_PATTERN = /^PER-[0-9]{6}$/;
+export const DEVICE_CODE_PATTERN = /^DEV-[0-9]{6}$/;
+export const EMBEDDING_CODE_PATTERN = /^EMB-[0-9]{6}$/;
+export const ACCESS_CODE_PATTERN = /^ASL-[0-9]{6}$/;
+export const ALERT_CODE_PATTERN = /^ALT-[0-9]{6}$/;
+
+/**
+ * Combined regular expression matching any valid canonical 5-entity business code.
+ */
+export const BUSINESS_ID_PATTERN = /^(PER|DEV|EMB|ASL|ALT)-[0-9]{6}$/;
+
+const PREFIX_TO_PATTERN: Record<IdentifierPrefix, RegExp> = {
+  [IDENTIFIER_PREFIXES.PERSON]: PERSON_CODE_PATTERN,
+  [IDENTIFIER_PREFIXES.DEVICE]: DEVICE_CODE_PATTERN,
+  [IDENTIFIER_PREFIXES.FACE_EMBEDDING]: EMBEDDING_CODE_PATTERN,
+  [IDENTIFIER_PREFIXES.ACCESS_LOG]: ACCESS_CODE_PATTERN,
+  [IDENTIFIER_PREFIXES.ALERT]: ALERT_CODE_PATTERN,
+};
+
+/**
+ * Generates an unbiased, cryptographically secure 6-digit numeric string (000000 - 999999).
+ * Uses Node.js `crypto.randomInt` which implements rejection sampling to eliminate modulo bias.
+ */
+function generateRandomSixDigits(): string {
+  const num = crypto.randomInt(0, MAX_NUMERIC_SUFFIX_EXCLUSIVE);
+  return num.toString().padStart(SUFFIX_DIGIT_LENGTH, "0");
 }
 
 /**
- * Generate a business identifier with the specified entity prefix.
- * Example output: 'PER-17BF059C1234', 'DEV-7A2D19F4B620'
+ * Core generator that creates a business identifier with the given prefix
+ * and 6 cryptographically random numeric digits.
  */
 export function generateBusinessIdentifier(prefix: IdentifierPrefix): string {
-  return `${prefix}${generateRandomHexSuffix(SUFFIX_HEX_LENGTH)}`;
+  return `${prefix}${generateRandomSixDigits()}`;
 }
 
-// ---------------------------------------------------------------------------
-// Entity-specific Generator Functions
-// ---------------------------------------------------------------------------
-
-/** Generate a unique Person code (e.g. 'PER-17BF059C1234') */
+/**
+ * Generates a unique business code for a Person record (e.g. `PER-482910`).
+ */
 export function generatePersonCode(): string {
   return generateBusinessIdentifier(IDENTIFIER_PREFIXES.PERSON);
 }
 
-/** Generate a unique Device code (e.g. 'DEV-7A2D19F4B620') */
+/**
+ * Generates a unique business code for a Device record (e.g. `DEV-918273`).
+ */
 export function generateDeviceCode(): string {
   return generateBusinessIdentifier(IDENTIFIER_PREFIXES.DEVICE);
 }
 
-/** Generate a unique FaceEmbedding code (e.g. 'EMB-9C31E8A2F741') */
-export function generateEmbeddingCode(): string {
+/**
+ * Generates a unique business code for a FaceEmbedding record (e.g. `EMB-123456`).
+ */
+export function generateFaceEmbeddingCode(): string {
   return generateBusinessIdentifier(IDENTIFIER_PREFIXES.FACE_EMBEDDING);
 }
-export const generateFaceEmbeddingCode = generateEmbeddingCode;
 
-/** Generate a unique RecognitionEvent code (e.g. 'REC-5B8F20D1A963') */
-export function generateRecognitionEventCode(): string {
-  return generateBusinessIdentifier(IDENTIFIER_PREFIXES.RECOGNITION_EVENT);
+/**
+ * Alias for `generateFaceEmbeddingCode()` (`EMB-123456`).
+ */
+export function generateEmbeddingCode(): string {
+  return generateFaceEmbeddingCode();
 }
 
-/** Generate a unique Alert code (e.g. 'ALT-4D7A91C3B825') */
+/**
+ * Generates a unique business code for an AccessLog record (e.g. `ASL-456789`).
+ */
+export function generateAccessLogCode(): string {
+  return generateBusinessIdentifier(IDENTIFIER_PREFIXES.ACCESS_LOG);
+}
+
+/**
+ * Alias for `generateAccessLogCode()` (`ASL-456789`).
+ */
+export function generateAccessCode(): string {
+  return generateAccessLogCode();
+}
+
+/**
+ * Generates a unique business code for an Alert record (e.g. `ALT-987654`).
+ */
 export function generateAlertCode(): string {
   return generateBusinessIdentifier(IDENTIFIER_PREFIXES.ALERT);
 }
 
-/** Generate a unique AccessLog / access decision code (e.g. 'ACL-8E2B61F4C930') */
-export function generateAccessCode(): string {
-  return generateBusinessIdentifier(IDENTIFIER_PREFIXES.ACCESS_LOG);
-}
-export const generateAccessLogCode = generateAccessCode;
-
-// ---------------------------------------------------------------------------
-// Validation & Parsing Helpers
-// ---------------------------------------------------------------------------
-
 /**
- * Standard business identifier regex pattern:
- * Allows standard 12-hex suffixes, while maintaining backward compatibility
- * with legacy 8-hex suffixes (e.g. earlier person codes like 'PER-17BF059C').
+ * Entity-specific validation helpers.
  */
-export const BUSINESS_ID_PATTERN = /^(PER|DEV|EMB|REC|ALT|ACL)-[0-9A-F]{8,16}$/;
+export function isValidPersonCode(value: unknown): value is string {
+  return typeof value === "string" && PERSON_CODE_PATTERN.test(value);
+}
+
+export function isValidDeviceCode(value: unknown): value is string {
+  return typeof value === "string" && DEVICE_CODE_PATTERN.test(value);
+}
+
+export function isValidEmbeddingCode(value: unknown): value is string {
+  return typeof value === "string" && EMBEDDING_CODE_PATTERN.test(value);
+}
+
+export function isValidAccessCode(value: unknown): value is string {
+  return typeof value === "string" && ACCESS_CODE_PATTERN.test(value);
+}
+
+export function isValidAlertCode(value: unknown): value is string {
+  return typeof value === "string" && ALERT_CODE_PATTERN.test(value);
+}
 
 /**
- * Validate whether a string is a valid business identifier.
- * Optionally verifies matching a specific prefix.
+ * Validates whether a string is a well-formed IntelliGuard business identifier.
+ * Optionally checks that it matches a specific entity prefix.
  */
 export function isValidBusinessIdentifier(
-  identifier: unknown,
+  value: unknown,
   expectedPrefix?: IdentifierPrefix
-): boolean {
-  if (typeof identifier !== "string") return false;
-  if (!BUSINESS_ID_PATTERN.test(identifier)) return false;
-  if (expectedPrefix && !identifier.startsWith(expectedPrefix)) return false;
-  return true;
-}
-
-/**
- * Extract the prefix from a business identifier if valid.
- */
-export function getIdentifierPrefix(identifier: string): IdentifierPrefix | null {
-  for (const prefix of Object.values(IDENTIFIER_PREFIXES)) {
-    if (identifier.startsWith(prefix)) {
-      return prefix;
-    }
+): value is string {
+  if (typeof value !== "string" || value.length === 0) {
+    return false;
   }
-  return null;
-}
 
-// ---------------------------------------------------------------------------
-// Collision Retry Mechanism
-// ---------------------------------------------------------------------------
+  if (expectedPrefix) {
+    const pattern = PREFIX_TO_PATTERN[expectedPrefix];
+    return pattern ? pattern.test(value) : false;
+  }
 
-export interface CollisionRetryOptions {
-  maxRetries?: number;
-  entityName?: string;
+  return BUSINESS_ID_PATTERN.test(value);
 }
 
 /**
- * Generate a business identifier with collision avoidance retry logic.
- * 
- * @param generatorFn Function returning a newly generated identifier
- * @param existsFn Async check that returns true if the identifier already exists in DB
- * @param options Configuration for retry limit and entity name for errors
+ * Extracts the entity prefix from a valid business identifier, or returns null.
+ */
+export function getIdentifierPrefix(value: string): IdentifierPrefix | null {
+  if (!isValidBusinessIdentifier(value)) {
+    return null;
+  }
+  const prefix = value.slice(0, 4) as IdentifierPrefix;
+  const validPrefixes = Object.values(IDENTIFIER_PREFIXES) as string[];
+  return validPrefixes.includes(prefix) ? prefix : null;
+}
+
+/**
+ * Checks whether an error is a database unique constraint violation (Prisma P2002 or PostgreSQL 23505).
+ */
+export function isUniqueConstraintError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const errObj = error as { code?: unknown; message?: unknown };
+  if (errObj.code === "P2002" || errObj.code === "23505") {
+    return true;
+  }
+  if (
+    typeof errObj.message === "string" &&
+    (errObj.message.includes("Unique constraint failed") ||
+      errObj.message.includes("duplicate key value violates unique constraint"))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Collision-avoidance retry helper for persisting business identifiers.
+ * Executes `generator()` and checks `existsCheck(candidate)` up to `maxRetries` times.
+ * Does not swallow unrelated database errors thrown by `existsCheck`.
  */
 export async function generateUniqueBusinessIdentifier(
-  generatorFn: () => string,
-  existsFn: (code: string) => Promise<boolean>,
-  options: CollisionRetryOptions = {}
+  generator: () => string,
+  existsCheck: (candidate: string) => Promise<boolean>,
+  options: { maxRetries?: number; entityName?: string } = {}
 ): Promise<string> {
-  const { maxRetries = 5, entityName = "record" } = options;
+  const maxRetries = options.maxRetries ?? 5;
+  const entityName = options.entityName ?? "Entity";
+
+  if (!Number.isInteger(maxRetries) || maxRetries < 1) {
+    throw new Error(`Invalid maxRetries (${maxRetries}) for ${entityName} identifier generation.`);
+  }
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const candidate = generatorFn();
-    const exists = await existsFn(candidate);
+    const candidate = generator();
+    const exists = await existsCheck(candidate);
     if (!exists) {
       return candidate;
     }
-    console.warn(
-      `[Identifier Collision] Candidate '${candidate}' already exists for ${entityName}. Retry attempt ${attempt}/${maxRetries}.`
-    );
   }
 
   throw new Error(

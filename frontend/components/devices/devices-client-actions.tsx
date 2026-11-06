@@ -296,8 +296,9 @@ export function DevicesTableInteractive({
   };
 
   const handleRegenerateKey = async (device: DeviceTableItem) => {
+    const code = device.deviceCode || device.id;
     try {
-      const res = await fetch(`/api/devices/${device.id}/regenerate-key`, {
+      const res = await fetch(`/api/devices/${code}/regenerate-key`, {
         method: "POST",
       });
       const json = await res.json();
@@ -307,7 +308,7 @@ export function DevicesTableInteractive({
       }
       if (json.apiKey) {
         setCreatedApiKey(json.apiKey);
-        setCreatedDeviceId(device.id);
+        setCreatedDeviceId(code);
         setCreatedDeviceName(device.deviceName);
         setApiKeyDialogOpen(true);
         toast.success(`New API Key generated for ${device.deviceName}`);
@@ -317,7 +318,7 @@ export function DevicesTableInteractive({
     }
   };
 
-  const handleDeleteDevice = async (deviceId: string | number) => {
+  const handleDeleteDevice = async (deviceId: string) => {
     const res = await fetch(`/api/devices/${deviceId}`, {
       method: "DELETE",
     });
@@ -365,9 +366,8 @@ export function DevicesTableInteractive({
 }
 
 export interface DeviceDetailItem {
-  id: string | number;
-  uuidId?: string;
-  deviceCode?: string;
+  id: string;
+  deviceCode: string;
   deviceName: string;
   serialNumber: string;
   location: string;
@@ -394,8 +394,10 @@ export function DeviceDetailHeaderActions({
   const [createdDeviceName, setCreatedDeviceName] = useState<string>("");
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
 
+  const code = device.deviceCode || device.id;
+
   const handleUpdateDevice = async (formData: DeviceFormData) => {
-    const res = await fetch(`/api/devices/${device.id}`, {
+    const res = await fetch(`/api/devices/${code}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -418,7 +420,7 @@ export function DeviceDetailHeaderActions({
 
   const handleRegenerateKey = async () => {
     try {
-      const res = await fetch(`/api/devices/${device.id}/regenerate-key`, {
+      const res = await fetch(`/api/devices/${code}/regenerate-key`, {
         method: "POST",
       });
       const json = await res.json();
@@ -428,7 +430,7 @@ export function DeviceDetailHeaderActions({
       }
       if (json.apiKey) {
         setCreatedApiKey(json.apiKey);
-        setCreatedDeviceId(device.id);
+        setCreatedDeviceId(code);
         setCreatedDeviceName(device.deviceName || "Device");
         setApiKeyDialogOpen(true);
         toast.success("New API key generated.");

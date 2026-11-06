@@ -4,11 +4,11 @@ import { AccessReason, AccessStatus, DoorAction, MatchStatus } from "@prisma/cli
 
 export interface LogBiometricParams {
   deviceId?: string | number | null;
-  deviceUuidId?: string | null;
+  deviceCode?: string | null;
   personId?: string | number | null;
-  personUuidId?: string | null;
+  personCode?: string | null;
   embeddingId?: string | number | null;
-  embeddingUuidId?: string | null;
+  embeddingCode?: string | null;
   matchStatus: MatchStatus;
   accessStatus: AccessStatus;
   reason: AccessReason;
@@ -20,10 +20,9 @@ export interface LogBiometricParams {
 
 export interface LogDeniedAlertParams {
   deviceId?: string | number | null;
-  deviceUuidId?: string | null;
+  deviceCode?: string | null;
   person: {
     id?: string | number;
-    uuidId?: string;
     firstName: string;
     lastName: string;
     personCode: string;
@@ -36,8 +35,11 @@ export interface LogDeniedAlertParams {
   personStatus: string;
 }
 
-function toUuidString(val: unknown): string | null {
-  if (typeof val === "string" && val.length >= 32) return val;
+function toCodeString(val: unknown): string | null {
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
   return null;
 }
 
@@ -50,18 +52,18 @@ export class AuditLogger {
    * Log alert when a hardware device fails HMAC, nonce, or credential authentication.
    */
   static async logDeviceAuthAlert(
-    device: { id?: string | number; uuidId?: string; deviceName: string },
+    device: { id?: string | number; deviceCode?: string; deviceName: string },
     reason: string | undefined,
     isReplayOrTamper: boolean
   ): Promise<void> {
-    const devUuid = device.uuidId || toUuidString(device.id);
-    const devLabel = devUuid ? `Device [${devUuid.slice(0, 8)}]` : `Device`;
+    const devCode = device.deviceCode || toCodeString(device.id);
+    const devLabel = devCode ? `Device [${devCode}]` : `Device`;
     try {
       if (isReplayOrTamper) {
         await prisma.alert.create({
           data: {
             alertCode: generateAlertCode(),
-            deviceUuidId: devUuid,
+            deviceCode: devCode,
             alertType: "unauthorized_access",
             title: reason === "invalid_signature" ? "HMAC Tamper Attempt" : "Replay Attack Detected",
             message: `${devLabel} (${device.deviceName}) submitted an invalid access request (${reason}). Request blocked.`,
@@ -72,7 +74,7 @@ export class AuditLogger {
         await prisma.alert.create({
           data: {
             alertCode: generateAlertCode(),
-            deviceUuidId: devUuid,
+            deviceCode: devCode,
             alertType: "unauthorized_access",
             title: "Device Authentication Rejected",
             message: `${devLabel} (${device.deviceName}) failed authentication (${reason || "invalid_credentials"}). Request blocked.`,
@@ -95,12 +97,12 @@ export class AuditLogger {
     alertMessage: string,
     severity: "low" | "medium" | "high" | "critical" = "high"
   ): Promise<void> {
-    const devUuid = toUuidString(deviceId);
+    const devCode = toCodeString(deviceId);
     try {
       await prisma.accessLog.create({
         data: {
           accessCode: generateAccessCode(),
-          deviceUuidId: devUuid,
+          deviceCode: devCode,
           matchStatus: "rejected",
           accessStatus: "denied",
           reason: "system_error",
@@ -112,7 +114,7 @@ export class AuditLogger {
       await prisma.alert.create({
         data: {
           alertCode: generateAlertCode(),
-          deviceUuidId: devUuid,
+          deviceCode: devCode,
           alertType: "system_error",
           title: alertTitle,
           message: alertMessage,
@@ -131,12 +133,12 @@ export class AuditLogger {
     deviceId: string | number | null,
     processingTimeMs: number
   ): Promise<void> {
-    const devUuid = toUuidString(deviceId);
+    const devCode = toCodeString(deviceId);
     try {
       await prisma.accessLog.create({
         data: {
           accessCode: generateAccessCode(),
-          deviceUuidId: devUuid,
+          deviceCode: devCode,
           matchStatus: "rejected",
           accessStatus: "denied",
           reason: "system_error",
@@ -158,12 +160,12 @@ export class AuditLogger {
     modelName: string | undefined,
     processingTimeMs: number
   ): Promise<void> {
-    const devUuid = toUuidString(deviceId);
+    const devCode = toCodeString(deviceId);
     try {
       await prisma.accessLog.create({
         data: {
           accessCode: generateAccessCode(),
-          deviceUuidId: devUuid,
+          deviceCode: devCode,
           matchStatus: "rejected",
           accessStatus: "denied",
           reason: "spoof_detected",
@@ -180,7 +182,7 @@ export class AuditLogger {
       await prisma.alert.create({
         data: {
           alertCode: generateAlertCode(),
-          deviceUuidId: devUuid,
+          deviceCode: devCode,
           alertType: "unauthorized_access",
           title: "Facial Presentation Attack (Spoof) Detected",
           message: `Anti-spoofing ensemble (${modelName || "MiniFASNet"}) detected a presentation attack (liveness score: ${liveScorePct}%). Access denied and door secured.`,
@@ -200,12 +202,12 @@ export class AuditLogger {
     liveScore: number | null | undefined,
     processingTimeMs: number
   ): Promise<void> {
-    const devUuid = toUuidString(deviceId);
+    const devCode = toCodeString(deviceId);
     try {
       await prisma.accessLog.create({
         data: {
           accessCode: generateAccessCode(),
-          deviceUuidId: devUuid,
+          deviceCode: devCode,
           matchStatus: "rejected",
           accessStatus: "denied",
           reason: "insufficient_confidence",
@@ -223,16 +225,16 @@ export class AuditLogger {
    * Persist successful or evaluated biometric verification AccessLog.
    */
   static async logBiometricDecision(params: LogBiometricParams): Promise<void> {
-    const devUuid = params.deviceUuidId || toUuidString(params.deviceId);
-    const perUuid = params.personUuidId || toUuidString(params.personId);
-    const embUuid = params.embeddingUuidId || toUuidString(params.embeddingId);
+    const devCode = params.deviceCode || toCodeString(params.deviceId);
+    const perCode = params.personCode || toCodeString(params.personId);
+    const embCode = params.embeddingCode || toCodeString(params.embeddingId);
     try {
       await prisma.accessLog.create({
         data: {
           accessCode: generateAccessCode(),
-          deviceUuidId: devUuid,
-          personUuidId: perUuid,
-          embeddingUuidId: embUuid,
+          deviceCode: devCode,
+          personCode: perCode,
+          embeddingCode: embCode,
           matchStatus: params.matchStatus,
           accessStatus: params.accessStatus,
           reason: params.reason,
@@ -251,17 +253,17 @@ export class AuditLogger {
    * Persist security alerts for denied biometric access (tailgating, unknown face, ambiguous match, deactivated/suspended account).
    */
   static async logBiometricDeniedAlert(params: LogDeniedAlertParams): Promise<void> {
-    const { deviceId, deviceUuidId, person, matchStatus, isTailgating, trailingCount, isDeactivated, personStatus } = params;
-    const devUuid = deviceUuidId || toUuidString(deviceId);
-    const perUuid = person ? (person.uuidId || toUuidString(person.id)) : null;
+    const { deviceId, deviceCode, person, matchStatus, isTailgating, trailingCount, isDeactivated, personStatus } = params;
+    const devCode = deviceCode || toCodeString(deviceId);
+    const perCode = person ? (person.personCode || toCodeString(person.id)) : null;
 
     try {
       if (isTailgating) {
         await prisma.alert.create({
           data: {
             alertCode: generateAlertCode(),
-            deviceUuidId: devUuid,
-            personUuidId: perUuid,
+            deviceCode: devCode,
+            personCode: perCode,
             alertType: "unauthorized_access",
             title: "Tailgating / Piggybacking Security Violation",
             message: `Tailgating violation: ${trailingCount || 1} trailing individual(s) detected in access threshold while ${
@@ -274,8 +276,8 @@ export class AuditLogger {
         await prisma.alert.create({
           data: {
             alertCode: generateAlertCode(),
-            deviceUuidId: devUuid,
-            personUuidId: null,
+            deviceCode: devCode,
+            personCode: null,
             alertType: "unknown_face",
             title: "Unknown Face Detected",
             message: "An unrecognized face attempted access.",
@@ -286,8 +288,8 @@ export class AuditLogger {
         await prisma.alert.create({
           data: {
             alertCode: generateAlertCode(),
-            deviceUuidId: devUuid,
-            personUuidId: null,
+            deviceCode: devCode,
+            personCode: null,
             alertType: "unauthorized_access",
             title: "Ambiguous Face Recognition",
             message: "Face recognition produced competing candidates with insufficient confidence margin.",
@@ -299,8 +301,8 @@ export class AuditLogger {
         await prisma.alert.create({
           data: {
             alertCode: generateAlertCode(),
-            deviceUuidId: devUuid,
-            personUuidId: perUuid,
+            deviceCode: devCode,
+            personCode: perCode,
             alertType: "unauthorized_access",
             title: isSuspended
               ? "Access Denied - Suspended User"

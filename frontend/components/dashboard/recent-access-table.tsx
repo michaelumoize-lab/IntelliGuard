@@ -17,8 +17,7 @@ import { FormattedTimestamp } from "@/components/ui/formatted-timestamp";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export interface AccessEventItem {
-  id: string | number;
-  uuidId?: string;
+  id: string;
   accessCode?: string;
   matchStatus: string;
   accessStatus: string;
@@ -28,8 +27,7 @@ export interface AccessEventItem {
   processingTimeMs: number | null;
   createdAt: string;
   person?: {
-    id: string | number;
-    uuidId?: string;
+    id: string;
     personCode: string;
     firstName: string;
     lastName: string;
@@ -38,8 +36,8 @@ export interface AccessEventItem {
     faceImageUrl?: string | null;
   } | null;
   device?: {
-    id: string | number;
-    uuidId?: string;
+    id: string;
+    deviceCode?: string;
     deviceName: string;
     serialNumber: string;
   } | null;
@@ -165,7 +163,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                         {evt.person ? (
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <Link
-                              href={`/dashboard/persons/${evt.person.id}`}
+                              href={`/dashboard/persons/${evt.person.personCode || evt.person.id}`}
                               className="font-semibold text-xs text-foreground hover:text-primary transition-colors block truncate"
                             >
                               {evt.person.firstName} {evt.person.lastName}
@@ -261,7 +259,7 @@ export function RecentAccessTable({ events }: RecentAccessTableProps) {
                       <td className="py-3.5">
                         {evt.person ? (
                           <Link
-                            href={`/dashboard/persons/${evt.person.id}`}
+                            href={`/dashboard/persons/${evt.person.personCode || evt.person.id}`}
                             className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-2 flex-wrap"
                           >
                             <div className="w-5 h-5 rounded-full bg-muted border border-border overflow-hidden flex items-center justify-center shrink-0">

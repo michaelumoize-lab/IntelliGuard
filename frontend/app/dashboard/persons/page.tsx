@@ -82,7 +82,6 @@ export default async function PersonsPage({
     take: limit,
     orderBy: { createdAt: "desc" },
     select: {
-      uuidId: true,
       personCode: true,
       firstName: true,
       lastName: true,
@@ -98,7 +97,6 @@ export default async function PersonsPage({
         where: { isActive: true },
         take: 1,
         select: {
-          uuidId: true,
           embeddingCode: true,
           embeddingModel: true,
           qualityScore: true,
@@ -186,7 +184,7 @@ export default async function PersonsPage({
                   const embeddingStatus = activeEmbedding ? "active" : "none";
 
                   return (
-                    <TableRow key={person.uuidId} className="hover:bg-muted/40 transition-colors">
+                    <TableRow key={person.personCode} className="hover:bg-muted/40 transition-colors">
                       {/* Photo Thumbnail */}
                       <TableCell className="py-3">
                         <div className="h-9 w-9 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center">
@@ -208,7 +206,7 @@ export default async function PersonsPage({
                       <TableCell className="py-3">
                         <div>
                           <Link
-                            href={`/dashboard/persons/${person.uuidId}`}
+                            href={`/dashboard/persons/${person.personCode}`}
                             className="font-semibold hover:underline text-foreground text-sm"
                           >
                             {person.firstName} {person.lastName}
@@ -268,7 +266,7 @@ export default async function PersonsPage({
 
                       {/* Actions */}
                       <TableCell className="py-3 text-right">
-                        <PersonRowActions person={{ ...person, id: person.uuidId, uuidId: person.uuidId }} />
+                        <PersonRowActions person={{ ...person, id: person.personCode }} />
                       </TableCell>
                     </TableRow>
                   );

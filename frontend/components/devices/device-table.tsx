@@ -36,9 +36,8 @@ import { DeviceTypeBadge } from "./device-type-badge";
 import { MoreHorizontal, Eye, Edit, KeyRound, Trash2, Cpu, Copy, Check } from "lucide-react";
 
 export interface DeviceTableItem {
-  id: string | number;
-  uuidId?: string;
-  deviceCode?: string;
+  id: string;
+  deviceCode: string;
   deviceName: string;
   serialNumber: string;
   location: string;
@@ -58,7 +57,7 @@ interface DeviceTableProps {
   isLoading?: boolean;
   onEdit?: (device: DeviceTableItem) => void;
   onRegenerateKey?: (device: DeviceTableItem) => void;
-  onDelete?: (deviceId: string | number) => Promise<void>;
+  onDelete?: (deviceId: string) => Promise<void>;
 }
 
 export function DeviceTable({
@@ -68,18 +67,18 @@ export function DeviceTable({
   onRegenerateKey,
   onDelete,
 }: DeviceTableProps) {
-  const [deleteId, setDeleteId] = React.useState<string | number | null>(null);
+  const [deleteId, setDeleteId] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
-  const [copiedId, setCopiedId] = React.useState<string | number | null>(null);
+  const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
-  const handleCopyId = async (id: string | number, e: React.MouseEvent) => {
+  const handleCopyId = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(String(id));
+      await navigator.clipboard.writeText(id);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
-      console.error("Failed to copy device ID:", err);
+      console.error("Failed to copy device code:", err);
     }
   };
 
@@ -136,19 +135,21 @@ export function DeviceTable({
               </TableCell>
             </TableRow>
           ) : (
-            devices.map((device) => (
-              <TableRow key={device.id} className="hover:bg-muted/40 transition-colors">
+            devices.map((device) => {
+              const code = device.deviceCode || device.id;
+              return (
+              <TableRow key={code} className="hover:bg-muted/40 transition-colors">
                 <TableCell className="py-3 font-mono text-xs">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        onClick={(e) => handleCopyId(device.deviceCode || device.id, e)}
+                        onClick={(e) => handleCopyId(code, e)}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
-                        aria-label="Click to copy Device ID"
+                        aria-label="Click to copy Device Code"
                       >
-                        <span>{device.deviceCode || `#${String(device.id).slice(0, 8)}`}</span>
-                        {copiedId === device.id || copiedId === device.deviceCode ? (
+                        <span>{code}</span>
+                        {copiedId === code ? (
                           <Check className="h-3 w-3 text-emerald-500" />
                         ) : (
                           <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground opacity-60 group-hover:opacity-100" />
@@ -156,7 +157,7 @@ export function DeviceTable({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      {copiedId === device.id || copiedId === device.deviceCode ? "Copied!" : "Click to copy Device ID"}
+                      {copiedId === code ? "Copied!" : "Click to copy Device Code"}
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
@@ -165,16 +166,14 @@ export function DeviceTable({
                 </TableCell>
                 <TableCell className="py-3 font-medium">
                   <Link
-                    href={`/dashboard/devices/${device.id}`}
+                    href={`/dashboard/devices/${code}`}
                     className="hover:underline text-foreground font-semibold text-sm"
                   >
                     {device.deviceName}
                   </Link>
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
-                    {device.deviceCode && (
-                      <span className="font-semibold text-primary/80">{device.deviceCode}</span>
-                    )}
-                    {device.deviceCode && device.ipAddress && <span>•</span>}
+                    <span className="font-semibold text-primary/80">{code}</span>
+                    {device.ipAddress && <span>•</span>}
                     {device.ipAddress && (
                       <span>{device.ipAddress}</span>
                     )}
@@ -217,7 +216,7 @@ export function DeviceTable({
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Device Actions</DropdownMenuLabel>
                       <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/devices/${device.id}`} className="cursor-pointer">
+                        <Link href={`/dashboard/devices/${code}`} className="cursor-pointer">
                           <Eye className="mr-2 h-4 w-4 text-blue-500" />
                           View Details & Stats
                         </Link>
@@ -237,7 +236,7 @@ export function DeviceTable({
                       <DropdownMenuSeparator />
                       {onDelete && (
                         <DropdownMenuItem
-                          onClick={() => setDeleteId(device.id)}
+                          onClick={() => setDeleteId(code)}
                           className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -248,7 +247,8 @@ export function DeviceTable({
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>

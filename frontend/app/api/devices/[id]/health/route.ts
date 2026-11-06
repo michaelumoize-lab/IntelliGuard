@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
 import { authenticateDevice } from "@/lib/access/device-auth";
+import { isValidDeviceCode } from "@/lib/identifiers";
 import {
   getDeviceTelemetry,
   recordDeviceHeartbeat,
@@ -10,8 +11,6 @@ import {
 } from "@/lib/devices/device-telemetry";
 
 export const dynamic = "force-dynamic";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function checkAdminAuth() {
   const session = await getServerSession();
@@ -36,18 +35,18 @@ export async function GET(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  if (!idParam || !UUID_REGEX.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID format. Expected UUIDv7." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code format. Expected DEV-XXXXXX." },
       { status: 400 }
     );
   }
 
   try {
     const device = await prisma.device.findUnique({
-      where: { uuidId: idParam },
+      where: { deviceCode: idParam },
       select: {
-        uuidId: true,
+        deviceCode: true,
         deviceName: true,
         serialNumber: true,
         status: true,
@@ -73,13 +72,14 @@ export async function GET(
     if (!liveOnline && device.status === "online") {
       currentStatus = "offline";
       prisma.device
-        .update({ where: { uuidId: device.uuidId }, data: { status: "offline" } })
+        .update({ where: { deviceCode: device.deviceCode }, data: { status: "offline" } })
         .catch((err) => console.error("Failed to mark expired device offline:", err));
     }
 
     return NextResponse.json({
       success: true,
-      deviceId: device.uuidId,
+      deviceId: device.deviceCode,
+      deviceCode: device.deviceCode,
       deviceName: device.deviceName,
       serialNumber: device.serialNumber,
       status: currentStatus,
@@ -120,9 +120,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: idParam } = await params;
-  if (!idParam || !UUID_REGEX.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID format. Expected UUIDv7." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code format. Expected DEV-XXXXXX." },
       { status: 400 }
     );
   }
@@ -198,11 +198,11 @@ export async function POST(
     });
 
     // Update persistent database record: set online only if current status is offline or online (preserving maintenance/error)
-    const currentDevice = authResult.device || (await prisma.device.findUnique({ where: { uuidId: idParam } }));
+    const currentDevice = authResult.device || (await prisma.device.findUnique({ where: { deviceCode: idParam } }));
     const shouldSetOnline = currentDevice?.status === "online" || currentDevice?.status === "offline";
 
     const updatedDevice = await prisma.device.update({
-      where: { uuidId: idParam },
+      where: { deviceCode: idParam },
       data: {
         ...(shouldSetOnline ? { status: "online" } : {}),
         lastSeen: new Date(),
@@ -218,6 +218,7 @@ export async function POST(
       success: true,
       acknowledged: true,
       deviceId: idParam,
+      deviceCode: idParam,
       status: updatedDevice.status,
       serverTime: new Date().toISOString(),
     });

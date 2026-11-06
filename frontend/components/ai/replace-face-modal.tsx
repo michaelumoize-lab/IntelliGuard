@@ -30,8 +30,7 @@ interface ReplaceFaceModalProps {
   onClose: () => void;
   onSuccess: () => void;
   person: {
-    id: string | number;
-    uuidId?: string;
+    id: string;
     firstName: string;
     lastName: string;
     personCode: string;
@@ -61,7 +60,7 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
     try {
       const fd = new FormData();
       fd.append("image", file);
-      fd.append("excludePersonId", String(person.id));
+      fd.append("excludePersonId", person.personCode || String(person.id));
       const res = await fetch("/api/persons/precheck", {
         method: "POST",
         body: fd,
@@ -153,7 +152,7 @@ export function ReplaceFaceModal({ isOpen, onClose, onSuccess, person }: Replace
       const formData = new FormData();
       formData.append("image", imageFile);
 
-      const res = await fetch(`/api/persons/${person.id}/face`, {
+      const res = await fetch(`/api/persons/${person.personCode || person.id}/face`, {
         method: "POST",
         body: formData,
       });

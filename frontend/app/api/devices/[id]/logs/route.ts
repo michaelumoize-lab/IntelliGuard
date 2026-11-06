@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
+import { isValidDeviceCode } from "@/lib/identifiers";
 import { Prisma, AccessStatus, AccessReason, MatchStatus } from "@prisma/client";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +25,9 @@ export async function GET(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  if (!idParam || !UUID_REGEX.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID format. Expected UUIDv7." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code format. Expected DEV-XXXXXX." },
       { status: 400 }
     );
   }
@@ -44,7 +43,7 @@ export async function GET(
   const dateTo = url.searchParams.get("dateTo");
 
   try {
-    const device = await prisma.device.findUnique({ where: { uuidId: idParam } });
+    const device = await prisma.device.findUnique({ where: { deviceCode: idParam } });
     if (!device) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -52,7 +51,7 @@ export async function GET(
       );
     }
 
-    const whereClause: Prisma.AccessLogWhereInput = { deviceUuidId: idParam };
+    const whereClause: Prisma.AccessLogWhereInput = { deviceCode: idParam };
 
     if (statusParam) {
       if (!Object.values(AccessStatus).includes(statusParam as AccessStatus)) {
@@ -115,7 +114,6 @@ export async function GET(
       include: {
         person: {
           select: {
-            uuidId: true,
             personCode: true,
             firstName: true,
             lastName: true,
@@ -128,14 +126,12 @@ export async function GET(
     });
 
     const data = logsRaw.map((log) => ({
-      id: log.uuidId,
-      uuidId: log.uuidId,
+      id: log.accessCode,
       accessCode: log.accessCode,
       createdAt: log.createdAt,
       person: log.person
         ? {
-            id: log.person.uuidId,
-            uuidId: log.person.uuidId,
+            id: log.person.personCode,
             personCode: log.person.personCode,
             firstName: log.person.firstName,
             lastName: log.person.lastName,

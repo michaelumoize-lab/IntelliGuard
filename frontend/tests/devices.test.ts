@@ -30,9 +30,9 @@ async function runMilestone10Tests() {
     }
   }
 
-  let createdDeviceId: string | null = null;
-  let mockLogId: string | null = null;
-  let mockAlertId: string | null = null;
+  let createdDeviceCode: string | null = null;
+  let mockAccessCode: string | null = null;
+  let mockAlertCode: string | null = null;
   let firstApiKey: string | null = null;
   let secondApiKey: string | null = null;
   const testSerial = `TEST-ESP32-M10-${Date.now()}`;
@@ -86,12 +86,12 @@ async function runMilestone10Tests() {
       },
     });
 
-    createdDeviceId = createdDevice.uuidId;
+    createdDeviceCode = createdDevice.deviceCode;
 
     assert(
-      createdDeviceId !== null && createdDevice.deviceName === "M10 Test Front Entrance Camera",
+      createdDeviceCode !== null && createdDevice.deviceName === "M10 Test Front Entrance Camera",
       "Test 2: Device record successfully created in PostgreSQL",
-      `ID: ${createdDeviceId}`
+      `ID: ${createdDeviceCode}`
     );
     assert(
       firstApiKey.startsWith("ig_dev_") && firstApiKey.length > 20,
@@ -103,7 +103,7 @@ async function runMilestone10Tests() {
     // Test 3: Database Stores Only SHA-256 Hash
     // ----------------------------------------------------
     console.log("\n[Test 3] Verifying Database Stores Only API Key Hash...");
-    const dbRecord = await prisma.device.findUnique({ where: { uuidId: createdDeviceId } });
+    const dbRecord = await prisma.device.findUnique({ where: { deviceCode: createdDeviceCode } });
     assert(
       dbRecord?.apiKeyHash === apiKeyHash && !dbRecord?.apiKeyHash.includes(firstApiKey),
       "Test 3: PostgreSQL stores SHA-256 hash (`apiKeyHash`), not plaintext key",
@@ -114,22 +114,23 @@ async function runMilestone10Tests() {
     // Test 4: Device Credentials Authentication Check
     // ----------------------------------------------------
     console.log("\n[Test 4] Testing Device Authentication via `device-auth.ts`...");
-    const authResultValid = await authenticateDevice(createdDeviceId, firstApiKey, {
+    const authResultValid = await authenticateDevice(createdDeviceCode, firstApiKey, {
       timestamp: Date.now(),
       nonce: crypto.randomUUID(),
     });
     assert(
-      authResultValid.isValid === true && (authResultValid.device?.id === createdDeviceId || authResultValid.device?.uuidId === createdDeviceId),
+      authResultValid.isValid === true &&
+        (authResultValid.device?.id === createdDeviceCode || authResultValid.device?.deviceCode === createdDeviceCode),
       "Test 4: Correct plaintext API key authenticates successfully against device-auth.ts"
     );
 
-    const authResultMissingReplay = await authenticateDevice(createdDeviceId, firstApiKey);
+    const authResultMissingReplay = await authenticateDevice(createdDeviceCode, firstApiKey);
     assert(
       authResultMissingReplay.isValid === false,
       "Test 4: Missing timestamp or nonce is rejected by device-auth.ts"
     );
 
-    const authResultInvalid = await authenticateDevice(createdDeviceId, "invalid_wrong_key", {
+    const authResultInvalid = await authenticateDevice(createdDeviceCode, "invalid_wrong_key", {
       timestamp: Date.now(),
       nonce: crypto.randomUUID(),
     });
@@ -157,7 +158,7 @@ async function runMilestone10Tests() {
       where: { deviceName: { contains: "M10 Test", mode: "insensitive" } },
     });
     assert(
-      searchByName.some((d) => d.uuidId === createdDeviceId),
+      searchByName.some((d) => d.deviceCode === createdDeviceCode),
       "Test 6: Search by deviceName matches created device"
     );
 
@@ -165,7 +166,7 @@ async function runMilestone10Tests() {
       where: { serialNumber: testSerial },
     });
     assert(
-      searchBySerial.length === 1 && searchBySerial[0].uuidId === createdDeviceId,
+      searchBySerial.length === 1 && searchBySerial[0].deviceCode === createdDeviceCode,
       "Test 6: Search by serialNumber matches exact device"
     );
 
@@ -173,7 +174,7 @@ async function runMilestone10Tests() {
       where: { status: "online" },
     });
     assert(
-      filterByStatus.some((d) => d.uuidId === createdDeviceId),
+      filterByStatus.some((d) => d.deviceCode === createdDeviceCode),
       "Test 6: Filter by status='online' matches created device"
     );
 
@@ -181,7 +182,7 @@ async function runMilestone10Tests() {
       where: { deviceType: "camera" },
     });
     assert(
-      filterByType.some((d) => d.uuidId === createdDeviceId),
+      filterByType.some((d) => d.deviceCode === createdDeviceCode),
       "Test 6: Filter by deviceType='camera' matches created device"
     );
 
@@ -190,7 +191,7 @@ async function runMilestone10Tests() {
     // ----------------------------------------------------
     console.log("\n[Test 7] Testing Device Update (PATCH)...");
     const updatedDevice = await prisma.device.update({
-      where: { uuidId: createdDeviceId },
+      where: { deviceCode: createdDeviceCode },
       data: {
         deviceName: "Updated M10 Front Camera",
         location: "Building B - Side Gate",
@@ -212,11 +213,11 @@ async function runMilestone10Tests() {
     const newApiKeyHash = crypto.createHash("sha256").update(newRawApiKey).digest("hex");
 
     await prisma.device.update({
-      where: { uuidId: createdDeviceId },
+      where: { deviceCode: createdDeviceCode },
       data: { apiKeyHash: newApiKeyHash },
     });
 
-    const authResultOldKey = await authenticateDevice(createdDeviceId, firstApiKey, {
+    const authResultOldKey = await authenticateDevice(createdDeviceCode, firstApiKey, {
       timestamp: Date.now(),
       nonce: crypto.randomUUID(),
     });
@@ -225,7 +226,7 @@ async function runMilestone10Tests() {
       "Test 8: Previous API key is immediately invalidated after regeneration"
     );
 
-    const authResultNewKey = await authenticateDevice(createdDeviceId, secondApiKey, {
+    const authResultNewKey = await authenticateDevice(createdDeviceCode, secondApiKey, {
       timestamp: Date.now(),
       nonce: crypto.randomUUID(),
     });
@@ -240,7 +241,8 @@ async function runMilestone10Tests() {
     console.log("\n[Test 9] Testing Device Health Endpoint Structure...");
     const healthMockRes = {
       success: true,
-      deviceId: createdDeviceId,
+      deviceId: createdDeviceCode,
+      deviceCode: createdDeviceCode,
       status: "online",
       hardwareConnected: false,
       hardwareTelemetryAvailable: false,
@@ -260,7 +262,7 @@ async function runMilestone10Tests() {
     const mockLog = await prisma.accessLog.create({
       data: {
         accessCode: generateAccessCode(),
-        deviceUuidId: createdDeviceId,
+        deviceCode: createdDeviceCode,
         matchStatus: "matched",
         accessStatus: "granted",
         reason: "face_match",
@@ -269,12 +271,12 @@ async function runMilestone10Tests() {
         processingTimeMs: 45,
       },
     });
-    mockLogId = mockLog.uuidId;
+    mockAccessCode = mockLog.accessCode;
 
     const mockAlert = await prisma.alert.create({
       data: {
         alertCode: generateAlertCode(),
-        deviceUuidId: createdDeviceId,
+        deviceCode: createdDeviceCode,
         alertType: "unauthorized_access",
         title: "M10 Test Alert",
         message: "Test unauthorized access alert",
@@ -282,18 +284,18 @@ async function runMilestone10Tests() {
         resolved: false,
       },
     });
-    mockAlertId = mockAlert.uuidId;
+    mockAlertCode = mockAlert.alertCode;
 
-    const deviceLogs = await prisma.accessLog.findMany({ where: { deviceUuidId: createdDeviceId } });
+    const deviceLogs = await prisma.accessLog.findMany({ where: { deviceCode: createdDeviceCode } });
     assert(
-      deviceLogs.some((l) => l.uuidId === mockLog.uuidId),
-      "Test 10: Device access log associated correctly with device ID"
+      deviceLogs.some((l) => l.accessCode === mockLog.accessCode),
+      "Test 10: Device access log associated correctly with deviceCode"
     );
 
-    const deviceAlerts = await prisma.alert.findMany({ where: { deviceUuidId: createdDeviceId } });
+    const deviceAlerts = await prisma.alert.findMany({ where: { deviceCode: createdDeviceCode } });
     assert(
-      deviceAlerts.some((a) => a.uuidId === mockAlert.uuidId),
-      "Test 10: Device security alert associated correctly with device ID"
+      deviceAlerts.some((a) => a.alertCode === mockAlert.alertCode),
+      "Test 10: Device security alert associated correctly with deviceCode"
     );
 
     // ----------------------------------------------------
@@ -310,25 +312,25 @@ async function runMilestone10Tests() {
     // Test 12: Device Deletion Preserves Access Logs & Alerts (SetNull)
     // ----------------------------------------------------
     console.log("\n[Test 12] Testing Device Deletion Log Preservation (`onDelete: SetNull`)...");
-    await prisma.device.delete({ where: { uuidId: createdDeviceId } });
+    await prisma.device.delete({ where: { deviceCode: createdDeviceCode } });
 
-    const preservedLog = await prisma.accessLog.findUnique({ where: { uuidId: mockLog.uuidId } });
+    const preservedLog = await prisma.accessLog.findUnique({ where: { accessCode: mockLog.accessCode } });
     assert(
-      preservedLog !== null && preservedLog.deviceUuidId === null,
-      "Test 12: Historical AccessLog record preserved with deviceId=null after device deletion"
+      preservedLog !== null && preservedLog.deviceCode === null,
+      "Test 12: Historical AccessLog record preserved with deviceCode=null after device deletion"
     );
 
-    const preservedAlert = await prisma.alert.findUnique({ where: { uuidId: mockAlert.uuidId } });
+    const preservedAlert = await prisma.alert.findUnique({ where: { alertCode: mockAlert.alertCode } });
     assert(
-      preservedAlert !== null && preservedAlert.deviceUuidId === null,
-      "Test 12: Historical Alert record preserved with deviceId=null after device deletion"
+      preservedAlert !== null && preservedAlert.deviceCode === null,
+      "Test 12: Historical Alert record preserved with deviceCode=null after device deletion"
     );
 
     // Clean up test records
-    await prisma.accessLog.delete({ where: { uuidId: mockLog.uuidId } });
-    mockLogId = null;
-    await prisma.alert.delete({ where: { uuidId: mockAlert.uuidId } });
-    mockAlertId = null;
+    await prisma.accessLog.delete({ where: { accessCode: mockLog.accessCode } });
+    mockAccessCode = null;
+    await prisma.alert.delete({ where: { alertCode: mockAlert.alertCode } });
+    mockAlertCode = null;
 
   } catch (err: unknown) {
     console.error("❌ Test suite encountered unhandled exception:", err);
@@ -337,9 +339,9 @@ async function runMilestone10Tests() {
   } finally {
     // Teardown safety: ensure orphaned test fixtures are purged even if assertions failed
     try {
-      if (mockLogId) await prisma.accessLog.delete({ where: { uuidId: mockLogId } }).catch(() => {});
-      if (mockAlertId) await prisma.alert.delete({ where: { uuidId: mockAlertId } }).catch(() => {});
-      if (createdDeviceId) await prisma.device.delete({ where: { uuidId: createdDeviceId } }).catch(() => {});
+      if (mockAccessCode) await prisma.accessLog.delete({ where: { accessCode: mockAccessCode } }).catch(() => {});
+      if (mockAlertCode) await prisma.alert.delete({ where: { alertCode: mockAlertCode } }).catch(() => {});
+      if (createdDeviceCode) await prisma.device.delete({ where: { deviceCode: createdDeviceCode } }).catch(() => {});
     } catch (_) {}
   }
 

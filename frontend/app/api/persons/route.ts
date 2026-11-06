@@ -10,7 +10,11 @@ import {
 } from "@/lib/ai/duplicate-check";
 import { uploadFaceImage, deleteFaceImage } from "@/lib/ai/imagekit";
 import { getServerSession } from "@/lib/get-session";
-import { generatePersonCode, generateEmbeddingCode } from "@/lib/identifiers";
+import {
+  generatePersonCode,
+  generateEmbeddingCode,
+  generateUniqueBusinessIdentifier,
+} from "@/lib/identifiers";
 import { PersonCategory, PersonStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -138,7 +142,17 @@ export async function POST(req: NextRequest) {
     uploadedFileId = ikResult.fileId; // Save for cleanup in case database creation fails
 
     // 6. Step D: Create Person and FaceEmbedding records atomically in PostgreSQL
-    const personCode = generatePersonCode();
+    const personCode = await generateUniqueBusinessIdentifier(
+      generatePersonCode,
+      async (code) => {
+        const existing = await prisma.person.findUnique({
+          where: { personCode: code },
+          select: { personCode: true },
+        });
+        return existing !== null;
+      },
+      { entityName: "Person" }
+    );
 
     // Wrap database creation in a transaction and try-catch for ImageKit cleanup
     try {
@@ -175,16 +189,26 @@ export async function POST(req: NextRequest) {
           });
 
           const vectorLiteral = `[${aiResult.embedding.join(",")}]`;
-          const embeddingCode = generateEmbeddingCode();
+          const embeddingCode = await generateUniqueBusinessIdentifier(
+            generateEmbeddingCode,
+            async (code) => {
+              const existing = await tx.faceEmbedding.findUnique({
+                where: { embeddingCode: code },
+                select: { embeddingCode: true },
+              });
+              return existing !== null;
+            },
+            { entityName: "FaceEmbedding" }
+          );
           await tx.$executeRawUnsafe(
             `
             INSERT INTO face_embeddings (
-              person_uuid_id, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
+              person_code, embedding_code, embedding, embedding_model, image_path, quality_score, is_active, created_at, updated_at
             ) VALUES (
-              $1::uuid, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
+              $1, $2, $3::vector, $4, $5, $6, true, NOW(), NOW()
             );
             `,
-            createdPerson.uuidId,
+            createdPerson.personCode,
             embeddingCode,
             vectorLiteral,
             activeModel,
@@ -203,8 +227,7 @@ export async function POST(req: NextRequest) {
           success: true,
           message: "Person registered successfully",
           person: {
-            id: newPerson.uuidId,
-            uuidId: newPerson.uuidId,
+            id: newPerson.personCode,
             personCode: newPerson.personCode,
             firstName: newPerson.firstName,
             lastName: newPerson.lastName,
@@ -352,7 +375,6 @@ export async function GET(req: NextRequest) {
       take: limit,
       orderBy: { createdAt: "desc" },
       select: {
-        uuidId: true,
         personCode: true,
         firstName: true,
         lastName: true,
@@ -368,7 +390,7 @@ export async function GET(req: NextRequest) {
           where: { isActive: true },
           take: 1,
           select: {
-            uuidId: true,
+            embeddingCode: true,
             embeddingModel: true,
             qualityScore: true,
             isActive: true,
@@ -387,8 +409,7 @@ export async function GET(req: NextRequest) {
       }
 
       return {
-        id: p.uuidId,
-        uuidId: p.uuidId,
+        id: p.personCode,
         personCode: p.personCode,
         firstName: p.firstName,
         lastName: p.lastName,
@@ -403,8 +424,8 @@ export async function GET(req: NextRequest) {
         embeddingStatus,
         embedding: activeEmbedding
           ? {
-              id: activeEmbedding.uuidId,
-              uuidId: activeEmbedding.uuidId,
+              id: activeEmbedding.embeddingCode,
+              embeddingCode: activeEmbedding.embeddingCode,
               model: activeEmbedding.embeddingModel,
               qualityScore: activeEmbedding.qualityScore,
               createdAt: activeEmbedding.createdAt,

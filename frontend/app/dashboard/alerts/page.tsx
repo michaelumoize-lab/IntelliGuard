@@ -28,18 +28,13 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const search = (params.search || "").trim();
   const severityFilter = (params.severity || "").trim().toLowerCase();
   const resolvedFilter = params.resolved === undefined ? "false" : params.resolved;
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const rawDeviceId = params.deviceId ? String(params.deviceId).trim() : undefined;
   const deviceIdParam = rawDeviceId ? `&deviceId=${encodeURIComponent(rawDeviceId)}` : "";
 
   const where: Prisma.AlertWhereInput = {};
 
   if (rawDeviceId) {
-    if (UUID_REGEX.test(rawDeviceId)) {
-      where.deviceUuidId = rawDeviceId;
-    } else {
-      where.device = { deviceCode: rawDeviceId };
-    }
+    where.deviceCode = rawDeviceId;
   }
 
   if (severityFilter && ["low", "medium", "high", "critical"].includes(severityFilter)) {
@@ -57,6 +52,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     if (terms.length > 0) {
       where.AND = terms.map((term) => ({
         OR: [
+          { alertCode: { contains: term, mode: "insensitive" } },
           { title: { contains: term, mode: "insensitive" } },
           { message: { contains: term, mode: "insensitive" } },
         ],
@@ -76,7 +72,6 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     include: {
       person: {
         select: {
-          uuidId: true,
           personCode: true,
           firstName: true,
           lastName: true,
@@ -86,7 +81,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   });
 
   const alerts: SecurityAlertItem[] = rawAlerts.map((alt) => ({
-    id: alt.uuidId,
+    id: alt.alertCode,
     alertCode: alt.alertCode,
     alertType: alt.alertType,
     title: alt.title,
@@ -96,7 +91,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     createdAt: alt.createdAt.toISOString(),
     person: alt.person
       ? {
-          id: alt.person.uuidId,
+          id: alt.person.personCode,
           personCode: alt.person.personCode,
           firstName: alt.person.firstName,
           lastName: alt.person.lastName,

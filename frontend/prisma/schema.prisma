@@ -25,7 +25,7 @@ model User {
   banExpires    DateTime?
   sessions      Session[]
   accounts      Account[]
-  alerts        Alert[]     @relation("ResolvedAlerts")
+  alerts        Alert[]   @relation("ResolvedAlerts")
 
   @@unique([email])
   @@map("user")
@@ -97,52 +97,48 @@ enum PersonStatus {
 }
 
 model Person {
-  uuidId          String          @id @default(dbgenerated("uuidv7()")) @map("uuid_id") @db.Uuid
-  personCode      String          @unique @map("person_code")
-  firstName       String          @map("first_name")
-  lastName        String          @map("last_name")
-  email           String?         @unique
-  phone           String?         @unique
+  personCode      String         @id @map("person_code")
+  firstName       String         @map("first_name")
+  lastName        String         @map("last_name")
+  email           String?        @unique
+  phone           String?        @unique
   category        PersonCategory
-  department      String?         @db.VarChar(100)
-  status          PersonStatus    @default(active)
-  faceImageUrl    String?         @map("face_image_url")
-  faceImageFileId String?         @map("face_image_file_id")
+  department      String?        @db.VarChar(100)
+  status          PersonStatus   @default(active)
+  faceImageUrl    String?        @map("face_image_url")
+  faceImageFileId String?        @map("face_image_file_id")
   notes           String?
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   faceEmbeddings FaceEmbedding[]
   accessLogs     AccessLog[]
   alerts         Alert[]
 
-  @@index([personCode], map: "idx_person_code")
   @@index([status], map: "idx_person_status")
   @@map("persons")
 }
 
 model FaceEmbedding {
-  uuidId                String   @id @default(dbgenerated("uuidv7()")) @map("uuid_id") @db.Uuid
-  embeddingCode         String   @unique @map("embedding_code")
-  personUuidId          String   @map("person_uuid_id") @db.Uuid
-  embedding             Unsupported("vector(512)")
-  embeddingModel        String   @default("buffalo_s") @map("embedding_model") @db.VarChar(100)
-  embeddingModelVersion String?  @map("embedding_model_version") @db.VarChar(50)
-  imagePath             String   @map("image_path")
-  imageHash             String?  @unique @map("image_hash")
-  qualityScore          Float?   @map("quality_score")
-  isActive              Boolean  @default(true) @map("is_active")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  embeddingCode         String                      @id @map("embedding_code")
+  personCode            String                      @map("person_code")
+  embedding             Unsupported("vector(512)")?
+  embeddingModel        String                      @default("buffalo_s") @map("embedding_model") @db.VarChar(100)
+  embeddingModelVersion String?                     @map("embedding_model_version") @db.VarChar(50)
+  imagePath             String                      @map("image_path")
+  imageHash             String?                     @unique @map("image_hash")
+  qualityScore          Float?                      @map("quality_score")
+  isActive              Boolean                     @default(true) @map("is_active")
+  createdAt             DateTime                    @default(now()) @map("created_at")
+  updatedAt             DateTime                    @updatedAt @map("updated_at")
 
-  person     Person      @relation(fields: [personUuidId], references: [uuidId], onDelete: Cascade)
+  person     Person      @relation(fields: [personCode], references: [personCode], onDelete: Cascade)
   accessLogs AccessLog[]
 
   // Note: PostgreSQL HNSW vector index is applied via pgvector:
   // CREATE INDEX idx_face_embeddings_hnsw ON face_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
-  @@index([embeddingCode], map: "idx_embedding_code")
   @@index([isActive], map: "idx_face_embedding_active")
-  @@index([personUuidId], map: "idx_face_embedding_person_uuid")
+  @@index([personCode], map: "idx_face_embedding_person_code")
   @@map("face_embeddings")
 }
 
@@ -161,8 +157,7 @@ enum DeviceStatus {
 }
 
 model Device {
-  uuidId          String       @id @default(dbgenerated("uuidv7()")) @map("uuid_id") @db.Uuid
-  deviceCode      String       @unique @map("device_code")
+  deviceCode      String       @id @map("device_code")
   deviceName      String       @map("device_name") @db.VarChar(100)
   serialNumber    String       @unique @map("serial_number")
   apiKeyHash      String       @unique @map("api_key_hash")
@@ -178,7 +173,6 @@ model Device {
   accessLogs AccessLog[]
   alerts     Alert[]
 
-  @@index([deviceCode], map: "idx_device_code")
   @@index([serialNumber], map: "idx_device_serial")
   @@index([apiKeyHash], map: "idx_device_api_key_hash")
   @@map("devices")
@@ -218,17 +212,14 @@ enum DoorAction {
 }
 
 model AccessLog {
-  uuidId            String       @id @default(dbgenerated("uuidv7()")) @map("uuid_id") @db.Uuid
-  accessCode        String       @unique @map("access_code")
-  deviceUuidId      String?      @map("device_uuid_id") @db.Uuid
-  personUuidId      String?      @map("person_uuid_id") @db.Uuid
-  embeddingUuidId   String?      @map("embedding_uuid_id") @db.Uuid
-  
+  accessCode        String       @id @map("access_code")
+  deviceCode        String?      @map("device_code")
+  personCode        String?      @map("person_code")
+  embeddingCode     String?      @map("embedding_code")
   matchStatus       MatchStatus  @map("match_status")
   accessStatus      AccessStatus @map("access_status")
   reason            AccessReason
   doorAction        DoorAction   @default(no_action) @map("door_action")
-  
   confidenceScore   Float?       @map("confidence_score")
   embeddingDistance Float?       @map("embedding_distance")
   capturedImagePath String?      @map("captured_image_path")
@@ -236,14 +227,13 @@ model AccessLog {
   createdAt         DateTime     @default(now()) @map("created_at")
 
   // Relations
-  device    Device?        @relation(fields: [deviceUuidId], references: [uuidId], onDelete: SetNull)
-  person    Person?        @relation(fields: [personUuidId], references: [uuidId], onDelete: SetNull)
-  embedding FaceEmbedding? @relation(fields: [embeddingUuidId], references: [uuidId], onDelete: SetNull)
+  device        Device?        @relation(fields: [deviceCode], references: [deviceCode], onDelete: SetNull)
+  person        Person?        @relation(fields: [personCode], references: [personCode], onDelete: SetNull)
+  faceEmbedding FaceEmbedding? @relation(fields: [embeddingCode], references: [embeddingCode], onDelete: SetNull)
 
-  @@index([accessCode], map: "idx_access_code")
-  @@index([deviceUuidId], map: "idx_accesslog_device_uuid")
-  @@index([personUuidId], map: "idx_accesslog_person_uuid")
-  @@index([embeddingUuidId], map: "idx_accesslog_embedding_uuid")
+  @@index([deviceCode], map: "idx_accesslog_device_code")
+  @@index([personCode], map: "idx_accesslog_person_code")
+  @@index([embeddingCode], map: "idx_accesslog_embedding_code")
   @@index([createdAt], map: "idx_accesslog_created")
   @@index([accessStatus], map: "idx_accesslog_status")
   @@map("access_logs")
@@ -264,29 +254,27 @@ enum Severity {
 }
 
 model Alert {
-  uuidId       String        @id @default(dbgenerated("uuidv7()")) @map("uuid_id") @db.Uuid
-  alertCode    String        @unique @map("alert_code")
-  deviceUuidId String?       @map("device_uuid_id") @db.Uuid
-  personUuidId String?       @map("person_uuid_id") @db.Uuid
-  alertType    AlertType     @map("alert_type")
-  title        String        @db.VarChar(150)
-  message      String        @db.Text
-  severity     Severity      @default(medium)
-  imagePath    String?       @map("image_path")
-  resolved     Boolean       @default(false)
-  resolvedBy   String?       @map("resolved_by")
-  resolvedAt   DateTime?     @map("resolved_at")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  alertCode  String    @id @map("alert_code")
+  deviceCode String?   @map("device_code")
+  personCode String?   @map("person_code")
+  alertType  AlertType @map("alert_type")
+  title      String    @db.VarChar(150)
+  message    String    @db.Text
+  severity   Severity  @default(medium)
+  imagePath  String?   @map("image_path")
+  resolved   Boolean   @default(false)
+  resolvedBy String?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  device   Device? @relation(fields: [deviceUuidId], references: [uuidId], onDelete: SetNull)
-  person   Person? @relation(fields: [personUuidId], references: [uuidId], onDelete: SetNull)
+  device   Device? @relation(fields: [deviceCode], references: [deviceCode], onDelete: SetNull)
+  person   Person? @relation(fields: [personCode], references: [personCode], onDelete: SetNull)
   resolver User?   @relation("ResolvedAlerts", fields: [resolvedBy], references: [id], onDelete: SetNull)
 
-  @@index([alertCode], map: "idx_alert_code")
   @@index([resolved], map: "idx_alert_resolved")
   @@index([createdAt], map: "idx_alert_created")
-  @@index([deviceUuidId], map: "idx_alerts_device_uuid")
-  @@index([personUuidId], map: "idx_alerts_person_uuid")
+  @@index([deviceCode], map: "idx_alerts_device_code")
+  @@index([personCode], map: "idx_alerts_person_code")
   @@map("alerts")
 }

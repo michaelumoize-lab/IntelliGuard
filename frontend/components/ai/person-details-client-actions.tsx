@@ -9,8 +9,7 @@ import { ReplaceFaceModal } from "@/components/ai/replace-face-modal";
 import { PencilIcon, CameraIcon, UserCheckIcon, UserXIcon, Loader2 } from "lucide-react";
 
 export interface PersonDetailsData extends PersonModalInitialData {
-  id: string | number;
-  uuidId?: string;
+  id: string;
   personCode: string;
   firstName: string;
   lastName: string;
@@ -64,7 +63,7 @@ export function PersonDetailsStatusToggle({ person }: { person: PersonDetailsDat
     setIsLoading(true);
 
     try {
-      const res = await fetch(`/api/persons/${person.id}`, {
+      const res = await fetch(`/api/persons/${person.personCode || person.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),

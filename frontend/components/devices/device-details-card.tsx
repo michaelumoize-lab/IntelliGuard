@@ -9,9 +9,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 
 interface DeviceDetailsCardProps {
   device: {
-    id: string | number;
-    uuidId?: string;
-    deviceCode?: string;
+    id: string;
+    deviceCode: string;
     deviceName: string;
     serialNumber: string;
     location: string;
@@ -32,11 +31,11 @@ export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDet
 
   const handleCopyId = async () => {
     try {
-      await navigator.clipboard.writeText(device.deviceCode || String(device.id));
+      await navigator.clipboard.writeText(device.deviceCode || device.id);
       setCopiedId(true);
       setTimeout(() => setCopiedId(false), 2000);
     } catch (err) {
-      console.error("Failed to copy device ID:", err);
+      console.error("Failed to copy device code:", err);
     }
   };
 
@@ -55,9 +54,9 @@ export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDet
                   type="button"
                   onClick={handleCopyId}
                   className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded bg-muted/60 hover:bg-muted font-semibold text-foreground transition-colors group cursor-pointer"
-                  aria-label="Copy Device ID"
+                  aria-label="Copy Device Code"
                 >
-                  <span>{device.deviceCode || `ID: #${String(device.id).slice(0, 8)}`}</span>
+                  <span>{device.deviceCode || device.id}</span>
                   {copiedId ? (
                     <Check className="h-3 w-3 text-emerald-500" />
                   ) : (
@@ -66,7 +65,7 @@ export function DeviceDetailsCard({ device, onEdit, onRegenerateKey }: DeviceDet
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {copiedId ? "Copied!" : "Copy Device ID"}
+                {copiedId ? "Copied!" : "Copy Device Code"}
               </TooltipContent>
             </Tooltip>
             <span>•</span>

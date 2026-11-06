@@ -2,8 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-session";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isValidDeviceCode } from "@/lib/identifiers";
 
 export const dynamic = "force-dynamic";
 
@@ -26,15 +25,15 @@ export async function POST(
   if (authCheck.error) return authCheck.error;
 
   const { id: idParam } = await params;
-  if (!idParam || !UUID_REGEX.test(idParam)) {
+  if (!idParam || !isValidDeviceCode(idParam)) {
     return NextResponse.json(
-      { success: false, error: "VALIDATION_ERROR", message: "Invalid device ID format. Expected UUIDv7." },
+      { success: false, error: "VALIDATION_ERROR", message: "Invalid device code format. Expected DEV-XXXXXX." },
       { status: 400 }
     );
   }
 
   try {
-    const existing = await prisma.device.findUnique({ where: { uuidId: idParam } });
+    const existing = await prisma.device.findUnique({ where: { deviceCode: idParam } });
     if (!existing) {
       return NextResponse.json(
         { success: false, error: "NOT_FOUND", message: "Device not found." },
@@ -46,7 +45,7 @@ export async function POST(
     const apiKeyHash = crypto.createHash("sha256").update(rawApiKey).digest("hex");
 
     await prisma.device.update({
-      where: { uuidId: idParam },
+      where: { deviceCode: idParam },
       data: { apiKeyHash },
     });
 

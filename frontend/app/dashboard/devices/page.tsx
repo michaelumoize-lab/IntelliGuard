@@ -51,6 +51,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
 
   if (search) {
     whereClause.OR = [
+      { deviceCode: { contains: search, mode: "insensitive" } },
       { deviceName: { contains: search, mode: "insensitive" } },
       { serialNumber: { contains: search, mode: "insensitive" } },
       { location: { contains: search, mode: "insensitive" } },
@@ -109,8 +110,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
 
   // Map Prisma data to clean serializable items for client table
   const devices: DeviceTableItem[] = rawDevices.map((device) => ({
-    id: device.uuidId,
-    uuidId: device.uuidId,
+    id: device.deviceCode,
     deviceCode: device.deviceCode,
     deviceName: device.deviceName,
     serialNumber: device.serialNumber,

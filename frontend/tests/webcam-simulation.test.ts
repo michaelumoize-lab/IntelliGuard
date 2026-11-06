@@ -274,14 +274,14 @@ async function runWebcamSimulationTests() {
         orderBy: { createdAt: "desc" },
       });
       if (createdSysAlert) {
-        await prisma.alert.delete({ where: { uuidId: createdSysAlert.uuidId } }).catch(() => {});
+        await prisma.alert.delete({ where: { alertCode: createdSysAlert.alertCode } }).catch(() => {});
       }
       const createdSysLog = await prisma.accessLog.findFirst({
         where: { reason: "system_error", matchStatus: "rejected" },
         orderBy: { createdAt: "desc" },
       });
       if (createdSysLog) {
-        await prisma.accessLog.delete({ where: { uuidId: createdSysLog.uuidId } }).catch(() => {});
+        await prisma.accessLog.delete({ where: { accessCode: createdSysLog.accessCode } }).catch(() => {});
       }
 
       if (

@@ -29,8 +29,6 @@ interface AccessLogsPageProps {
   }>;
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export default async function AccessLogsPage({ searchParams }: AccessLogsPageProps) {
   const params = await searchParams;
   const rawPage = parseInt(params.page || "1", 10);
@@ -45,11 +43,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
   const where: Prisma.AccessLogWhereInput = {};
 
   if (rawDeviceId) {
-    if (UUID_REGEX.test(rawDeviceId)) {
-      where.deviceUuidId = rawDeviceId;
-    } else {
-      where.device = { deviceCode: rawDeviceId };
-    }
+    where.deviceCode = rawDeviceId;
   }
 
   if (statusFilter && ["granted", "denied"].includes(statusFilter)) {
@@ -65,9 +59,11 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
     if (terms.length > 0) {
       where.AND = terms.map((term) => ({
         OR: [
+          { accessCode: { contains: term, mode: "insensitive" } },
           { person: { firstName: { contains: term, mode: "insensitive" } } },
           { person: { lastName: { contains: term, mode: "insensitive" } } },
           { person: { personCode: { contains: term, mode: "insensitive" } } },
+          { device: { deviceCode: { contains: term, mode: "insensitive" } } },
         ],
       }));
     }
@@ -85,7 +81,6 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
     include: {
       person: {
         select: {
-          uuidId: true,
           personCode: true,
           firstName: true,
           lastName: true,
@@ -95,7 +90,6 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
       },
       device: {
         select: {
-          uuidId: true,
           deviceCode: true,
           deviceName: true,
           serialNumber: true,
@@ -123,7 +117,7 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
         <div className="flex items-center gap-2">
           <ExportLogsButton
             logs={logs.map((l) => ({
-              id: l.uuidId,
+              id: l.accessCode,
               createdAt: l.createdAt,
               personName: l.person ? `${l.person.firstName} ${l.person.lastName}` : null,
               personCode: l.person?.personCode || null,
@@ -215,15 +209,15 @@ export default async function AccessLogsPage({ searchParams }: AccessLogsPagePro
                   }
 
                   return (
-                    <TableRow key={log.uuidId} className="hover:bg-muted/40 transition-colors">
-                      <TableCell className="py-3.5 font-mono text-muted-foreground">{log.accessCode || `#${log.uuidId.slice(0, 8)}`}</TableCell>
+                    <TableRow key={log.accessCode} className="hover:bg-muted/40 transition-colors">
+                      <TableCell className="py-3.5 font-mono text-muted-foreground">{log.accessCode}</TableCell>
                       <TableCell className="py-3.5 font-mono text-muted-foreground whitespace-nowrap">
                         <FormattedTimestamp date={log.createdAt} mode="datetime" />
                       </TableCell>
                       <TableCell className="py-3.5">
                         {log.person ? (
                           <Link
-                            href={`/dashboard/persons/${log.person.uuidId}`}
+                            href={`/dashboard/persons/${log.person.personCode}`}
                             className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1.5 flex-wrap"
                           >
                             <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />

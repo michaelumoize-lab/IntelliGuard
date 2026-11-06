@@ -9,7 +9,7 @@ export function SystemHealthPanel() {
   const { health, isLoading, isRefreshing, isError, dataUpdatedAt, refresh } = useSystemHealth();
 
   const lastChecked = dataUpdatedAt
-    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
     : null;
 
   const getStatusBadge = (status: string) => {
