@@ -44,7 +44,7 @@ export default async function DashboardLayout({
 
           <SidebarInset className="flex flex-col flex-1 bg-background min-w-0">
             {/* Top Navbar Header aligned seamlessly at h-14 with Sidebar Header */}
-            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-2 sm:px-4 md:px-6 backdrop-blur-md">
+            <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/80 px-2 sm:px-4 md:px-6 backdrop-blur-md">
               {/* Left Section: Sidebar Toggle + Breadcrumb */}
               <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
                 <Tooltip>
@@ -114,7 +114,7 @@ export default async function DashboardLayout({
             </header>
 
             {/* Main Page Content */}
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1 overflow-y-auto relative z-0">
               {children}
             </main>
 
